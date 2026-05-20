@@ -1,0 +1,5 @@
+# Supabase CLI — link once: npx supabase link --project-ref vzwbctsrunszxzmfhxch
+project_id = "vzwbctsrunszxzmfhxch"
+
+[db]
+major_version = 15

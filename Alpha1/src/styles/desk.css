@@ -1,0 +1,92 @@
+/**
+ * Premium desk UI — surfaces, restrained atmosphere, layout rhythm.
+ * Active when `data-ui="desk"` on `<html>` (see desk-ui-boot.ts).
+ */
+
+html[data-ui="desk"] {
+  --space-section: 1.5rem;
+  --space-section-lg: 2rem;
+  --radius-desk: 1.125rem;
+  --desk-panel-blur: 18px;
+  --shadow-panel: 0 28px 72px -16px rgba(0, 0, 0, 0.48);
+}
+
+/* Quieter atmosphere */
+html[data-ui="desk"] body {
+  background-image:
+    radial-gradient(ellipse 130% 90% at -8% -15%, rgb(var(--holo-a) / 0.1), transparent 52%),
+    radial-gradient(ellipse 95% 75% at 108% 5%, rgb(var(--holo-b) / 0.08), transparent 48%),
+    radial-gradient(ellipse 85% 65% at 42% 108%, rgb(var(--holo-c) / 0.06), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 72% 38%, rgb(var(--gradient-bloom) / 0.1), transparent 50%),
+    linear-gradient(
+      168deg,
+      rgb(var(--bg-canvas)) 0%,
+      rgb(var(--gradient-mid)) 42%,
+      rgb(var(--bg-gradient-end)) 100%
+    );
+}
+
+html[data-ui="desk"] .vision-aurora {
+  opacity: 0.42;
+  animation-duration: 32s;
+}
+
+html[data-ui="desk"] .vision-vignette {
+  opacity: 0.85;
+}
+
+html[data-ui="desk"] .vision-noise {
+  opacity: 0.06;
+}
+
+html[data-ui="desk"] .vision-webgl {
+  opacity: 0.28;
+}
+
+.desk-surface {
+  background: rgb(var(--bg-panel) / 0.52);
+  backdrop-filter: blur(var(--desk-panel-blur));
+  -webkit-backdrop-filter: blur(var(--desk-panel-blur));
+}
+
+.desk-surface-raised {
+  background: rgb(var(--bg-panel-raised) / 0.68);
+  backdrop-filter: blur(var(--desk-panel-blur));
+  -webkit-backdrop-filter: blur(var(--desk-panel-blur));
+  box-shadow: inset 0 1px 0 rgb(var(--panel-shine));
+}
+
+.desk-divider {
+  border-color: rgb(var(--border-subtle) / 0.5);
+}
+
+.desk-nav-cluster {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  border-radius: 1rem;
+  padding: 0.25rem;
+  background: rgb(var(--bg-panel-raised) / 0.42);
+  backdrop-filter: blur(var(--desk-panel-blur));
+  -webkit-backdrop-filter: blur(var(--desk-panel-blur));
+}
+
+.desk-dock {
+  background: rgb(var(--bg-panel) / 0.78);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow: var(--shadow-panel), inset 0 1px 0 rgb(var(--panel-shine));
+  border: 1px solid rgb(var(--border-subtle) / 0.85);
+}
+
+/* Floating mobile dock needs extra scroll padding */
+html[data-ui="desk"] .pb-global-nav {
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 1024px) {
+  html[data-ui="desk"] .pb-global-nav,
+  html[data-ui="desk"] .pb-scanner-mobile {
+    padding-bottom: 1.75rem;
+  }
+}

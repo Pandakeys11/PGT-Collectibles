@@ -1,0 +1,380 @@
+[
+  {
+    "setId": "si1",
+    "name": "Southern Islands",
+    "bucket": "special",
+    "era": "2001"
+  },
+  {
+    "setId": "basep",
+    "name": "Wizards Black Star Promos",
+    "bucket": "promo",
+    "era": "1999–2003"
+  },
+  {
+    "setId": "bp",
+    "name": "Best of Game",
+    "bucket": "promo",
+    "era": "2002–2003"
+  },
+  {
+    "setId": "base6",
+    "name": "Legendary Collection",
+    "bucket": "special",
+    "era": "2002"
+  },
+  {
+    "setId": "np",
+    "name": "Nintendo Black Star Promos",
+    "bucket": "promo",
+    "era": "2003–2006"
+  },
+  {
+    "setId": "tk1a",
+    "name": "EX Trainer Kit Latias",
+    "bucket": "promo",
+    "era": "2004"
+  },
+  {
+    "setId": "tk1b",
+    "name": "EX Trainer Kit Latios",
+    "bucket": "promo",
+    "era": "2004"
+  },
+  {
+    "setId": "pop1",
+    "name": "POP Series 1",
+    "bucket": "promo",
+    "era": "2004"
+  },
+  {
+    "setId": "pop2",
+    "name": "POP Series 2",
+    "bucket": "promo",
+    "era": "2005"
+  },
+  {
+    "setId": "tk2a",
+    "name": "EX Trainer Kit 2 Plusle",
+    "bucket": "promo",
+    "era": "2006"
+  },
+  {
+    "setId": "tk2b",
+    "name": "EX Trainer Kit 2 Minun",
+    "bucket": "promo",
+    "era": "2006"
+  },
+  {
+    "setId": "pop3",
+    "name": "POP Series 3",
+    "bucket": "promo",
+    "era": "2006"
+  },
+  {
+    "setId": "pop4",
+    "name": "POP Series 4",
+    "bucket": "promo",
+    "era": "2006"
+  },
+  {
+    "setId": "pop5",
+    "name": "POP Series 5",
+    "bucket": "promo",
+    "era": "2007"
+  },
+  {
+    "setId": "pop6",
+    "name": "POP Series 6",
+    "bucket": "promo",
+    "era": "2007"
+  },
+  {
+    "setId": "pop7",
+    "name": "POP Series 7",
+    "bucket": "promo",
+    "era": "2008"
+  },
+  {
+    "setId": "pop8",
+    "name": "POP Series 8",
+    "bucket": "promo",
+    "era": "2008"
+  },
+  {
+    "setId": "pop9",
+    "name": "POP Series 9",
+    "bucket": "promo",
+    "era": "2009"
+  },
+  {
+    "setId": "ru1",
+    "name": "Pokémon Rumble",
+    "bucket": "promo",
+    "era": "2009"
+  },
+  {
+    "setId": "hsp",
+    "name": "HGSS Black Star Promos",
+    "bucket": "promo",
+    "era": "2010-2011"
+  },
+  {
+    "setId": "bwp",
+    "name": "BW Black Star Promos",
+    "bucket": "promo",
+    "era": "2011-2013"
+  },
+  {
+    "setId": "col1",
+    "name": "Call of Legends",
+    "bucket": "special",
+    "era": "2011"
+  },
+  {
+    "setId": "dv1",
+    "name": "Dragon Vault",
+    "bucket": "special",
+    "era": "2012"
+  },
+  {
+    "setId": "xyp",
+    "name": "XY Black Star Promos",
+    "bucket": "promo",
+    "era": "2013-2016"
+  },
+  {
+    "setId": "xy0",
+    "name": "Kalos Starter Set",
+    "bucket": "special",
+    "era": "2013"
+  },
+  {
+    "setId": "dc1",
+    "name": "Double Crisis",
+    "bucket": "special",
+    "era": "2015"
+  },
+  {
+    "setId": "g1",
+    "name": "Generations",
+    "bucket": "special",
+    "era": "2016"
+  },
+  {
+    "setId": "sm35",
+    "name": "Shining Legends",
+    "bucket": "special",
+    "era": "2017"
+  },
+  {
+    "setId": "sm75",
+    "name": "Dragon Majesty",
+    "bucket": "special",
+    "era": "2018"
+  },
+  {
+    "setId": "det1",
+    "name": "Detective Pikachu",
+    "bucket": "special",
+    "era": "2019"
+  },
+  {
+    "setId": "sm115",
+    "name": "Hidden Fates",
+    "bucket": "special",
+    "era": "2019"
+  },
+  {
+    "setId": "sma",
+    "name": "Hidden Fates Shiny Vault",
+    "bucket": "special",
+    "era": "2019"
+  },
+  {
+    "setId": "swsh35",
+    "name": "Champion's Path",
+    "bucket": "special",
+    "era": "2020"
+  },
+  {
+    "setId": "fut20",
+    "name": "Pokémon Futsal Collection",
+    "bucket": "promo",
+    "era": "2020"
+  },
+  {
+    "setId": "swsh45",
+    "name": "Shining Fates",
+    "bucket": "special",
+    "era": "2021"
+  },
+  {
+    "setId": "swsh45sv",
+    "name": "Shining Fates Shiny Vault",
+    "bucket": "special",
+    "era": "2021"
+  },
+  {
+    "setId": "cel25",
+    "name": "Celebrations",
+    "bucket": "special",
+    "era": "2021"
+  },
+  {
+    "setId": "cel25c",
+    "name": "Celebrations: Classic Collection",
+    "bucket": "special",
+    "era": "2021"
+  },
+  {
+    "setId": "pgo",
+    "name": "Pokémon GO",
+    "bucket": "special",
+    "era": "2022"
+  },
+  {
+    "setId": "swsh9tg",
+    "name": "Brilliant Stars Trainer Gallery",
+    "bucket": "special",
+    "era": "2022"
+  },
+  {
+    "setId": "swsh10tg",
+    "name": "Astral Radiance Trainer Gallery",
+    "bucket": "special",
+    "era": "2022"
+  },
+  {
+    "setId": "swsh11tg",
+    "name": "Lost Origin Trainer Gallery",
+    "bucket": "special",
+    "era": "2022"
+  },
+  {
+    "setId": "swsh12tg",
+    "name": "Silver Tempest Trainer Gallery",
+    "bucket": "special",
+    "era": "2022"
+  },
+  {
+    "setId": "swsh12pt5",
+    "name": "Crown Zenith",
+    "bucket": "special",
+    "era": "2023"
+  },
+  {
+    "setId": "swsh12pt5gg",
+    "name": "Crown Zenith Galarian Gallery",
+    "bucket": "special",
+    "era": "2023"
+  },
+  {
+    "setId": "sv3pt5",
+    "name": "Scarlet & Violet: 151",
+    "bucket": "special",
+    "era": "2023"
+  },
+  {
+    "setId": "sv4pt5",
+    "name": "Paldean Fates",
+    "bucket": "special",
+    "era": "2024"
+  },
+  {
+    "setId": "sv6pt5",
+    "name": "Shrouded Fable",
+    "bucket": "special",
+    "era": "2024"
+  },
+  {
+    "setId": "sv8pt5",
+    "name": "Prismatic Evolutions",
+    "bucket": "special",
+    "era": "2025"
+  },
+  {
+    "setId": "dpp",
+    "name": "Diamond & Pearl Promos",
+    "bucket": "promo",
+    "era": "2007–2009"
+  },
+  {
+    "setId": "mcd11",
+    "name": "McDonald's Collection 2011",
+    "bucket": "promo",
+    "era": "2011"
+  },
+  {
+    "setId": "mcd12",
+    "name": "McDonald's Collection 2012",
+    "bucket": "promo",
+    "era": "2012"
+  },
+  {
+    "setId": "mcd14",
+    "name": "McDonald's Collection 2014",
+    "bucket": "promo",
+    "era": "2014"
+  },
+  {
+    "setId": "mcd15",
+    "name": "McDonald's Collection 2015",
+    "bucket": "promo",
+    "era": "2015"
+  },
+  {
+    "setId": "mcd16",
+    "name": "McDonald's Collection 2016",
+    "bucket": "promo",
+    "era": "2016"
+  },
+  {
+    "setId": "mcd17",
+    "name": "McDonald's Collection 2017",
+    "bucket": "promo",
+    "era": "2017"
+  },
+  {
+    "setId": "mcd18",
+    "name": "McDonald's Collection 2018",
+    "bucket": "promo",
+    "era": "2018"
+  },
+  {
+    "setId": "mcd19",
+    "name": "McDonald's Collection 2019",
+    "bucket": "promo",
+    "era": "2019"
+  },
+  {
+    "setId": "mcd21",
+    "name": "McDonald's Collection 2021",
+    "bucket": "promo",
+    "era": "2021"
+  },
+  {
+    "setId": "mcd22",
+    "name": "McDonald's Collection 2022",
+    "bucket": "promo",
+    "era": "2022"
+  },
+  {
+    "setId": "smp",
+    "name": "Sun & Moon Promos",
+    "bucket": "promo",
+    "era": "2016–2021"
+  },
+  {
+    "setId": "svp",
+    "name": "Scarlet & Violet Promos",
+    "bucket": "promo",
+    "era": "2023–present"
+  },
+  {
+    "setId": "swshp",
+    "name": "Sword & Shield Promos",
+    "bucket": "promo",
+    "era": "2019–2023"
+  }
+]

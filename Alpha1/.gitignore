@@ -1,0 +1,32 @@
+# Alpha1 — see also repo root .gitignore (PGT_Vision/.gitignore)
+
+# Secrets & local env (templates .env.example / .env.production.example are tracked)
+.env*.local
+.env.production
+.env.production.local
+
+# Next.js
+/.next/
+/out/
+/build
+
+# Tooling
+/node_modules
+.vercel
+.clerk/
+*.tsbuildinfo
+
+# Generated
+/reports/
+/vendor/
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Misc
+.DS_Store
+*.pem
+/coverage

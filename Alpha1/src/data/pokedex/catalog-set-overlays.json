@@ -1,0 +1,842 @@
+{
+  "version": 1,
+  "methodology": "Set totals sum Pokémon TCG API catalog prices (TCGPlayer market/mid when present; Cardmarket trend when EUR is listed). One API row per numbered slot — 1st Edition, Unlimited, and Shadowless are separate in the wild but merged in the API; use print tabs + market panel for comps. Sealed rows are curated product intents with hub links (eBay sold/active, TCGPlayer, PriceCharting, Cardmarket, etc.) — not official MSRP.",
+  "sets": [
+    {
+      "setId": "base1",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Base_Set_(TCG)",
+      "setValueNotes": "Near-set value uses API-listed singles only. Master set in the hobby includes every print variant and parallel; that is wider than this spine sum.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited print run",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition stamp",
+          "marketSuffix": "1st Edition"
+        },
+        {
+          "id": "shadowless",
+          "label": "Shadowless",
+          "hint": "Early Base print without shadow border — bias comps toward Shadowless",
+          "marketSuffix": "Shadowless"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Base Set Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Base Set Booster Pack sealed"
+        },
+        {
+          "id": "td-venusaur",
+          "label": "Theme deck — Venusaur",
+          "category": "theme_deck",
+          "searchQuery": "Pokemon Base Set Venusaur Theme Deck sealed"
+        },
+        {
+          "id": "td-charizard",
+          "label": "Theme deck — Charizard",
+          "category": "theme_deck",
+          "searchQuery": "Pokemon Base Set Charizard Theme Deck sealed"
+        },
+        {
+          "id": "td-blastoise",
+          "label": "Theme deck — Blastoise",
+          "category": "theme_deck",
+          "searchQuery": "Pokemon Base Set Blastoise Theme Deck sealed"
+        }
+      ]
+    },
+    {
+      "setId": "base2",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Jungle_(TCG)",
+      "setValueNotes": "Jungle WOTC English: 1st Edition and Unlimited holos/non-holos share API slots — totals are catalog reference sums.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Jungle Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Jungle Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "base3",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Fossil_(TCG)",
+      "setValueNotes": "Fossil: 1st Edition vs Unlimited merged on API rows.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Fossil Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Fossil Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "base4",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Base_Set_2_(TCG)",
+      "setValueNotes": "Base Set 2 is primarily Unlimited-era reprint compilation in the API.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Rare 1st stamps on some slots — bias comps",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Base Set 2 Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Base Set 2 Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "base5",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Team_Rocket_(TCG)",
+      "setValueNotes": "Team Rocket: 1st Edition vs Unlimited merged per API slot.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Team Rocket Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Team Rocket Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "gym1",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Gym_Heroes_(TCG)",
+      "setValueNotes": "Gym Heroes: 1st vs Unlimited merged in API.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Gym Heroes Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Gym Heroes Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "gym2",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Gym_Challenge_(TCG)",
+      "setValueNotes": "Gym Challenge: 1st vs Unlimited merged in API.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Gym Challenge Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Gym Challenge Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "neo1",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Neo_Genesis_(TCG)",
+      "setValueNotes": "Neo Genesis: 1st vs Unlimited merged in API.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Neo Genesis Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Neo Genesis Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "neo2",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Neo_Discovery_(TCG)",
+      "setValueNotes": "Neo Discovery: 1st vs Unlimited merged in API.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Neo Discovery Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Neo Discovery Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "neo3",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Neo_Revelation_(TCG)",
+      "setValueNotes": "Neo Revelation: 1st vs Unlimited merged in API.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Neo Revelation Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Neo Revelation Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "neo4",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Neo_Destiny_(TCG)",
+      "setValueNotes": "Neo Destiny: 1st vs Unlimited merged in API.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Neo Destiny Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Neo Destiny Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "si1",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Southern_Islands_(TCG)",
+      "setValueNotes": "Southern Islands: boutique sheet set — sealed sheet/tin searches differ from standard booster box.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited / open sheet",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition where stamped",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "sheet",
+          "label": "Sealed sheet / collection",
+          "category": "other_sealed",
+          "searchQuery": "Pokemon Southern Islands sealed sheet"
+        },
+        {
+          "id": "binder",
+          "label": "Tin / binder presentation",
+          "category": "other_sealed",
+          "searchQuery": "Pokemon Southern Islands Collection sealed"
+        }
+      ]
+    },
+    {
+      "setId": "basep",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Wizards_Black_Star_Promos_(TCG)",
+      "setValueNotes": "Wizards Black Star Promos: print-run tabs bias comps for stamped promos (e.g. movie stamps).",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited-style promo prints",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition stamp",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "movie",
+          "label": "Sealed promo / movie display (varies)",
+          "category": "other_sealed",
+          "searchQuery": "Pokemon Wizards Black Star Promo sealed lot"
+        }
+      ]
+    },
+    {
+      "setId": "ecard1",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Expedition_Base_Set_(TCG)",
+      "setValueNotes": "Expedition e-Card: 1st Edition vs Unlimited merged in API.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Expedition Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Expedition Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "ecard2",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aquapolis_(TCG)",
+      "setValueNotes": "Aquapolis: 1st vs Unlimited merged in API.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Aquapolis Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Aquapolis Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "ecard3",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Skyridge_(TCG)",
+      "setValueNotes": "Skyridge: 1st vs Unlimited merged in API; set is high-value sealed.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        },
+        {
+          "id": "unlimited",
+          "label": "Unlimited",
+          "hint": "Bias marketplace search toward Unlimited",
+          "marketSuffix": "Unlimited"
+        },
+        {
+          "id": "first_edition",
+          "label": "1st Edition",
+          "hint": "Bias marketplace search toward 1st Edition",
+          "marketSuffix": "1st Edition"
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Skyridge Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Skyridge Booster Pack sealed"
+        }
+      ]
+    },
+    {
+      "setId": "base6",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Legendary_Collection_(TCG)",
+      "setValueNotes": "Legendary Collection: reverse holo patterns are in API rarities — use Rare finish tabs. No separate 1st/Unlimited tab needed for this English set.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Legendary Collection Booster Box 36"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Legendary Collection Booster Pack sealed"
+        }
+      ],
+      "finishVariants": [
+        {
+          "id": "standard",
+          "label": "Standard catalog",
+          "hint": "Official API/default artwork and prices",
+          "marketSuffix": null
+        },
+        {
+          "id": "rare_holo",
+          "label": "Holo rares",
+          "hint": "Legendary Collection holo rare finish",
+          "marketSuffix": "Holo"
+        },
+        {
+          "id": "rare_non_holo",
+          "label": "Non-holo rares",
+          "hint": "Legendary Collection non-holo rare finish",
+          "marketSuffix": "Non Holo"
+        },
+        {
+          "id": "reverse_holo",
+          "label": "Reverse holo",
+          "hint": "Fireworks reverse holo parallel",
+          "marketSuffix": "Reverse Holo"
+        }
+      ]
+    },
+    {
+      "setId": "bp",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Best_of_Game_(TCG)",
+      "setValueNotes": "Best of Game is a small Wizards-era promo/prize set. The API spine is one row per card; stamp/event nuance should stay in print stamps/details and marketplace search terms.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "promo-lot",
+          "label": "Promo lot / winner cards",
+          "category": "other_sealed",
+          "searchQuery": "Pokemon Best of Game promo winner sealed lot"
+        }
+      ]
+    },
+    {
+      "setId": "ex1",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/EX_Ruby_%26_Sapphire_(TCG)",
+      "setValueNotes": "EX Ruby & Sapphire has standard and reverse-holo market distinctions, but no English 1st Edition print tab. Use print stamps/details for reverse holo and pack/deck source when visible.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon EX Ruby Sapphire Booster Box 36 sealed"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon EX Ruby Sapphire Booster Pack sealed"
+        },
+        {
+          "id": "theme-deck",
+          "label": "Theme deck",
+          "category": "theme_deck",
+          "searchQuery": "Pokemon EX Ruby Sapphire Theme Deck sealed"
+        }
+      ]
+    },
+    {
+      "setId": "ex2",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/EX_Sandstorm_(TCG)",
+      "setValueNotes": "EX Sandstorm uses EX-era standard/reverse-holo distinctions. No English 1st Edition print tab; use print stamps/details for reverse holo and deck exclusives.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon EX Sandstorm Booster Box 36 sealed"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon EX Sandstorm Booster Pack sealed"
+        },
+        {
+          "id": "theme-deck",
+          "label": "Theme deck",
+          "category": "theme_deck",
+          "searchQuery": "Pokemon EX Sandstorm Theme Deck sealed"
+        }
+      ]
+    },
+    {
+      "setId": "ex3",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/EX_Dragon_(TCG)",
+      "setValueNotes": "EX Dragon uses EX-era standard/reverse-holo distinctions. No English 1st Edition print tab; use print stamps/details for reverse holo and deck/source variants.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon EX Dragon Booster Box 36 sealed"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon EX Dragon Booster Pack sealed"
+        },
+        {
+          "id": "theme-deck",
+          "label": "Theme deck",
+          "category": "theme_deck",
+          "searchQuery": "Pokemon EX Dragon Theme Deck sealed"
+        }
+      ]
+    },
+    {
+      "setId": "np",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nintendo_Black_Star_Promos_(TCG)",
+      "setValueNotes": "Nintendo Black Star Promos are promo-distribution cards; source/stamp/event differences should stay in print stamps/details and market queries.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "promo-lot",
+          "label": "Sealed promo / promo lot",
+          "category": "other_sealed",
+          "searchQuery": "Pokemon Nintendo Black Star Promo sealed lot"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "pgt-vision-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix Alpha1",
+    "build": "npm run build --prefix Alpha1",
+    "start": "npm run start --prefix Alpha1",
+    "lint": "npm run lint --prefix Alpha1"
+  }
+}

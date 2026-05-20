@@ -1,0 +1,727 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-19T20:02:59.286Z",
+  "cdnBase": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites",
+  "entries": [
+    {
+      "nationalId": 1,
+      "slug": "bulbasaur",
+      "name": "Bulbasaur",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/1.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/1.png"
+    },
+    {
+      "nationalId": 4,
+      "slug": "charmander",
+      "name": "Charmander",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/4.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/4.png"
+    },
+    {
+      "nationalId": 7,
+      "slug": "squirtle",
+      "name": "Squirtle",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/7.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/7.png"
+    },
+    {
+      "nationalId": 25,
+      "slug": "pikachu",
+      "name": "Pikachu",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/25.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/25.png"
+    },
+    {
+      "nationalId": 152,
+      "slug": "chikorita",
+      "name": "Chikorita",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/152.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/152.png"
+    },
+    {
+      "nationalId": 155,
+      "slug": "cyndaquil",
+      "name": "Cyndaquil",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/155.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/155.png"
+    },
+    {
+      "nationalId": 158,
+      "slug": "totodile",
+      "name": "Totodile",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/158.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/158.png"
+    },
+    {
+      "nationalId": 252,
+      "slug": "treecko",
+      "name": "Treecko",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/252.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/252.png"
+    },
+    {
+      "nationalId": 255,
+      "slug": "torchic",
+      "name": "Torchic",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/255.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/255.png"
+    },
+    {
+      "nationalId": 258,
+      "slug": "mudkip",
+      "name": "Mudkip",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/258.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/258.png"
+    },
+    {
+      "nationalId": 387,
+      "slug": "turtwig",
+      "name": "Turtwig",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/387.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/387.png"
+    },
+    {
+      "nationalId": 390,
+      "slug": "chimchar",
+      "name": "Chimchar",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/390.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/390.png"
+    },
+    {
+      "nationalId": 393,
+      "slug": "piplup",
+      "name": "Piplup",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/393.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/393.png"
+    },
+    {
+      "nationalId": 495,
+      "slug": "snivy",
+      "name": "Snivy",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/495.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/495.png"
+    },
+    {
+      "nationalId": 498,
+      "slug": "tepig",
+      "name": "Tepig",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/498.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/498.png"
+    },
+    {
+      "nationalId": 501,
+      "slug": "oshawott",
+      "name": "Oshawott",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/501.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/501.png"
+    },
+    {
+      "nationalId": 650,
+      "slug": "chespin",
+      "name": "Chespin",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/650.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/650.png"
+    },
+    {
+      "nationalId": 653,
+      "slug": "fennekin",
+      "name": "Fennekin",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/653.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/653.png"
+    },
+    {
+      "nationalId": 656,
+      "slug": "froakie",
+      "name": "Froakie",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/656.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/656.png"
+    },
+    {
+      "nationalId": 722,
+      "slug": "rowlet",
+      "name": "Rowlet",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/722.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/722.png"
+    },
+    {
+      "nationalId": 725,
+      "slug": "litten",
+      "name": "Litten",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/725.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/725.png"
+    },
+    {
+      "nationalId": 728,
+      "slug": "popplio",
+      "name": "Popplio",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/728.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/728.png"
+    },
+    {
+      "nationalId": 810,
+      "slug": "grookey",
+      "name": "Grookey",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/810.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/810.png"
+    },
+    {
+      "nationalId": 813,
+      "slug": "scorbunny",
+      "name": "Scorbunny",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/813.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/813.png"
+    },
+    {
+      "nationalId": 816,
+      "slug": "sobble",
+      "name": "Sobble",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/816.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/816.png"
+    },
+    {
+      "nationalId": 906,
+      "slug": "sprigatito",
+      "name": "Sprigatito",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/906.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/906.png"
+    },
+    {
+      "nationalId": 909,
+      "slug": "fuecoco",
+      "name": "Fuecoco",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/909.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/909.png"
+    },
+    {
+      "nationalId": 912,
+      "slug": "quaxly",
+      "name": "Quaxly",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/912.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/912.png"
+    },
+    {
+      "nationalId": 133,
+      "slug": "eevee",
+      "name": "Eevee",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/133.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/133.png"
+    },
+    {
+      "nationalId": 134,
+      "slug": "vaporeon",
+      "name": "Vaporeon",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/134.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/134.png"
+    },
+    {
+      "nationalId": 135,
+      "slug": "jolteon",
+      "name": "Jolteon",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/135.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/135.png"
+    },
+    {
+      "nationalId": 136,
+      "slug": "flareon",
+      "name": "Flareon",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/136.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/136.png"
+    },
+    {
+      "nationalId": 196,
+      "slug": "espeon",
+      "name": "Espeon",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/196.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/196.png"
+    },
+    {
+      "nationalId": 197,
+      "slug": "umbreon",
+      "name": "Umbreon",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/197.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/197.png"
+    },
+    {
+      "nationalId": 470,
+      "slug": "leafeon",
+      "name": "Leafeon",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/470.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/470.png"
+    },
+    {
+      "nationalId": 471,
+      "slug": "glaceon",
+      "name": "Glaceon",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/471.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/471.png"
+    },
+    {
+      "nationalId": 700,
+      "slug": "sylveon",
+      "name": "Sylveon",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/700.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/700.png"
+    },
+    {
+      "nationalId": 144,
+      "slug": "articuno",
+      "name": "Articuno",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/144.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/144.png"
+    },
+    {
+      "nationalId": 145,
+      "slug": "zapdos",
+      "name": "Zapdos",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/145.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/145.png"
+    },
+    {
+      "nationalId": 146,
+      "slug": "moltres",
+      "name": "Moltres",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/146.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/146.png"
+    },
+    {
+      "nationalId": 150,
+      "slug": "mewtwo",
+      "name": "Mewtwo",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/150.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/150.png"
+    },
+    {
+      "nationalId": 151,
+      "slug": "mew",
+      "name": "Mew",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/151.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/151.png"
+    },
+    {
+      "nationalId": 243,
+      "slug": "raikou",
+      "name": "Raikou",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/243.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/243.png"
+    },
+    {
+      "nationalId": 244,
+      "slug": "entei",
+      "name": "Entei",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/244.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/244.png"
+    },
+    {
+      "nationalId": 245,
+      "slug": "suicune",
+      "name": "Suicune",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/245.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/245.png"
+    },
+    {
+      "nationalId": 249,
+      "slug": "lugia",
+      "name": "Lugia",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/249.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/249.png"
+    },
+    {
+      "nationalId": 250,
+      "slug": "hooh",
+      "name": "Ho-Oh",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/250.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/250.png"
+    },
+    {
+      "nationalId": 251,
+      "slug": "celebi",
+      "name": "Celebi",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/251.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/251.png"
+    },
+    {
+      "nationalId": 377,
+      "slug": "regirock",
+      "name": "Regirock",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/377.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/377.png"
+    },
+    {
+      "nationalId": 378,
+      "slug": "regice",
+      "name": "Regice",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/378.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/378.png"
+    },
+    {
+      "nationalId": 379,
+      "slug": "registeel",
+      "name": "Registeel",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/379.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/379.png"
+    },
+    {
+      "nationalId": 380,
+      "slug": "latias",
+      "name": "Latias",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/380.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/380.png"
+    },
+    {
+      "nationalId": 381,
+      "slug": "latios",
+      "name": "Latios",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/381.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/381.png"
+    },
+    {
+      "nationalId": 382,
+      "slug": "kyogre",
+      "name": "Kyogre",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/382.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/382.png"
+    },
+    {
+      "nationalId": 383,
+      "slug": "groudon",
+      "name": "Groudon",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/383.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/383.png"
+    },
+    {
+      "nationalId": 384,
+      "slug": "rayquaza",
+      "name": "Rayquaza",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/384.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/384.png"
+    },
+    {
+      "nationalId": 385,
+      "slug": "jirachi",
+      "name": "Jirachi",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/385.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/385.png"
+    },
+    {
+      "nationalId": 386,
+      "slug": "deoxys",
+      "name": "Deoxys",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/386.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/386.png"
+    },
+    {
+      "nationalId": 480,
+      "slug": "uxie",
+      "name": "Uxie",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/480.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/480.png"
+    },
+    {
+      "nationalId": 481,
+      "slug": "mesprit",
+      "name": "Mesprit",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/481.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/481.png"
+    },
+    {
+      "nationalId": 482,
+      "slug": "azelf",
+      "name": "Azelf",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/482.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/482.png"
+    },
+    {
+      "nationalId": 483,
+      "slug": "dialga",
+      "name": "Dialga",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/483.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/483.png"
+    },
+    {
+      "nationalId": 484,
+      "slug": "palkia",
+      "name": "Palkia",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/484.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/484.png"
+    },
+    {
+      "nationalId": 487,
+      "slug": "giratina",
+      "name": "Giratina",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/487.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/487.png"
+    },
+    {
+      "nationalId": 488,
+      "slug": "cresselia",
+      "name": "Cresselia",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/488.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/488.png"
+    },
+    {
+      "nationalId": 493,
+      "slug": "arceus",
+      "name": "Arceus",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/493.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/493.png"
+    },
+    {
+      "nationalId": 643,
+      "slug": "reshiram",
+      "name": "Reshiram",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/643.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/643.png"
+    },
+    {
+      "nationalId": 644,
+      "slug": "zekrom",
+      "name": "Zekrom",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/644.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/644.png"
+    },
+    {
+      "nationalId": 646,
+      "slug": "kyurem",
+      "name": "Kyurem",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/646.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/646.png"
+    },
+    {
+      "nationalId": 716,
+      "slug": "xerneas",
+      "name": "Xerneas",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/716.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/716.png"
+    },
+    {
+      "nationalId": 717,
+      "slug": "yveltal",
+      "name": "Yveltal",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/717.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/717.png"
+    },
+    {
+      "nationalId": 718,
+      "slug": "zygarde",
+      "name": "Zygarde",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/718.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/718.png"
+    },
+    {
+      "nationalId": 791,
+      "slug": "solgaleo",
+      "name": "Solgaleo",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/791.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/791.png"
+    },
+    {
+      "nationalId": 792,
+      "slug": "lunala",
+      "name": "Lunala",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/792.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/792.png"
+    },
+    {
+      "nationalId": 800,
+      "slug": "necrozma",
+      "name": "Necrozma",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/800.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/800.png"
+    },
+    {
+      "nationalId": 888,
+      "slug": "zacian",
+      "name": "Zacian",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/888.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/888.png"
+    },
+    {
+      "nationalId": 889,
+      "slug": "zamazenta",
+      "name": "Zamazenta",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/889.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/889.png"
+    },
+    {
+      "nationalId": 890,
+      "slug": "eternatus",
+      "name": "Eternatus",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/890.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/890.png"
+    },
+    {
+      "nationalId": 1007,
+      "slug": "koraidon",
+      "name": "Koraidon",
+      "hasAni": true,
+      "hasArtwork": true,
+      "aniUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/ani/1007.gif",
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/1007.png"
+    },
+    {
+      "nationalId": 1008,
+      "slug": "miraidon",
+      "name": "Miraidon",
+      "hasAni": false,
+      "hasArtwork": true,
+      "aniUrl": null,
+      "artworkUrl": "https://vzwbctsrunszxzmfhxch.supabase.co/storage/v1/object/public/pokemon-sprites/artwork/1008.png"
+    }
+  ]
+}

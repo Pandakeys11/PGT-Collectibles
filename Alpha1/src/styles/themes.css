@@ -1,0 +1,369 @@
+/**
+ * Energy Nexus themes — each preset anchors to Pokémon energy palettes.
+ * Semantic success / warning / danger live in energy-tokens.css (grass / fighting / fire).
+ * Switch via `data-theme` on `<html>`.
+ */
+
+html:not([data-theme]),
+[data-theme="obsidian-clean"] {
+  --bg-canvas: 8 10 14;
+  --bg-panel: 12 16 22;
+  --bg-panel-raised: 18 22 30;
+  --bg-subtle: 24 30 40;
+  --border-subtle: 255 255 255 / 0.08;
+  --border-strong: 255 255 255 / 0.16;
+  --text-primary: 237 242 244;
+  --text-muted: 201 214 223;
+  --text-faint: 141 153 174;
+  --accent: 141 153 174;
+  --accent-strong: 201 214 223;
+  --accent-glow: 255 230 0;
+  --shadow-panel: 0 20px 55px rgba(0, 0, 0, 0.58);
+  --spark-primary: #8d99ae;
+  --spark-secondary: #ffe600;
+  --bg-gradient-end: 5 6 10;
+}
+
+[data-theme="energy-nexus"] {
+  --bg-canvas: 5 6 10;
+  --bg-panel: 11 15 24;
+  --bg-panel-raised: 16 22 36;
+  --bg-subtle: 21 28 44;
+  --border-subtle: 255 255 255 / 0.08;
+  --border-strong: 255 255 255 / 0.18;
+  --text-primary: 248 250 252;
+  --text-muted: 170 180 200;
+  --text-faint: 111 122 145;
+  --accent: 255 230 0;
+  --accent-strong: 255 208 0;
+  --accent-glow: 216 180 254;
+  --shadow-panel: 0 20px 55px rgba(2, 4, 14, 0.58);
+  --spark-primary: #ffe600;
+  --spark-secondary: #b517ff;
+  --bg-gradient-end: 3 4 8;
+}
+
+[data-theme="midnight-mirage"] {
+  --bg-canvas: 10 6 16;
+  --bg-panel: 14 10 24;
+  --bg-panel-raised: 20 14 34;
+  --bg-subtle: 28 18 44;
+  --border-subtle: 255 255 255 / 0.08;
+  --border-strong: 255 255 255 / 0.16;
+  --text-primary: 248 250 252;
+  --text-muted: 196 181 220;
+  --text-faint: 120 100 150;
+  --accent: 181 23 255;
+  --accent-strong: 247 37 133;
+  --accent-glow: 255 230 0;
+  --shadow-panel: 0 20px 55px rgba(20, 4, 40, 0.55);
+  --spark-primary: #b517ff;
+  --spark-secondary: #ffe600;
+  --bg-gradient-end: 6 4 12;
+}
+
+[data-theme="coral-depth"] {
+  --bg-canvas: 14 6 8;
+  --bg-panel: 20 10 14;
+  --bg-panel-raised: 28 14 20;
+  --bg-subtle: 36 18 26;
+  --border-subtle: 255 255 255 / 0.08;
+  --border-strong: 255 255 255 / 0.16;
+  --text-primary: 255 248 245;
+  --text-muted: 255 194 209;
+  --text-faint: 180 100 90;
+  --accent: 255 59 31;
+  --accent-strong: 255 122 24;
+  --accent-glow: 0 180 216;
+  --shadow-panel: 0 22px 55px rgba(40, 8, 12, 0.52);
+  --spark-primary: #ff3b1f;
+  --spark-secondary: #00b4d8;
+  --bg-gradient-end: 8 4 6;
+}
+
+[data-theme="auric-void"] {
+  --bg-canvas: 12 10 6;
+  --bg-panel: 18 14 10;
+  --bg-panel-raised: 26 20 14;
+  --bg-subtle: 34 26 18;
+  --border-subtle: 255 248 240 / 0.08;
+  --border-strong: 255 248 240 / 0.16;
+  --text-primary: 255 251 235;
+  --text-muted: 201 214 223;
+  --text-faint: 141 153 174;
+  --accent: 255 215 0;
+  --accent-strong: 123 44 191;
+  --accent-glow: 201 214 223;
+  --shadow-panel: 0 22px 55px rgba(0, 0, 0, 0.55);
+  --spark-primary: #ffd700;
+  --spark-secondary: #7b2cbf;
+  --bg-gradient-end: 8 6 4;
+}
+
+[data-theme="neon-district"] {
+  --bg-canvas: 10 10 5;
+  --bg-panel: 16 16 10;
+  --bg-panel-raised: 22 22 14;
+  --bg-subtle: 30 28 18;
+  --border-subtle: 255 255 255 / 0.08;
+  --border-strong: 255 255 255 / 0.17;
+  --text-primary: 255 252 240;
+  --text-muted: 255 247 168;
+  --text-faint: 180 160 80;
+  --accent: 255 230 0;
+  --accent-strong: 255 208 0;
+  --accent-glow: 181 23 255;
+  --shadow-panel: 0 22px 58px rgba(30, 24, 4, 0.5);
+  --spark-primary: #ffe600;
+  --spark-secondary: #b517ff;
+  --bg-gradient-end: 6 6 3;
+}
+
+[data-theme="pastel-signal"] {
+  --bg-canvas: 14 8 12;
+  --bg-panel: 20 12 18;
+  --bg-panel-raised: 28 16 24;
+  --bg-subtle: 36 20 30;
+  --border-subtle: 255 255 255 / 0.08;
+  --border-strong: 255 255 255 / 0.15;
+  --text-primary: 255 252 252;
+  --text-muted: 255 194 209;
+  --text-faint: 160 120 140;
+  --accent: 255 143 171;
+  --accent-strong: 255 194 209;
+  --accent-glow: 144 224 239;
+  --shadow-panel: 0 20px 55px rgba(24, 8, 18, 0.48);
+  --spark-primary: #ff8fab;
+  --spark-secondary: #90e0ef;
+  --bg-gradient-end: 10 6 10;
+}
+
+[data-theme="terracotta-field"] {
+  --bg-canvas: 14 10 6;
+  --bg-panel: 22 14 10;
+  --bg-panel-raised: 30 20 14;
+  --bg-subtle: 38 26 18;
+  --border-subtle: 255 247 237 / 0.08;
+  --border-strong: 255 247 237 / 0.15;
+  --text-primary: 255 251 245;
+  --text-muted: 244 211 94;
+  --text-faint: 160 110 70;
+  --accent: 199 125 58;
+  --accent-strong: 224 159 62;
+  --accent-glow: 255 122 24;
+  --shadow-panel: 0 22px 55px rgba(20, 10, 4, 0.52);
+  --spark-primary: #c77d3a;
+  --spark-secondary: #ff7a18;
+  --bg-gradient-end: 10 8 4;
+}
+
+[data-theme="zen-mist"] {
+  --bg-canvas: 4 12 8;
+  --bg-panel: 8 18 14;
+  --bg-panel-raised: 12 26 20;
+  --bg-subtle: 16 34 26;
+  --border-subtle: 255 255 255 / 0.07;
+  --border-strong: 255 255 255 / 0.14;
+  --text-primary: 240 253 248;
+  --text-muted: 185 251 192;
+  --text-faint: 94 160 120;
+  --accent: 45 211 111;
+  --accent-strong: 124 255 107;
+  --accent-glow: 144 224 239;
+  --shadow-panel: 0 20px 52px rgba(4, 16, 12, 0.5);
+  --spark-primary: #2dd36f;
+  --spark-secondary: #90e0ef;
+  --bg-gradient-end: 3 10 7;
+}
+
+[data-theme="emerald-vault"] {
+  --bg-canvas: 6 10 8;
+  --bg-panel: 10 16 14;
+  --bg-panel-raised: 14 22 20;
+  --bg-subtle: 20 30 28;
+  --border-subtle: 255 255 255 / 0.07;
+  --border-strong: 255 255 255 / 0.14;
+  --text-primary: 236 253 245;
+  --text-muted: 185 251 192;
+  --text-faint: 80 120 100;
+  --accent: 45 211 111;
+  --accent-strong: 124 255 107;
+  --accent-glow: 91 33 182;
+  --shadow-panel: 0 22px 55px rgba(2, 12, 8, 0.55);
+  --spark-primary: #2dd36f;
+  --spark-secondary: #5b21b6;
+  --bg-gradient-end: 4 8 6;
+}
+
+[data-theme="chrome-slate"] {
+  --bg-canvas: 8 10 14;
+  --bg-panel: 12 16 22;
+  --bg-panel-raised: 18 24 32;
+  --bg-subtle: 24 32 42;
+  --border-subtle: 255 255 255 / 0.08;
+  --border-strong: 255 255 255 / 0.15;
+  --text-primary: 244 248 255;
+  --text-muted: 201 214 223;
+  --text-faint: 120 135 155;
+  --accent: 141 153 174;
+  --accent-strong: 201 214 223;
+  --accent-glow: 0 180 216;
+  --shadow-panel: 0 20px 55px rgba(6, 10, 20, 0.52);
+  --spark-primary: #8d99ae;
+  --spark-secondary: #00b4d8;
+  --bg-gradient-end: 5 7 12;
+}
+
+/* —— TCG collection presets —— */
+
+[data-theme="booster-classic"] {
+  --bg-canvas: 8 12 28;
+  --bg-panel: 12 18 38;
+  --bg-panel-raised: 16 24 48;
+  --bg-subtle: 22 32 58;
+  --border-subtle: 255 255 255 / 0.08;
+  --border-strong: 255 255 255 / 0.15;
+  --text-primary: 248 250 255;
+  --text-muted: 255 247 168;
+  --text-faint: 100 130 200;
+  --accent: 255 230 0;
+  --accent-strong: 255 208 0;
+  --accent-glow: 0 180 216;
+  --shadow-panel: 0 22px 58px rgba(8, 12, 32, 0.55);
+  --spark-primary: #ffe600;
+  --spark-secondary: #00b4d8;
+  --bg-gradient-end: 5 8 20;
+}
+
+[data-theme="illustrators-sky"] {
+  --bg-canvas: 10 14 22;
+  --bg-panel: 14 20 32;
+  --bg-panel-raised: 20 28 42;
+  --bg-subtle: 28 36 52;
+  --border-subtle: 255 251 235 / 0.08;
+  --border-strong: 255 251 235 / 0.14;
+  --text-primary: 255 252 248;
+  --text-muted: 255 229 236;
+  --text-faint: 140 120 160;
+  --accent: 255 143 171;
+  --accent-strong: 255 215 0;
+  --accent-glow: 0 245 212;
+  --shadow-panel: 0 22px 55px rgba(8, 14, 28, 0.5);
+  --spark-primary: #ff8fab;
+  --spark-secondary: #ffd700;
+  --bg-gradient-end: 6 10 18;
+}
+
+[data-theme="crystal-chamber"] {
+  --bg-canvas: 4 10 14;
+  --bg-panel: 6 16 22;
+  --bg-panel-raised: 8 22 30;
+  --bg-subtle: 12 30 40;
+  --border-subtle: 204 251 241 / 0.08;
+  --border-strong: 204 251 241 / 0.15;
+  --text-primary: 240 253 250;
+  --text-muted: 144 224 239;
+  --text-faint: 72 160 190;
+  --accent: 0 180 216;
+  --accent-strong: 72 202 228;
+  --accent-glow: 181 23 255;
+  --shadow-panel: 0 22px 58px rgba(2, 14, 20, 0.55);
+  --spark-primary: #00b4d8;
+  --spark-secondary: #b517ff;
+  --bg-gradient-end: 3 8 12;
+}
+
+[data-theme="shadow-scheme"] {
+  --bg-canvas: 8 6 12;
+  --bg-panel: 12 10 20;
+  --bg-panel-raised: 18 14 28;
+  --bg-subtle: 24 18 36;
+  --border-subtle: 255 255 255 / 0.07;
+  --border-strong: 255 255 255 / 0.15;
+  --text-primary: 250 245 255;
+  --text-muted: 216 180 254;
+  --text-faint: 120 90 160;
+  --accent: 91 33 182;
+  --accent-strong: 39 26 58;
+  --accent-glow: 247 37 133;
+  --shadow-panel: 0 24px 60px rgba(16, 6, 28, 0.52);
+  --spark-primary: #5b21b6;
+  --spark-secondary: #f72585;
+  --bg-gradient-end: 5 4 10;
+}
+
+[data-theme="silver-dive"] {
+  --bg-canvas: 8 10 14;
+  --bg-panel: 12 16 22;
+  --bg-panel-raised: 18 24 32;
+  --bg-subtle: 24 32 42;
+  --border-subtle: 248 250 252 / 0.08;
+  --border-strong: 248 250 252 / 0.14;
+  --text-primary: 248 250 252;
+  --text-muted: 201 214 223;
+  --text-faint: 141 153 174;
+  --accent: 201 214 223;
+  --accent-strong: 141 153 174;
+  --accent-glow: 0 180 216;
+  --shadow-panel: 0 22px 55px rgba(6, 10, 20, 0.5);
+  --spark-primary: #c9d6df;
+  --spark-secondary: #00b4d8;
+  --bg-gradient-end: 5 7 12;
+}
+
+[data-theme="ember-holo"] {
+  --bg-canvas: 14 6 6;
+  --bg-panel: 22 10 10;
+  --bg-panel-raised: 32 14 12;
+  --bg-subtle: 42 18 14;
+  --border-subtle: 255 247 237 / 0.08;
+  --border-strong: 255 247 237 / 0.14;
+  --text-primary: 255 251 245;
+  --text-muted: 255 209 102;
+  --text-faint: 180 80 40;
+  --accent: 255 59 31;
+  --accent-strong: 255 122 24;
+  --accent-glow: 255 215 0;
+  --shadow-panel: 0 24px 58px rgba(20, 6, 4, 0.55);
+  --spark-primary: #ff3b1f;
+  --spark-secondary: #ffd700;
+  --bg-gradient-end: 10 4 4;
+}
+
+[data-theme="hoenn-dawn"] {
+  --bg-canvas: 4 12 10;
+  --bg-panel: 8 18 16;
+  --bg-panel-raised: 12 26 22;
+  --bg-subtle: 18 34 28;
+  --border-subtle: 255 255 255 / 0.07;
+  --border-strong: 255 255 255 / 0.14;
+  --text-primary: 236 253 245;
+  --text-muted: 185 251 192;
+  --text-faint: 90 140 110;
+  --accent: 45 211 111;
+  --accent-strong: 224 159 62;
+  --accent-glow: 255 122 24;
+  --shadow-panel: 0 22px 55px rgba(4, 14, 12, 0.5);
+  --spark-primary: #2dd36f;
+  --spark-secondary: #e09f3e;
+  --bg-gradient-end: 3 10 8;
+}
+
+[data-theme="rainbow-chase"] {
+  --bg-canvas: 10 8 14;
+  --bg-panel: 16 12 22;
+  --bg-panel-raised: 22 16 30;
+  --bg-subtle: 30 20 40;
+  --border-subtle: 255 255 255 / 0.08;
+  --border-strong: 255 255 255 / 0.16;
+  --text-primary: 250 245 255;
+  --text-muted: 216 180 254;
+  --text-faint: 140 100 180;
+  --accent: 255 0 110;
+  --accent-strong: 123 44 191;
+  --accent-glow: 0 245 212;
+  --shadow-panel: 0 24px 60px rgba(24, 8, 40, 0.48);
+  --spark-primary: #ff006e;
+  --spark-secondary: #00f5d4;
+  --bg-gradient-end: 6 4 10;
+}

@@ -1,0 +1,92 @@
+/**
+ * Pokémon Energy Nexus — canonical palettes & semantic wiring.
+ * RGB triplets pair with `rgb(var(--token) / <alpha>)` across the app.
+ */
+
+:root,
+html {
+  /* Nexus void foundation (doc base) */
+  --nexus-void: 5 6 10;
+  --nexus-panel: 11 15 24;
+  --nexus-card: 16 22 36;
+  --nexus-elevated: 21 28 44;
+  --nexus-text: 248 250 252;
+  --nexus-text-muted: 170 180 200;
+  --nexus-text-faint: 111 122 145;
+
+  /* Fire — ember core → solar flare */
+  --energy-fire-1: 255 69 38;
+  --energy-fire-2: 255 138 42;
+  --energy-fire-3: 255 214 120;
+  --energy-fire-glow: 255 92 32;
+
+  /* Water — abyss teal → surf foam */
+  --energy-water-1: 0 191 230;
+  --energy-water-2: 64 210 240;
+  --energy-water-3: 168 235 255;
+  --energy-water-glow: 0 191 230;
+
+  /* Electric — bolt gold → static white */
+  --energy-electric-1: 255 234 0;
+  --energy-electric-2: 255 210 0;
+  --energy-electric-3: 255 250 180;
+  --energy-electric-glow: 255 234 0;
+
+  /* Grass — jungle → spring leaf */
+  --energy-grass-1: 34 214 122;
+  --energy-grass-2: 118 255 108;
+  --energy-grass-3: 196 255 188;
+  --energy-grass-glow: 34 214 122;
+
+  /* Psychic — void violet → neon magenta */
+  --energy-psychic-1: 186 28 255;
+  --energy-psychic-2: 244 42 142;
+  --energy-psychic-3: 228 196 255;
+  --energy-psychic-glow: 186 28 255;
+
+  /* Dark — midnight → ultraviolet edge */
+  --energy-dark-1: 18 14 28;
+  --energy-dark-2: 52 32 78;
+  --energy-dark-3: 108 42 196;
+  --energy-dark-glow: 108 42 196;
+
+  /* Metal — gunmetal → chrome highlight */
+  --energy-metal-1: 132 146 168;
+  --energy-metal-2: 196 210 222;
+  --energy-metal-3: 244 248 252;
+  --energy-metal-glow: 196 210 222;
+
+  /* Fighting — clay → championship gold */
+  --energy-fighting-1: 204 128 58;
+  --energy-fighting-2: 232 164 64;
+  --energy-fighting-3: 250 216 108;
+  --energy-fighting-glow: 232 164 64;
+
+  /* Fairy — cotton candy → pearl blush */
+  --energy-fairy-1: 255 138 176;
+  --energy-fairy-2: 255 196 214;
+  --energy-fairy-3: 255 236 244;
+  --energy-fairy-glow: 255 138 176;
+
+  /* Dragon — auric prismatic chase */
+  --energy-dragon-1: 255 212 0;
+  --energy-dragon-2: 128 48 200;
+  --energy-dragon-3: 0 248 216;
+  --energy-dragon-4: 255 24 120;
+  --energy-dragon-glow: 255 212 0;
+
+  /* Global semantics (energy-backed, theme-agnostic) */
+  --semantic-success: var(--energy-grass-1);
+  --semantic-warning: var(--energy-fighting-2);
+  --semantic-danger: var(--energy-fire-1);
+  --semantic-scan: var(--energy-electric-1);
+  --semantic-ai: var(--energy-psychic-1);
+  --semantic-verified: var(--energy-grass-1);
+  --semantic-review: var(--energy-fighting-1);
+  --semantic-risk: var(--energy-fire-1);
+  --semantic-flow: var(--energy-water-1);
+
+  --success: var(--semantic-success);
+  --warning: var(--semantic-warning);
+  --danger: var(--semantic-danger);
+}

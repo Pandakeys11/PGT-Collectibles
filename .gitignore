@@ -1,0 +1,78 @@
+# =============================================================================
+# PGT Vision monorepo — gitignore
+# Deployable app: Alpha1/   |   Local-only reference: PGTVision/
+# =============================================================================
+
+# --- Not part of the product ---
+PGTVision/
+
+# --- Dependencies & build output ---
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+.next/
+out/
+build/
+dist/
+.swc/
+.turbo/
+*.tsbuildinfo
+.eslintcache
+.cache/
+
+# --- Environment & secrets (only safe templates are tracked) ---
+.env
+.env.*
+!.env.example
+!.env.production.example
+.env*.local
+.env.production
+.env.production.local
+.env.development.local
+.env.test.local
+
+# --- Hosting & auth sidecars ---
+.vercel/
+.clerk/
+
+# --- Generated reports & caches ---
+_reports/
+reports/
+**/reports/
+*.log
+*.pid
+*.pid.json
+
+# --- Local vendor exports & large optional data ---
+vendor/
+**/vendor/
+
+# --- SQLite / local DB ---
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# --- Supabase CLI ---
+**/.branches/
+**/.temp/
+
+# --- Test / coverage ---
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# --- OS & editors ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+
+# --- TLS / keys ---
+*.pem
