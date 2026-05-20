@@ -1,6 +1,6 @@
-# PGT Vision
+# PGT Collectibles
 
-Production app: **[Alpha1](./Alpha1/)** — Next.js scanner with Clerk auth, Supabase, Stripe billing, and vision/market enrichment.
+Production app: **[Alpha1](./Alpha1/)** — Next.js Pokémon TCG scanner with Clerk auth, Supabase, Stripe billing, and vision/market enrichment.
 
 `PGTVision/` is a **local-only** V1 reference (gitignored). Do not commit it.
 
