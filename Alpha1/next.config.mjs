@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["three", "@react-three/fiber"],
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: "/scanner",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {
