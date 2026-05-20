@@ -1,23 +1,14 @@
 import { structuredBriefSchema, type ScanCardContext, type StructuredBrief } from "@/lib/scan/schemas";
-
+import { parseNarrationBriefFromLlm } from "@/lib/scan/narration-brief";
 export function parseStructuredBriefFromLlm(
   raw: string,
   context: ScanCardContext,
 ): ReturnType<typeof structuredBriefSchema.safeParse> {
-  try {
-    const jsonText = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] ?? raw;
-    const parsed = JSON.parse(jsonText) as Record<string, unknown>;
-    if (
-      Array.isArray(parsed.marketEvidence) &&
-      parsed.marketEvidence.length === 0 &&
-      context.marketEvidence.length > 0
-    ) {
-      parsed.marketEvidence = context.marketEvidence.slice(0, 8);
-    }
-    return structuredBriefSchema.safeParse(parsed);
-  } catch {
-    return structuredBriefSchema.safeParse({});
+  const result = parseNarrationBriefFromLlm(raw, context);
+  if (result.ok) {
+    return structuredBriefSchema.safeParse(result.brief);
   }
+  return structuredBriefSchema.safeParse({});
 }
 
 export function briefToMarkdown(brief: StructuredBrief): string {

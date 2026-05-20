@@ -5,7 +5,7 @@ export const EARLY_USER_PROMO = {
   /** First N accounts to sign up (by signup order) */
   signupLimit: 200,
   /** One-time bonus scans granted at signup */
-  bonusScans: 20,
+  bonusScans: 50,
 } as const;
 
 export function hasEarlyUserPromo(earlyPromoNumber: number | null | undefined): boolean {

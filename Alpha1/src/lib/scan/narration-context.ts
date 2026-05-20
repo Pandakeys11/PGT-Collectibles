@@ -1,4 +1,5 @@
 import type { ScanCardContext } from "@/lib/scan/schemas";
+import { NARRATION_TODAY_ISO } from "@/lib/scan/narration-brief";
 
 const MAX_EVIDENCE = 12;
 const MAX_CATALOG_CANDIDATES = 3;
@@ -24,6 +25,7 @@ export function buildNarrationLlmContext(context: ScanCardContext): Record<strin
   return {
     specimenId: context.specimenId,
     asOf: context.marketAsOf,
+    todayUtc: NARRATION_TODAY_ISO,
     identity: {
       name: context.name,
       setName: context.setName,

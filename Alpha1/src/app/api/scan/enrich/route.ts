@@ -4,7 +4,7 @@ import { matchPokemonCatalog } from "@/lib/market/pokemon-catalog";
 import { researchCardMarket } from "@/lib/market/research";
 import { catalogMatchIsAuthoritative, mergeExtractedCardWithCatalog } from "@/lib/scan/catalog-merge";
 import { buildScanCardContext } from "@/lib/scan/context-builder";
-import { extractedCardSchema } from "@/lib/scan/schemas";
+import { catalogCandidateSchema, extractedCardSchema, identityEvidenceSchema } from "@/lib/scan/schemas";
 
 export const maxDuration = 300;
 
@@ -18,6 +18,10 @@ export async function POST(req: NextRequest) {
     phase?: string;
     catalogId?: string | null;
     catalogImageUrl?: string | null;
+    catalogIdentityStatus?: string;
+    catalogConfidence?: number;
+    catalogCandidates?: unknown;
+    identityEvidence?: unknown;
   };
   try {
     body = await req.json();
@@ -52,6 +56,23 @@ export async function POST(req: NextRequest) {
       typeof body.catalogImageUrl === "string" && body.catalogImageUrl.trim()
         ? body.catalogImageUrl.trim()
         : null;
+    const catalogIdentityStatus =
+      body.catalogIdentityStatus === "confirmed" ||
+      body.catalogIdentityStatus === "likely" ||
+      body.catalogIdentityStatus === "ambiguous" ||
+      body.catalogIdentityStatus === "failed"
+        ? body.catalogIdentityStatus
+        : catalogId
+          ? "confirmed"
+          : undefined;
+    const catalogConfidence =
+      typeof body.catalogConfidence === "number" && Number.isFinite(body.catalogConfidence)
+        ? body.catalogConfidence
+        : undefined;
+    const catalogCandidatesParsed = catalogCandidateSchema.array().safeParse(body.catalogCandidates);
+    const catalogCandidates = catalogCandidatesParsed.success ? catalogCandidatesParsed.data : undefined;
+    const identityEvidenceParsed = identityEvidenceSchema.array().safeParse(body.identityEvidence);
+    const identityEvidence = identityEvidenceParsed.success ? identityEvidenceParsed.data : undefined;
 
     const context = buildScanCardContext({
       specimenId,
@@ -59,6 +80,10 @@ export async function POST(req: NextRequest) {
       catalogId,
       year: parsedCard.data.year ?? null,
       catalogImageUrl,
+      catalogIdentityStatus,
+      catalogConfidence,
+      catalogCandidates,
+      identityEvidence,
       marketEvidence: market.marketEvidence,
       marketSourceLinks: market.marketSourceLinks,
       fairValueUsd: market.fairValueUsd,

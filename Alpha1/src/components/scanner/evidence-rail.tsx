@@ -210,7 +210,7 @@ export function EvidenceRail({
         </div>
       </dl>
       <section className="mt-4">
-        <SpecimenMarketSummary specimen={specimen} variant="hero" />
+        <SpecimenMarketSummary specimen={specimen} variant="compact" />
       </section>
       {specimen.context.catalogCandidates.length > 0 ? (
         <section className="mt-4">
@@ -241,11 +241,12 @@ export function EvidenceRail({
       </div>
       <section className="mt-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-faint">Recent sales and listings</h3>
-        <div className="mt-2">
+        <div className="mt-2 max-h-[min(18rem,42vh)] overflow-y-auto pr-0.5">
           <MarketEvidenceTable
             items={specimen.context.marketEvidence}
             hubLinks={specimen.context.marketSourceLinks}
             card={specimen.card}
+            maxRows={12}
           />
         </div>
       </section>

@@ -1,12 +1,12 @@
 /**
- * Functional check: early-user promo grants 20 bonus scans for signup slots 1–200 only.
+ * Functional check: early-user promo grants 50 bonus scans for signup slots 1–200 only.
  * Usage: node scripts/verify-early-user-promo.mjs
  */
 import pg from "pg";
 import { loadEnvLocal } from "./load-env-local.mjs";
 
 const EARLY_PROMO_LIMIT = 200;
-const EARLY_PROMO_BONUS = 20;
+const EARLY_PROMO_BONUS = 50;
 
 loadEnvLocal();
 

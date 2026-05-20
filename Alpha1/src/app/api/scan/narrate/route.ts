@@ -1,29 +1,13 @@
 import { NextRequest } from "next/server";
 import { completePlainText } from "@/lib/ai/text";
-import { buildLocalStructuredBrief } from "@/lib/scan/local-brief";
 import { buildNarrationLlmContext } from "@/lib/scan/narration-context";
-import { briefToMarkdown, parseStructuredBriefFromLlm } from "@/lib/scan/parse-structured-brief";
-import { scanCardContextSchema, structuredBriefSchema } from "@/lib/scan/schemas";
-
-const NARRATION_SYSTEM = `You are a senior Pokémon TCG market analyst writing a **research desk brief** for a collector.
-
-Rules:
-- Use ONLY facts in the JSON context. Never invent prices, URLs, dates, populations, or comps.
-- marketEvidence in your output must be copied from context rows (subset ok); do not fabricate titles or prices.
-- Hubs are in marketSourceLinks — do not paste URLs in nextChecks.
-
-Return a single JSON object with keys:
-summary, marketSnapshot, compAnalysis, verification, gradedSupply, marketEvidence, valuation, nextChecks
-
-Field guide:
-- summary: 3–4 sentences — identity, lane (raw/graded), verification state, top takeaway.
-- marketSnapshot: 2–3 sentences — FMV basis, sticker/ask vs FMV, what current in-session comps imply.
-- compAnalysis: 3–5 short bullets or one tight paragraph grouping sold vs active vs reference rows by price and date.
-- verification: same shape as context.verificationFields (field, extracted, verified, status).
-- gradedSupply: population/registry note from context or null.
-- marketEvidence: up to 8 rows from context (preserve kind, title, priceUsd, observedAt, source, slab).
-- valuation: 2–3 sentences — pricing thesis grounded in FMV and comps.
-- nextChecks: 3–5 imperative actions (no URLs).`;
+import {
+  buildSessionBrief,
+  NARRATION_SYSTEM,
+  parseNarrationBriefFromLlm,
+} from "@/lib/scan/narration-brief";
+import { briefToMarkdown } from "@/lib/scan/parse-structured-brief";
+import { scanCardContextSchema } from "@/lib/scan/schemas";
 
 function chunkTextForSse(text: string, size = 240): string[] {
   const parts: string[] = [];
@@ -47,6 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   const context = parsed.data;
+  const sessionBrief = buildSessionBrief(context);
   const llmContext = buildNarrationLlmContext(context);
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -61,60 +46,60 @@ export async function POST(req: NextRequest) {
           { json: true },
         );
 
-        let structured = null as ReturnType<typeof structuredBriefSchema.safeParse> | null;
-        let provider = "local";
-        let streamText = "";
+        let brief = sessionBrief;
+        let provider = "session";
 
         if (result.ok) {
-          provider = result.provider;
-          streamText = result.text;
-          structured = parseStructuredBriefFromLlm(result.text, context);
-        }
-
-        if (!structured?.success) {
-          const fallback = buildLocalStructuredBrief(context);
-          structured = structuredBriefSchema.safeParse(fallback);
-          if (!result.ok) {
+          const llmBrief = parseNarrationBriefFromLlm(result.text, context, sessionBrief);
+          if (llmBrief.ok) {
+            brief = llmBrief.brief;
+            provider = llmBrief.source === "llm" ? result.provider : `${result.provider}+session`;
+            if (llmBrief.salvaged) {
+              send({
+                type: "notice",
+                level: "info",
+                message:
+                  "Brief uses your **session comps and FMV**; the model narrative was partially trimmed and merged with verified session fields.",
+              });
+            }
+          } else {
             send({
               type: "notice",
+              level: "info",
               message:
-                "Live LLM unavailable — showing a **research brief from your session data** (extraction + market enrich). Free tier: set `FREE_TIER_ONLY=1`, `TEXT_PROVIDER_ORDER=groq,openrouter,gemini`, and skip exhausted providers via `TEXT_SKIP_PROVIDERS` (see `.env.example`).",
-              detail: result.cause ?? result.error,
+                "Brief built from **your session data** (catalog match, FMV, and in-session comps). The text model did not return usable JSON.",
+              detail: result.text.slice(0, 280),
             });
-          } else if (result.ok) {
-            send({
-              type: "notice",
-              message:
-                "LLM returned invalid JSON — showing the **offline research brief** from session data. Try Refresh or a different text model.",
-              detail: result.text.slice(0, 400),
-            });
-          }
-        }
-
-        if (structured?.success) {
-          const markdown = briefToMarkdown(structured.data);
-          for (const part of chunkTextForSse(markdown)) {
-            send({ type: "text", text: part });
-          }
-          send({ type: "structured", payload: structured.data });
-        } else if (streamText) {
-          for (const part of chunkTextForSse(streamText)) {
-            send({ type: "text", text: part });
           }
         } else {
           send({
-            type: "error",
-            message: "Unable to build specimen brief",
-            detail: result.ok ? undefined : result.cause,
+            type: "notice",
+            level: "info",
+            message:
+              "Brief built from **your session data** (extraction + market enrich). Configure `GROQ_API_KEY` or `OPENROUTER_API_KEY` for an optional AI narrative layer.",
+            detail: result.cause ?? result.error,
           });
         }
 
+        const markdown = briefToMarkdown(brief);
+        for (const part of chunkTextForSse(markdown)) {
+          send({ type: "text", text: part });
+        }
+        send({ type: "structured", payload: brief });
         send({ type: "done", provider });
       } catch (err) {
+        const markdown = briefToMarkdown(sessionBrief);
+        for (const part of chunkTextForSse(markdown)) {
+          send({ type: "text", text: part });
+        }
+        send({ type: "structured", payload: sessionBrief });
         send({
-          type: "error",
-          message: err instanceof Error ? err.message : String(err),
+          type: "notice",
+          level: "info",
+          message: "Brief built from session data after an unexpected error.",
+          detail: err instanceof Error ? err.message : String(err),
         });
+        send({ type: "done", provider: "session" });
       } finally {
         controller.close();
       }

@@ -128,3 +128,37 @@ export function buildScanCardContext(args: {
 function cardRecordFromExtracted(card: ExtractedCard): Record<string, unknown> {
   return { ...card };
 }
+
+/** Catalog fields preserved when running market-only enrichment. */
+export type CatalogContextSnapshot = Pick<
+  ScanCardContext,
+  | "catalogId"
+  | "catalogIdentityStatus"
+  | "catalogConfidence"
+  | "catalogCandidates"
+  | "identityEvidence"
+  | "catalogImageUrl"
+>;
+
+export function pickCatalogContext(context: ScanCardContext): CatalogContextSnapshot {
+  return {
+    catalogId: context.catalogId,
+    catalogIdentityStatus: context.catalogIdentityStatus,
+    catalogConfidence: context.catalogConfidence,
+    catalogCandidates: context.catalogCandidates,
+    identityEvidence: context.identityEvidence,
+    catalogImageUrl: context.catalogImageUrl ?? null,
+  };
+}
+
+export function mergeCatalogIntoContext(
+  context: ScanCardContext,
+  catalog: Partial<CatalogContextSnapshot>,
+): ScanCardContext {
+  return {
+    ...context,
+    ...catalog,
+    catalogCandidates: catalog.catalogCandidates ?? context.catalogCandidates,
+    identityEvidence: catalog.identityEvidence ?? context.identityEvidence,
+  };
+}

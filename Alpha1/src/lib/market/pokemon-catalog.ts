@@ -644,7 +644,7 @@ export async function matchPokemonCatalog(
   const scored = hits
     .map((hit) => scoreCatalogCandidate(cardForSearch, hit, aliases))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
-    .slice(0, 8);
+    .slice(0, 12);
   const top = scored[0];
   if (!top) return null;
 

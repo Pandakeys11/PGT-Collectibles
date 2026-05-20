@@ -77,7 +77,7 @@ export function buildLocalStructuredBrief(context: ScanCardContext): StructuredB
   const refCount = context.marketEvidence.filter((e) => e.kind === "reference").length;
 
   const marketSnapshot = [
-    `Session comps: **${soldCount} sold** · **${activeCount} active** · **${refCount} reference** (as of ${new Date(context.marketAsOf).toLocaleDateString()}).`,
+    `Session comps: **${soldCount} sold** · **${activeCount} active** · **${refCount} reference** (enriched as of ${new Date(context.marketAsOf).toLocaleDateString()}).`,
     context.fairValueUsd != null
       ? `Model FMV **${formatUsd(context.fairValueUsd)}**${context.fairValueBasis ? ` (${basisLabel(context.fairValueBasis)})` : ""}${context.askingUsd != null ? ` vs sticker/ask **${formatUsd(context.askingUsd)}**` : ""}.`
       : "FMV not computed — confirm identity, then refresh market enrich.",

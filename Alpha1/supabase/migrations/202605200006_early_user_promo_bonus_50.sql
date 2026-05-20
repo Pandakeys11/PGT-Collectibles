@@ -1,4 +1,4 @@
--- Early user promo ledger + sync audit (run after 202605200004 enum commit)
+-- Bump early adopter promo from 20 → 50 bonus scans (sync with src/lib/auth/promotions.ts)
 
 create or replace function public.sync_clerk_user(
   p_clerk_user_id text,
@@ -118,24 +118,51 @@ begin
 end;
 $$;
 
+-- Top up existing early adopters who received the original 20-scan grant
+update public.app_users u
+set bonus_scans = u.bonus_scans + 30
+where u.early_promo_number is not null
+  and u.early_promo_number <= 200
+  and exists (
+    select 1
+    from public.usage_ledger ul
+    where ul.user_id = u.id
+      and ul.route in ('early_user_promo', 'early_user_promo_backfill')
+      and coalesce((ul.metadata_json->>'credits_granted')::integer, 0) = 20
+  )
+  and not exists (
+    select 1
+    from public.usage_ledger ul
+    where ul.user_id = u.id
+      and ul.route = 'early_user_promo_topup_50'
+  );
+
 insert into public.usage_ledger (user_id, event_type, credits_used, route, metadata_json)
 select
   u.id,
   'promo_grant',
   0,
-  'early_user_promo_backfill',
+  'early_user_promo_topup_50',
   jsonb_build_object(
     'promo_id', 'early_user_2026',
-    'credits_granted', 50,
+    'credits_granted', 30,
+    'previous_grant', 20,
+    'new_total_grant', 50,
     'early_promo_number', u.early_promo_number
   )
 from public.app_users u
 where u.early_promo_number is not null
   and u.early_promo_number <= 200
+  and exists (
+    select 1
+    from public.usage_ledger ul
+    where ul.user_id = u.id
+      and ul.route in ('early_user_promo', 'early_user_promo_backfill')
+      and coalesce((ul.metadata_json->>'credits_granted')::integer, 0) = 20
+  )
   and not exists (
     select 1
     from public.usage_ledger ul
     where ul.user_id = u.id
-      and ul.event_type = 'promo_grant'
-      and ul.route in ('early_user_promo', 'early_user_promo_backfill')
+      and ul.route = 'early_user_promo_topup_50'
   );

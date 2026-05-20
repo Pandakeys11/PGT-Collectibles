@@ -26,6 +26,7 @@ const ordered = [
   "202605200003_early_user_promo.sql",
   "202605200004_early_user_promo_ledger.sql",
   "202605200005_early_user_promo_ledger_apply.sql",
+  "202605200006_early_user_promo_bonus_50.sql",
 ];
 
 console.log("Migrations to apply (in order):\n");

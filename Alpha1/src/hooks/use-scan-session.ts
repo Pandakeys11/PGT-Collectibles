@@ -5,7 +5,7 @@ import {
   hasMinimumIdentityForCatalog,
   patchTouchesManualIdentity,
 } from "@/lib/scan/catalog-merge";
-import { buildScanCardContext } from "@/lib/scan/context-builder";
+import { buildScanCardContext, pickCatalogContext } from "@/lib/scan/context-builder";
 import {
   enrichExtractedCard,
   flushRuntimeCaches,
@@ -329,14 +329,22 @@ export function useScanSession() {
                 specimenId: latest.id,
                 card: latest.card,
                 phase: "market",
-                catalogId: latest.context.catalogId,
-                catalogImageUrl: latest.context.catalogImageUrl,
+                ...pickCatalogContext(latest.context),
                 skipCache: true,
               });
               setSpecimens((current) =>
                 current.map((entry) =>
                   entry.id === latest.id
-                    ? { ...entry, card: result.card, context: result.context }
+                    ? {
+                        ...entry,
+                        card: result.card,
+                        context: {
+                          ...result.context,
+                          ...pickCatalogContext(latest.context),
+                          catalogId: latest.context.catalogId ?? result.context.catalogId,
+                          catalogImageUrl: latest.context.catalogImageUrl ?? result.context.catalogImageUrl,
+                        },
+                      }
                     : entry,
                 ),
               );
@@ -710,12 +718,16 @@ export function useScanSession() {
           specimenId: id,
           card: catalogEnriched.card,
           phase: "market",
-          catalogId: catalogEnriched.context.catalogId,
-          catalogImageUrl: catalogEnriched.context.catalogImageUrl,
+          ...pickCatalogContext(catalogEnriched.context),
           skipCache: true,
         });
         if (stale()) return;
-        patchRow(enriched.card, enriched.context);
+        patchRow(enriched.card, {
+          ...enriched.context,
+          ...pickCatalogContext(catalogEnriched.context),
+          catalogId: catalogEnriched.context.catalogId ?? enriched.context.catalogId,
+          catalogImageUrl: catalogEnriched.context.catalogImageUrl ?? enriched.context.catalogImageUrl,
+        });
       } catch (err) {
         if (!stale()) {
           if (isScanLimitError(err)) {
@@ -765,8 +777,7 @@ export function useScanSession() {
         specimenId: id,
         card: catalogResult.card,
         phase: "market",
-        catalogId: catalogResult.context.catalogId,
-        catalogImageUrl: catalogResult.context.catalogImageUrl,
+        ...pickCatalogContext(catalogResult.context),
         skipCache: true,
       });
       if (enrichRunRef.current.get(id) !== runId) return;
@@ -774,7 +785,16 @@ export function useScanSession() {
       setSpecimens((current) =>
         current.map((s) =>
           s.id === id
-            ? { ...s, card: marketResult.card, context: marketResult.context }
+            ? {
+                ...s,
+                card: marketResult.card,
+                context: {
+                  ...marketResult.context,
+                  ...pickCatalogContext(catalogResult.context),
+                  catalogId: catalogResult.context.catalogId ?? marketResult.context.catalogId,
+                  catalogImageUrl: catalogResult.context.catalogImageUrl ?? marketResult.context.catalogImageUrl,
+                },
+              }
             : s,
         ),
       );
@@ -829,13 +849,12 @@ export function useScanSession() {
             context: buildScanCardContext({
               specimenId: id,
               card,
-              catalogId: item.context.catalogId,
+              ...pickCatalogContext(item.context),
               year: card.year ?? item.context.year,
               marketEvidence: item.context.marketEvidence,
               marketSourceLinks: item.context.marketSourceLinks,
               fairValueUsd: item.context.fairValueUsd,
               fairValueBasis: item.context.fairValueBasis,
-              catalogImageUrl: item.context.catalogImageUrl ?? null,
             }),
           };
         }),
@@ -859,8 +878,13 @@ export function useScanSession() {
           specimenId: id,
           card,
           phase: "market",
+          ...pickCatalogContext(
+            specimensRef.current.find((item) => item.id === id)?.context ?? buildScanCardContext({ specimenId: id, card }),
+          ),
           catalogId,
           catalogImageUrl,
+          catalogIdentityStatus: "confirmed",
+          catalogConfidence: 1,
           skipCache: true,
         });
         if (enrichRunRef.current.get(id) !== runId) return;
@@ -868,7 +892,18 @@ export function useScanSession() {
         setSpecimens((current) =>
           current.map((item) =>
             item.id === id
-              ? { ...item, card: marketResult.card, context: marketResult.context }
+              ? {
+                  ...item,
+                  card: marketResult.card,
+                  context: {
+                    ...marketResult.context,
+                    catalogId,
+                    catalogIdentityStatus: "confirmed" as const,
+                    catalogConfidence: 1,
+                    catalogCandidates: item.context.catalogCandidates,
+                    catalogImageUrl: catalogImageUrl ?? marketResult.context.catalogImageUrl,
+                  },
+                }
               : item,
           ),
         );
@@ -1032,6 +1067,7 @@ export function useScanSession() {
           specimenId: row.id,
           card: row.card,
           phase: "market",
+          ...pickCatalogContext(row.context),
           catalogId: prefill.catalogId,
           catalogImageUrl: row.context.catalogImageUrl,
           skipCache: true,
@@ -1042,6 +1078,7 @@ export function useScanSession() {
           card: marketResult.card,
           context: {
             ...marketResult.context,
+            ...pickCatalogContext(row.context),
             catalogId: prefill.catalogId,
             catalogIdentityStatus: "confirmed",
             catalogImageUrl: row.context.catalogImageUrl,

@@ -24,6 +24,10 @@ export async function enrichExtractedCard(args: {
   phase?: EnrichPhase;
   catalogId?: string | null;
   catalogImageUrl?: string | null;
+  catalogIdentityStatus?: ScanCardContext["catalogIdentityStatus"];
+  catalogConfidence?: number;
+  catalogCandidates?: ScanCardContext["catalogCandidates"];
+  identityEvidence?: ScanCardContext["identityEvidence"];
   /** After resync, bypass market cache so identity/comps refresh for the new extraction. */
   skipCache?: boolean;
 }): Promise<{

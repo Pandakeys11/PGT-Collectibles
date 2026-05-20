@@ -20,7 +20,7 @@ async function readSseStream(
   response: Response,
   onText: (chunk: string) => void,
   onStructured: (payload: StructuredBrief) => void,
-  onNotice: (message: string, detail?: string) => void,
+  onNotice: (message: string, detail?: string, level?: "info" | "warn") => void,
 ) {
   if (!response.ok || !response.body) {
     throw new Error(`Narration failed (${response.status})`);
@@ -43,6 +43,7 @@ async function readSseStream(
         payload?: StructuredBrief;
         message?: string;
         detail?: string;
+        level?: "info" | "warn";
       };
       try {
         payload = JSON.parse(line.slice(5).trim()) as typeof payload;
@@ -52,7 +53,7 @@ async function readSseStream(
       if (payload.type === "text" && payload.text) onText(payload.text);
       if (payload.type === "structured" && payload.payload) onStructured(payload.payload);
       if (payload.type === "notice" && payload.message) {
-        onNotice(payload.message, payload.detail);
+        onNotice(payload.message, payload.detail, payload.level ?? "info");
       }
       if (payload.type === "error") {
         throw new Error(
@@ -69,7 +70,7 @@ export function InsightCanvas({ specimen }: { specimen: ScanSpecimen | null }) {
   const [loading, setLoading] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ message: string; level: "info" | "warn" } | null>(null);
   const [message, setMessage] = useState("");
   const [reply, setReply] = useState<string | null>(null);
 
@@ -91,7 +92,11 @@ export function InsightCanvas({ specimen }: { specimen: ScanSpecimen | null }) {
         response,
         (chunk) => setStreamText((current) => current + chunk),
         (payload) => setStructured(payload),
-        (message, detail) => setNotice(detail ? `${message} (${detail})` : message),
+        (message, detail, level) =>
+          setNotice({
+            message: detail ? `${message} (${detail})` : message,
+            level: level ?? "info",
+          }),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -284,7 +289,17 @@ export function InsightCanvas({ specimen }: { specimen: ScanSpecimen | null }) {
         ) : (
           <pre className="whitespace-pre-wrap text-base leading-relaxed text-primary sm:text-sm sm:leading-6">{streamText}</pre>
         )}
-        {notice ? <p className="text-base text-warning sm:text-sm">{notice}</p> : null}
+        {notice ? (
+          <p
+            className={
+              notice.level === "warn"
+                ? "text-base text-warning sm:text-sm"
+                : "text-base text-muted sm:text-sm"
+            }
+          >
+            {notice.message}
+          </p>
+        ) : null}
         {error ? <p className="text-base text-danger sm:text-sm">{error}</p> : null}
         {reply ? (
           <section>

@@ -30,7 +30,7 @@ The first-500 rule is enforced in the Supabase `sync_clerk_user` function with a
 - Monthly counters reset on the first UTC day of each month.
 - Rate-limit blocks are recorded in `usage_ledger`.
 - Bonus scan packs never expire; pricing lives in `src/lib/billing/pricing.ts`.
-- **Early adopter promo:** the first **200** accounts to sign up receive **+20 bonus scans** automatically at signup (`early_promo_number` on `app_users`). Constants in `src/lib/auth/promotions.ts`; enforced in `sync_clerk_user` (`202605200003_early_user_promo.sql`).
+- **Early adopter promo:** the first **200** accounts to sign up receive **+50 bonus scans** automatically at signup (`early_promo_number` on `app_users`). Constants in `src/lib/auth/promotions.ts`; enforced in `sync_clerk_user`.
 - Scanner UI shows live quota via `/api/account/me`; upgrade at `/usage`.
 
 ## Data Rules

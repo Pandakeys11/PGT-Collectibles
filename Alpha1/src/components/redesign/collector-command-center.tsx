@@ -89,6 +89,7 @@ import { useCompanion } from "@/hooks/use-companion";
 import { useActiveThemeEnergy } from "@/hooks/use-active-theme-energy";
 import { ThemeControl } from "@/components/shell/theme-control";
 import { moduleFromViewParam, SCANNER_PATH, scannerHref } from "@/lib/app-routes";
+import { CatalogMatchPanel } from "@/components/scanner/catalog-match-panel";
 import { confidenceToEnergy, type EnergyType } from "@/lib/energy-theme";
 import { ENERGY_UI, energyNavClasses } from "@/lib/energy-ui";
 import { MODULE_ENERGY, type DeskModuleId } from "@/lib/module-energy";
@@ -1106,148 +1107,6 @@ function UploadPanel({
   );
 }
 
-function CatalogPanel({
-  specimen,
-  busy = false,
-  onConfirmCandidate,
-  onRejectCandidate,
-}: {
-  specimen: ScanSpecimen | null;
-  busy?: boolean;
-  onConfirmCandidate: (candidate: ScanSpecimen["context"]["catalogCandidates"][number]) => void;
-  onRejectCandidate: (catalogId: string) => void;
-}) {
-  const candidates = specimen?.context.catalogCandidates ?? [];
-  const best = candidates[0] ?? null;
-  const activeCatalogId = specimen?.context.catalogId ?? null;
-  return (
-    <section id="catalog" className={panelClass("p-3")}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase text-amber-200">Catalog intelligence</p>
-          <h2 className="mt-1 text-base font-semibold text-white">Identity match</h2>
-        </div>
-        <Link
-          href={scannerHref("catalog")}
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-white/10 bg-white/[0.05] px-3 text-sm font-semibold text-slate-200 transition hover:border-amber-200/35 hover:bg-amber-300/10"
-        >
-          <BookOpen className="h-4 w-4" />
-          Catalog
-        </Link>
-      </div>
-
-      <div className="mt-3 rounded-lg border border-white/[0.08] bg-[#070b10] p-3">
-        <div className="flex items-center gap-2 text-slate-500">
-          <Search className="h-4 w-4" />
-          <p className="truncate text-sm">
-            {specimen
-              ? [getCardDisplayTitle(specimen.card), specimen.card.set, specimen.card.number].filter(Boolean).join(" / ")
-              : "Select a scanned card to see catalog matches"}
-          </p>
-        </div>
-      </div>
-
-      {specimen ? (
-        <div className="mt-3 grid gap-3">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-md border border-white/[0.08] bg-white/[0.035] p-2">
-              <p className="text-[10px] uppercase text-slate-500">Status</p>
-              <p className="mt-1 truncate text-xs font-semibold text-amber-100">{specimen.context.catalogIdentityStatus}</p>
-            </div>
-            <div className="rounded-md border border-white/[0.08] bg-white/[0.035] p-2">
-              <p className="text-[10px] uppercase text-slate-500">Confidence</p>
-              <p className="mt-1 font-mono text-xs text-cyan-100">{pct(specimen.context.catalogConfidence)}</p>
-            </div>
-            <div className="rounded-md border border-white/[0.08] bg-white/[0.035] p-2">
-              <p className="text-[10px] uppercase text-slate-500">Options</p>
-              <p className="mt-1 font-mono text-xs text-fuchsia-100">{candidates.length}</p>
-            </div>
-          </div>
-
-          {best ? (
-            <div className="space-y-2">
-              {candidates.slice(0, 6).map((candidate) => {
-                const active = activeCatalogId === candidate.catalogId;
-                return (
-                  <div
-                    key={candidate.catalogId}
-                    className={cn(
-                      "grid gap-3 rounded-lg border p-2 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto]",
-                      active
-                        ? "border-emerald-300/25 bg-emerald-300/[0.08]"
-                        : "border-amber-300/16 bg-amber-300/[0.06]",
-                    )}
-                  >
-                    <div className="h-14 w-10 overflow-hidden rounded border border-white/10 bg-[#070b10]">
-                      {candidate.imageSmallUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={candidate.imageSmallUrl} alt="" className="h-full w-full object-contain" />
-                      ) : null}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-slate-100">{candidate.name}</p>
-                        {active ? (
-                          <span className="rounded border border-emerald-300/25 bg-emerald-300/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-200">
-                            User verified
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">
-                        {[candidate.setName, candidate.cardNumber, candidate.year, candidate.rarity].filter(Boolean).join(" / ") ||
-                          "Catalog metadata pending"}
-                      </p>
-                      {candidate.conflicts.length > 0 ? (
-                        <p className="mt-1 truncate text-[10px] text-rose-200/80">{candidate.conflicts[0]}</p>
-                      ) : candidate.reasons.length > 0 ? (
-                        <p className="mt-1 truncate text-[10px] text-slate-500">{candidate.reasons[0]}</p>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center gap-2 sm:justify-end">
-                      <div className="min-w-10 text-right font-mono text-xs text-amber-100">
-                        {Math.round(candidate.confidence * 100)}%
-                      </div>
-                      <button
-                        type="button"
-                        disabled={busy || active}
-                        onClick={() => onConfirmCandidate(candidate)}
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2 text-[11px] font-semibold text-emerald-100 transition hover:bg-emerald-300/15 disabled:pointer-events-none disabled:opacity-45"
-                      >
-                        Verify
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onRejectCandidate(candidate.catalogId)}
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-rose-300/20 bg-rose-300/8 px-2 text-[11px] font-semibold text-rose-100 transition hover:bg-rose-300/12 disabled:pointer-events-none disabled:opacity-45"
-                      >
-                        Deny
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-              {candidates.length > 6 ? (
-                <p className="text-center text-[11px] text-slate-500">
-                  Showing top 6 of {candidates.length} catalog candidates.
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <p className="rounded-lg border border-dashed border-white/[0.1] px-3 py-5 text-center text-sm text-slate-500">
-              Catalog match appears after scan enrichment. Edit the selected record and resync if the identity needs another pass.
-            </p>
-          )}
-        </div>
-      ) : (
-        <p className="mt-3 rounded-lg border border-dashed border-white/[0.1] px-3 py-5 text-center text-sm text-slate-500">
-          Select a scanned card to see match status, confidence, and best candidate.
-        </p>
-      )}
-    </section>
-  );
-}
-
 function median(values: number[]) {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -1370,7 +1229,7 @@ function PriceSparkline({ specimen }: { specimen: ScanSpecimen | null }) {
         </div>
         <TrendingUp className="h-4 w-4 text-emerald-200" />
       </div>
-      <div className="mt-3 h-40 rounded-md border border-white/[0.06] bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:32px_32px] p-2">
+      <div className="mt-3 h-28 rounded-md border border-white/[0.06] bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:32px_32px] p-2 sm:h-32">
         {points.length > 1 ? (
           <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible" preserveAspectRatio="none">
             <defs>
@@ -1419,45 +1278,44 @@ function MarketPanel({ specimen }: { specimen: ScanSpecimen | null }) {
   }[decision.tone];
 
   return (
-    <section id="market" className={panelClass("p-4")}>
+    <section id="market" className={panelClass("p-3 sm:p-4")}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase text-emerald-200">Market analytics</p>
           <h2 className="mt-1 text-lg font-semibold text-white">Value, comps, and sources</h2>
         </div>
-        <CircleDollarSign className="h-5 w-5 text-emerald-200" />
+        <CircleDollarSign className="h-5 w-5 shrink-0 text-emerald-200" />
       </div>
 
-      <div className="mt-4 grid gap-3 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className={cn("rounded-lg border p-3", toneClass)}>
-          <div className="flex items-start gap-3">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">{decision.label}</p>
-              <p className="mt-1 text-xs leading-5 opacity-80">{decision.detail}</p>
+      <div className="mt-3 space-y-3">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-start">
+          <div className={cn("rounded-lg border p-3", toneClass)}>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{decision.label}</p>
+                <p className="mt-1 text-xs leading-5 opacity-80">{decision.detail}</p>
+              </div>
             </div>
           </div>
+          <div className="grid grid-cols-3 gap-2">
+            <StatTile label="Sold comps" value={String(stats.sold.length)} tone="grass" detail={money(stats.soldMedian)} />
+            <StatTile label="Active asks" value={String(stats.active.length)} tone="fighting" detail="Live listings" />
+            <StatTile label="Sources" value={String(sources.length)} tone="electric" detail={stats.newest ? formatMarketDate(stats.newest.observedAt) : "No date"} />
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <StatTile label="Sold comps" value={String(stats.sold.length)} tone="grass" detail={money(stats.soldMedian)} />
-          <StatTile label="Active asks" value={String(stats.active.length)} tone="fighting" detail="Live listings" />
-          <StatTile label="Sources" value={String(sources.length)} tone="electric" detail={stats.newest ? formatMarketDate(stats.newest.observedAt) : "No date"} />
-        </div>
-      </div>
 
-      <div className="mt-4">
         {specimen ? (
           <SpecimenMarketSummary specimen={specimen} variant="hero" />
         ) : (
-          <div className="rounded-lg border border-dashed border-white/[0.1] px-3 py-8 text-center text-sm text-slate-500">
+          <div className="rounded-lg border border-dashed border-white/[0.1] px-3 py-6 text-center text-sm text-slate-500">
             Select a card to load fair value, sold comps, active listings, and source links.
           </div>
         )}
-      </div>
 
-      <div className="mt-4 grid gap-3 xl:grid-cols-[1.05fr_0.95fr]">
-        <PriceSparkline specimen={specimen} />
-        <div className="rounded-lg border border-white/[0.08] bg-[#070b10] p-3">
+        <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
+          <PriceSparkline specimen={specimen} />
+          <div className="rounded-lg border border-white/[0.08] bg-[#070b10] p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold uppercase text-slate-500">Source health</p>
@@ -1496,17 +1354,24 @@ function MarketPanel({ specimen }: { specimen: ScanSpecimen | null }) {
               <ExternalLink className="h-4 w-4" />
             </a>
           ) : null}
+          </div>
         </div>
-      </div>
 
-      <div className="mt-4">
         {specimen ? (
-          <MarketEvidenceTable
-            items={specimen.context.marketEvidence}
-            hubLinks={specimen.context.marketSourceLinks}
-            card={specimen.card}
-            maxRows={5}
-          />
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase text-slate-500">Session comps</p>
+              <p className="text-[10px] text-slate-500">
+                {specimen.context.marketEvidence.length} rows · use hubs on the right for live search
+              </p>
+            </div>
+            <MarketEvidenceTable
+              items={specimen.context.marketEvidence}
+              hubLinks={specimen.context.marketSourceLinks}
+              card={specimen.card}
+              maxRows={8}
+            />
+          </div>
         ) : null}
       </div>
     </section>
@@ -1537,7 +1402,7 @@ function CompanionMobilePanel({
 
 function AIInsightPanel({ specimen }: { specimen: ScanSpecimen | null }) {
   return (
-    <section id="ai" className={panelClass("min-h-0 p-3 lg:min-h-[34rem] lg:p-4")}>
+    <section id="ai" className={panelClass("p-3 lg:p-4")}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase text-fuchsia-200">AI insight</p>
@@ -1756,7 +1621,7 @@ function CommandCenterInner() {
       return;
     }
     const targetId = id === "catalog" ? "catalog-full" : id;
-    document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, []);
 
   return (
@@ -1797,7 +1662,7 @@ function CommandCenterInner() {
           coreEnergy={coreEnergy}
         />
 
-        <main className="min-w-0 px-3 py-3 pb-28 sm:px-6 sm:py-4 lg:px-8 lg:pb-8 xl:px-10">
+        <main className="flex min-w-0 flex-col gap-5 px-3 py-3 pb-28 sm:px-6 sm:py-4 lg:gap-5 lg:px-8 lg:pb-8 xl:px-10">
           <TopCommandBar
             busy={busy}
             progress={session.progress}
@@ -1834,7 +1699,7 @@ function CommandCenterInner() {
           </section>
 
           <div className={mobileModulePanel(activeModule, "scanner")}>
-            <section id="scanner" className="grid gap-5 xl:grid-cols-[22rem_minmax(0,1fr)_24rem]">
+            <section id="scanner" className="grid gap-5 xl:grid-cols-[22rem_minmax(0,1fr)_24rem] xl:items-start">
               <UploadPanel
                 slots={session.slots}
                 scanning={session.scanning}
@@ -1942,16 +1807,17 @@ function CommandCenterInner() {
             </section>
           </div>
 
-          <section id="master" className={cn("mt-5", mobileModulePanel(activeModule, "master"))}>
+          <section id="master" className={mobileModulePanel(activeModule, "master")}>
             <MasterSessionPanel specimens={session.specimens} totals={session.totals} />
           </section>
 
-          <section className="mt-5 grid gap-5 lg:mt-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
-            <div className="grid min-w-0 gap-5">
+          <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] xl:items-start">
+            <div className="grid min-w-0 content-start gap-5 self-start">
               <div className={mobileModulePanel(activeModule, "catalog")}>
-                <CatalogPanel
+                <CatalogMatchPanel
                   specimen={selected}
                   busy={Boolean(selectedBusy)}
+                  panelClassName={panelClass("p-3")}
                   onConfirmCandidate={(candidate) => {
                     if (selected) session.confirmCatalogCandidate(selected.id, candidate);
                   }}
@@ -1965,7 +1831,12 @@ function CommandCenterInner() {
               </div>
             </div>
 
-            <div className={cn("grid min-w-0 gap-5", mobileModulePanel(activeModule, "scanner"))}>
+            <div
+              className={cn(
+                "grid min-w-0 content-start gap-5 self-start",
+                mobileModulePanel(activeModule, "scanner"),
+              )}
+            >
               <section className={panelClass("p-4")}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -2002,18 +1873,18 @@ function CommandCenterInner() {
             </div>
           </section>
 
-          <section className={cn("mt-5", mobileModulePanel(activeModule, "ai"))}>
+          <section className={mobileModulePanel(activeModule, "ai")}>
             <AIInsightPanel specimen={selected} />
           </section>
 
           <section
             id="companion"
-            className={cn("mt-5", mobileModulePanel(activeModule, "companion"))}
+            className={mobileModulePanel(activeModule, "companion")}
           >
             <CompanionMobilePanel companion={companion} />
           </section>
 
-          <section className={cn("mt-5", mobileModulePanel(activeModule, "catalog"))}>
+          <section className={mobileModulePanel(activeModule, "catalog")}>
             <FullCatalogPanel />
           </section>
 

@@ -1,4 +1,4 @@
--- Early user promo: first 200 signups receive 20 bonus scans automatically (sync with src/lib/auth/promotions.ts)
+-- Early user promo: first 200 signups receive 50 bonus scans automatically (sync with src/lib/auth/promotions.ts)
 
 alter table public.app_users
   add column if not exists early_promo_number integer;
@@ -35,7 +35,7 @@ declare
   grant_early_promo boolean := false;
   master_admin_email constant text := 'solarverse2022@gmail.com';
   early_promo_limit constant integer := 200;
-  early_promo_bonus constant integer := 20;
+  early_promo_bonus constant integer := 50;
 begin
   if nullif(trim(p_clerk_user_id), '') is null then
     raise exception 'clerk_user_id is required';
@@ -128,7 +128,7 @@ with ranked as (
 update public.app_users u
 set
   early_promo_number = r.rn,
-  bonus_scans = u.bonus_scans + 20
+  bonus_scans = u.bonus_scans + 50
 from ranked r
 where u.id = r.id
   and r.rn <= 200

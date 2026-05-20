@@ -38,6 +38,7 @@ async function runOpenAiCompatible(
       { role: "user", content: user },
     ],
     temperature: 0.2,
+    max_tokens: jsonObject ? 1200 : 900,
     ...(jsonObject ? { response_format: { type: "json_object" as const } } : {}),
   });
   const text = response.choices[0]?.message?.content?.trim() ?? "";
@@ -51,6 +52,7 @@ async function runGeminiText(system: string, user: string, jsonObject?: boolean)
     model: getGeminiTextModel(),
     generationConfig: {
       temperature: 0.2,
+      maxOutputTokens: jsonObject ? 1200 : 900,
       ...(jsonObject ? { responseMimeType: "application/json" } : {}),
     },
   });
