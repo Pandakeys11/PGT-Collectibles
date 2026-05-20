@@ -13,23 +13,16 @@ If Vercel **Root Directory** is blank (`.`):
 1. `npm run build --prefix Alpha1` can succeed (you see routes in logs).
 2. Vercel still looks for the app output at the **repo root** → nothing to serve → platform 404.
 
-## Fix (choose one)
+## Fix
 
-### Option A — Recommended
+1. Vercel → **Settings → General → Root Directory** = `Alpha1` (you have this).
+2. **Do not** use a repo-root `vercel.json` with custom `outputDirectory` — that forces Framework **Other** and causes 404.
+3. **Framework Preset** = **Next.js** (default commands: `next build`, output `.next`).
+4. **Deployments → Redeploy** Production (or promote latest `main` deployment).
 
-Vercel → Project → **Settings → General → Root Directory** → set to:
+### Yellow warning: “Production deployment differs from Project Settings”
 
-```text
-Alpha1
-```
-
-Save → **Redeploy** Production.
-
-Remove or ignore the repo-root `vercel.json` if you use Option A (Vercel uses `Alpha1/` as project root).
-
-### Option B — Keep Root Directory as `.`
-
-Keep the repo-root `vercel.json` (sets `outputDirectory` to `Alpha1`) and redeploy.
+That means the **live** site was built with old settings (often Framework **Other**). Settings are correct now, but you must **redeploy** so Production Overrides match Next.js + `Alpha1`.
 
 ## After redeploy
 
