@@ -19,18 +19,6 @@ export type SyncResult = {
   error?: string;
 };
 
-function searchText(parts: (string | null | undefined)[]): string {
-  return parts
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\w\s/.-]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function isRecentRelease(releaseDate: string | null | undefined, days = 120): boolean {
   if (!releaseDate) return true;
   const t = Date.parse(releaseDate);

@@ -51,11 +51,11 @@ export async function enrichExtractedCard(args: {
 
     let response: Response;
     try {
-      const { skipRegistry: _skipRegistry, ...payload } = args;
+      const { skipRegistry, ...payload } = args;
       response = await fetch("/api/scan/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, skipRegistry: args.skipRegistry === true ? true : undefined }),
+        body: JSON.stringify({ ...payload, skipRegistry: skipRegistry === true ? true : undefined }),
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {

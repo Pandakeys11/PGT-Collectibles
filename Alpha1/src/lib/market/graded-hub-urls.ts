@@ -10,10 +10,6 @@ export type GradedHubLink = {
   lane: "sold" | "active" | "reference";
 };
 
-function compact(parts: Array<string | null | undefined>): string {
-  return parts.filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
-}
-
 export function buildAltBrowseUrl(query: string): string {
   return `https://app.alt.xyz/browse?q=${encodeURIComponent(query)}`;
 }

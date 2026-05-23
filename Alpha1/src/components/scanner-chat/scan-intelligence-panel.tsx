@@ -16,7 +16,6 @@ import { CatalogMatchPanel } from "@/components/scan-panels/catalog-match-panel"
 import { SpecimenMarketHub } from "@/components/scanner-chat/specimen-market-hub";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { ExtractedCard } from "@/lib/scan/schemas";
-import { getCardDisplayTitle } from "@/lib/scan/card-display";
 import type { CatalogCandidate } from "@/lib/scan/schemas";
 import type { CardMatch, ScanSummary } from "@/lib/scanner-chat/types";
 import { cn } from "@/lib/cn";

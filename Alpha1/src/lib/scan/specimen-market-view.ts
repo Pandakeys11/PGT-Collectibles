@@ -70,11 +70,6 @@ const SOURCE_BRAND: Record<
   fanatics: { accent: "#1d4ed8", tagline: "Fanatics Collect" },
 };
 
-function price(item: MarketEvidence): number | null {
-  const v = item.priceUsd;
-  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
-}
-
 function buildHighlight(
   evidence: MarketEvidence[],
   bucket: GradeBucketId,

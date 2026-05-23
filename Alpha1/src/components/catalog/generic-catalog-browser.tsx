@@ -121,7 +121,7 @@ export function GenericCatalogBrowser({
   useEffect(() => {
     if (!selectedSet) return;
     setCardsPage(1);
-  }, [selectedSet?.id, debouncedCardQ]);
+  }, [selectedSet, selectedSet?.id, debouncedCardQ]);
 
   useEffect(() => {
     if (!selectedSet) return;

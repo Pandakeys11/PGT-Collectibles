@@ -1,7 +1,6 @@
 import type { ExtractedCard } from "@/lib/scan/schemas";
 import { buildMarketSearchIdentity } from "@/lib/market/market-search-identity";
 import { MARKET_SOURCES, type MarketSourceId } from "@/lib/market/sources";
-import { franchiseSearchPrefix } from "@/lib/scan/franchise";
 
 export type MarketQuerySet = {
   rawSold: string;
@@ -26,7 +25,6 @@ function siteQuery(domain: string, query: string): string {
 
 export function buildMarketQueries(card: ExtractedCard): MarketQuerySet {
   const searchId = buildMarketSearchIdentity(card);
-  const franchise = franchiseSearchPrefix(card);
   const identity = searchId.raw;
   const graded = searchId.graded;
   const targetGradeSold = compact([searchId.ebayPrimary, "sold"]);

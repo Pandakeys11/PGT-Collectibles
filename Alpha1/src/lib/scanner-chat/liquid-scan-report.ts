@@ -1,7 +1,6 @@
 import { buildSessionBrief } from "@/lib/scan/narration-brief";
 import { buildNarrationLlmContext } from "@/lib/scan/narration-context";
 import type { ScanCardContext } from "@/lib/scan/schemas";
-import { buildScanSummaryFromSpecimens } from "@/lib/scanner-chat/specimen-present";
 import type { ScanSummary } from "@/lib/scanner-chat/types";
 import { NARRATION_TODAY_ISO } from "@/lib/scan/narration-brief";
 

@@ -147,8 +147,6 @@ export function ImageLightbox({
 export function ExpandableImageThumb({
   src,
   alt,
-  caption,
-  gallery,
   galleryIndex,
   onOpenGallery,
   className,
@@ -157,7 +155,9 @@ export function ExpandableImageThumb({
 }: {
   src: string;
   alt: string;
+  /** Reserved for future caption overlay in lightbox parent. */
   caption?: string;
+  /** Reserved — parent owns gallery state via onOpenGallery. */
   gallery: LightboxImage[];
   galleryIndex: number;
   onOpenGallery: (index: number) => void;

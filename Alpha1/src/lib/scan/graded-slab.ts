@@ -181,7 +181,7 @@ export function normalizeGradedSlabFields(
   let grader = cleanText(card.grader);
   let grade = cleanText(card.grade);
   let details: string | undefined = cleanText(card.details) || undefined;
-  let labelTitle = cleanText(card.labelTitle) || undefined;
+  const labelTitle = cleanText(card.labelTitle) || undefined;
   let name = cleanText(card.name);
   let set = cleanText(card.set);
   let number = cleanText(card.number);
@@ -280,7 +280,7 @@ export function mergeRegistrySlabIntoCard(
   registry?: RegistrySnapshot | null,
 ): ExtractedCard {
   if (!registry) return normalizeGradedSlabFields(card);
-  let next: ExtractedCard = { ...card };
+  const next: ExtractedCard = { ...card };
   if (!cleanText(next.grader) && registry.grader) next.grader = registry.grader;
   if (!cleanText(next.grade) && registry.grade) next.grade = registry.grade;
   if (isCertNotApplicable(next.cert) && registry.certNumber) {

@@ -30,3 +30,9 @@ yarn-error.log*
 .DS_Store
 *.pem
 /coverage
+
+# Local dev test captures (not shipped assets)
+/public/branding/binder-test-*
+
+# Optional local catalog export drops (see CATALOG_*_PATH in .env.example)
+/catalog-exports/

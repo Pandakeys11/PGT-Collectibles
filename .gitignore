@@ -69,6 +69,10 @@ playwright/.cache/
 *.mp4
 *.mov
 Screen Recording*
+**/public/branding/binder-test-*
+
+# --- Optional local catalog export drops ---
+**/catalog-exports/
 
 # --- OS & editors ---
 .DS_Store

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Menu, PanelRightOpen } from "lucide-react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
