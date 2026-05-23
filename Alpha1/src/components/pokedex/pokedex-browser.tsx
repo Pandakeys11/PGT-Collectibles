@@ -229,7 +229,17 @@ function CatalogMetaRow({
   );
 }
 
-export function PokedexBrowser({ scanTargetPath }: { scanTargetPath?: string } = {}) {
+export function PokedexBrowser({
+  scanTargetPath,
+  onScanPrefill,
+  embedded = false,
+}: {
+  scanTargetPath?: string;
+  /** In-app handoff (e.g. Liquid Scan chat) — skips route navigation. */
+  onScanPrefill?: (prefill: CatalogScanPrefill) => void;
+  /** Compact layout for chat output panels. */
+  embedded?: boolean;
+} = {}) {
   const [setEra, setSetEra] = useState<SetEraId>("modern");
   const [setQuery, setSetQuery] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -506,6 +516,7 @@ export function PokedexBrowser({ scanTargetPath }: { scanTargetPath?: string } =
       detail.catalogFinish === "reverse_holo" ? "Reverse Holo" : null,
     ].filter(Boolean) as string[];
     return {
+      franchise: "pokemon",
       catalogId: detail.id,
       name: detail.name,
       set: setName,
@@ -551,8 +562,14 @@ export function PokedexBrowser({ scanTargetPath }: { scanTargetPath?: string } =
   }, [detail, selectedSetName, selectedSetSnapshot]);
 
   return (
-    <div className="relative min-w-0 max-w-full overflow-x-hidden">
-      <div className="mx-auto max-w-[1600px]">
+    <div
+      className={cn(
+        "relative min-w-0 max-w-full overflow-x-hidden",
+        embedded && "liquid-catalog-embed text-slate-200",
+      )}
+    >
+      <div className={cn("mx-auto max-w-full", !embedded && "max-w-[1600px]")}>
+        {embedded ? null : (
         <p className="text-xs leading-relaxed text-muted">
           Card data from{" "}
           <a
@@ -579,7 +596,9 @@ export function PokedexBrowser({ scanTargetPath }: { scanTargetPath?: string } =
           ) : null}
           .
         </p>
+        )}
 
+        {!embedded ? (
         <div className="mt-4 flex items-center gap-2">
           <BookOpen className="h-7 w-7 text-accent" aria-hidden />
           <div>
@@ -592,22 +611,45 @@ export function PokedexBrowser({ scanTargetPath }: { scanTargetPath?: string } =
             </p>
           </div>
         </div>
+        ) : null}
 
-        <div className="mt-8 grid min-h-0 gap-4 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-          <Card className="desk-surface-raised flex max-h-[70dvh] min-h-0 flex-col overflow-hidden p-5 sm:max-h-none lg:max-h-[calc(100dvh-10rem)]">
-            <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+        <div
+          className={cn(
+            "min-h-0 gap-3",
+            embedded
+              ? "mt-1 flex flex-col lg:grid lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)]"
+              : "mt-8 grid lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]",
+          )}
+        >
+          <Card
+            className={cn(
+              "desk-surface-raised flex min-h-0 flex-col overflow-hidden",
+              embedded
+                ? "max-h-[min(36dvh,300px)] shrink-0 p-2.5 sc-glass-raised !border-white/8 lg:max-h-[min(58dvh,520px)] lg:min-h-0 lg:p-3"
+                : "max-h-[70dvh] p-4 sm:max-h-none sm:p-5 lg:max-h-[calc(100dvh-10rem)]",
+            )}
+          >
+            <div className={cn("flex shrink-0 flex-col gap-2", embedded ? "" : "sm:flex-row sm:items-center")}>
               <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+                <Search
+                  className={cn(
+                    "pointer-events-none absolute top-1/2 -translate-y-1/2 text-faint",
+                    embedded ? "left-2 h-3.5 w-3.5" : "left-2.5 h-4 w-4",
+                  )}
+                />
                 <Input
                   value={setQuery}
                   onChange={(e) => setSetQuery(e.target.value)}
                   placeholder="Search set name…"
-                  className="pl-9"
+                  className={cn(embedded ? "h-8 pl-8 text-[11px] sm:h-8" : "pl-9")}
                   aria-label="Search sets"
                 />
               </div>
               <div
-                className="grid shrink-0 grid-cols-3 gap-1 rounded-xl border border-border-subtle bg-panel-raised/40 p-1"
+                className={cn(
+                  "grid shrink-0 grid-cols-3 gap-0.5 rounded-lg border border-border-subtle bg-panel-raised/40 p-0.5",
+                  embedded ? "" : "gap-1 rounded-xl p-1",
+                )}
                 role="group"
                 aria-label="Filter sets by era"
               >
@@ -621,7 +663,8 @@ export function PokedexBrowser({ scanTargetPath }: { scanTargetPath?: string } =
                       aria-pressed={active}
                       onClick={() => setSetEra(era)}
                       className={cn(
-                        "rounded-lg px-1.5 py-2 text-center text-[10px] font-semibold leading-tight transition touch-manipulation sm:px-2 sm:text-xs",
+                        "rounded-md px-1 py-1.5 text-center font-semibold leading-tight transition touch-manipulation",
+                        embedded ? "text-[9px]" : "rounded-lg px-1.5 py-2 text-[10px] sm:px-2 sm:text-xs",
                         active
                           ? "bg-accent text-canvas shadow-sm"
                           : "text-muted hover:bg-panel-raised hover:text-primary",
@@ -633,7 +676,11 @@ export function PokedexBrowser({ scanTargetPath }: { scanTargetPath?: string } =
                 })}
               </div>
             </div>
-            <p className="mt-2 text-[10px] leading-snug text-muted sm:text-[11px]">{SET_ERA_DESCRIPTION[setEra]}</p>
+            {!embedded ? (
+              <p className="mt-2 text-[10px] leading-snug text-muted sm:text-[11px]">
+                {SET_ERA_DESCRIPTION[setEra]}
+              </p>
+            ) : null}
 
             <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-lg border border-border-subtle bg-panel-raised/30">
               {setsLoading ? (
@@ -707,7 +754,14 @@ export function PokedexBrowser({ scanTargetPath }: { scanTargetPath?: string } =
             </div>
           </Card>
 
-          <Card className="desk-surface-raised flex min-h-[50dvh] flex-col overflow-hidden p-5 lg:min-h-[calc(100dvh-10rem)]">
+          <Card
+            className={cn(
+              "desk-surface-raised flex min-h-0 flex-col overflow-hidden",
+              embedded
+                ? "min-h-[min(38dvh,340px)] flex-1 p-2.5 sc-glass-raised !border-white/8 lg:min-h-[min(58dvh,520px)] lg:p-3"
+                : "min-h-[50dvh] p-4 sm:p-5 lg:min-h-[calc(100dvh-10rem)]",
+            )}
+          >
             {!selectedSetId ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-16 text-center text-sm text-muted">
                 <p className="max-w-sm text-pretty">Choose a set on the left to load its cards here.</p>
@@ -984,6 +1038,7 @@ export function PokedexBrowser({ scanTargetPath }: { scanTargetPath?: string } =
                   prefill={catalogScanPrefill}
                   className="w-full sm:w-auto"
                   targetPath={scanTargetPath}
+                  onScan={onScanPrefill}
                 />
               ) : null}
               {detail.tcgplayer?.url ? (

@@ -59,11 +59,11 @@ export default async function SavedPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Link
-                href="/scanner"
+                href="/liquid-scan"
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/15"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Command center
+                Liquid Scan
               </Link>
             </div>
           </div>

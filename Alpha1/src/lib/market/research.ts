@@ -11,9 +11,17 @@ import {
   type MarketSourceId,
 } from "@/lib/market/sources";
 import { collectApiMarketEvidence } from "@/lib/market/adapters/run-api-evidence";
+import { harvestGradedMarketEvidence } from "@/lib/market/graded-sales-harvest";
+import { classifyCardLane } from "@/lib/scan/lane";
 import { sanitizeEvidenceList } from "@/lib/market/evidence-dates";
 import { withTimeout } from "@/lib/async-timeout";
 import { searchWeb, type WebSearchResult } from "@/lib/market/web-search";
+import { franchiseLabel } from "@/lib/scan/franchise";
+import {
+  inferCardTargetGradeBucket,
+  inferEvidenceGradeBucket,
+  inferMarketVenueType,
+} from "@/lib/market/market-intelligence";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 
 const MARKET_SOURCES_LINE =
@@ -35,11 +43,11 @@ const MARKET_JSON_SCHEMA = `{
   ]
 }`;
 
-const MARKET_ANALYST_SYSTEM = `You are a senior TCG market analyst. Pull the freshest sold comps and active asks from ${MARKET_SOURCES_LINE}.
+const MARKET_ANALYST_SYSTEM = `You are a senior trading-card and collectibles market analyst for Pokemon TCG, other TCGs (One Piece, Yu-Gi-Oh!, Magic, Lorcana, Dragon Ball), and sports cards. Pull the freshest sold comps and active asks from ${MARKET_SOURCES_LINE}.
 
 Today's date is ${RESEARCH_TODAY_ISO} (use only for reasoning, not as a fake observedAt).
 
-Card Ladder links: search uses \`https://www.cardladder.com/ladder?query=...&category=Pokemon\`; use \`/ladder/card/...\` only when that exact URL appears in snippets—never invent slugs.
+Card Ladder links: use the provided Card Ladder search URL; use \`/ladder/card/...\` only when that exact URL appears in snippets. Never invent slugs.
 
 Return only verifiable rows with real URLs, USD prices when visible, and the correct source label.
 Prioritize PSA 10 and BGS Black Label sold comps when the card is vintage, chase, or slab-relevant.
@@ -134,6 +142,7 @@ const SOURCE_DOMAIN_PATTERN: Record<MarketSourceId, RegExp> = {
   cardladder: /cardladder\.com/i,
   alt: /alt\.xyz/i,
   goldin: /goldin\.co/i,
+  fanatics: /fanatics/i,
   pricecharting: /pricecharting\.com/i,
   cardmarket: /cardmarket\.com/i,
   tcgplayer: /tcgplayer\.com/i,
@@ -170,7 +179,7 @@ export async function collectSnippetMarketEvidence(card: ExtractedCard): Promise
 async function collectSourceSnippets(card: ExtractedCard) {
   const queries = buildMarketQueries(card);
   const sourceIds = (
-    ["ebay", "pricecharting", "tcgplayer", "cardladder", "alt", "goldin", "cardmarket"] as MarketSourceId[]
+    ["ebay", "pricecharting", "tcgplayer", "cardladder", "alt", "goldin", "fanatics", "cardmarket"] as MarketSourceId[]
   ).filter((sourceId) => queries.bySource[sourceId]);
   const settled = await Promise.allSettled(
     sourceIds.flatMap((sourceId) => [
@@ -208,10 +217,12 @@ async function researchWithGemini(card: ExtractedCard, bundles: Awaited<ReturnTy
 Card JSON:
 ${JSON.stringify(card, null, 2)}
 
+Detected franchise/category: ${franchiseLabel(card)}
+
 Required coverage:
 1. Recent sold comps for the raw card.
 2. Recent sold comps for PSA 10.
-3. Recent sold comps for BGS Black Label.
+3. Recent sold comps for BGS Black Label when that grading lane is relevant.
 4. Current active listings across ${MARKET_SOURCES_LINE}.
 
 Source-targeted snippets:
@@ -236,6 +247,8 @@ async function researchWithSearchSnippets(
 
 Card JSON:
 ${JSON.stringify(card, null, 2)}
+
+Detected franchise/category: ${franchiseLabel(card)}
 
 Source snippets:
 ${JSON.stringify(bundles, null, 2)}
@@ -292,6 +305,15 @@ function rankEvidence(items: MarketEvidence[]): MarketEvidence[] {
   return [...items].sort((a, b) => priority(a) - priority(b));
 }
 
+function decorateEvidence(items: MarketEvidence[]): MarketEvidence[] {
+  return items.map((item) => ({
+    ...item,
+    gradeBucket: item.gradeBucket ?? inferEvidenceGradeBucket(item),
+    saleType: item.saleType ?? inferMarketVenueType(item),
+    confidence: item.confidence ?? (item.url && item.priceUsd != null ? 0.72 : item.url ? 0.52 : 0.35),
+  }));
+}
+
 export async function researchCardMarket(card: ExtractedCard): Promise<{
   marketEvidence: MarketEvidence[];
   fairValueUsd: number | null;
@@ -299,6 +321,12 @@ export async function researchCardMarket(card: ExtractedCard): Promise<{
   marketSourceLinks: ReturnType<typeof buildMarketSourceLinks>;
 }> {
   const marketSourceLinks = buildMarketSourceLinks(card);
+  const lane = classifyCardLane(card as Record<string, unknown>).lane;
+  const gradedHarvest =
+    lane === "graded" || card.cert
+      ? await withTimeout(harvestGradedMarketEvidence(card), 20_000, "graded harvest").catch(() => null)
+      : null;
+
   const apiEvidence = await withTimeout(collectApiMarketEvidence(card), 15_000, "market api adapters").catch(
     () => [],
   );
@@ -308,7 +336,11 @@ export async function researchCardMarket(card: ExtractedCard): Promise<{
     "market snippet collection",
   ).catch(() => ({ bundles: [], heuristicEvidence: [], queries: buildMarketQueries(card) }));
 
-  const evidence: MarketEvidence[] = [...apiEvidence, ...heuristicEvidence];
+  const evidence: MarketEvidence[] = [
+    ...apiEvidence,
+    ...(gradedHarvest?.evidence ?? []),
+    ...heuristicEvidence,
+  ];
   const tasks: Promise<MarketEvidence[]>[] = [];
 
   if (getGeminiApiKey()) {
@@ -323,9 +355,12 @@ export async function researchCardMarket(card: ExtractedCard): Promise<{
     evidence.push(...chunk);
   }
 
-  const marketEvidence = rankEvidence(dedupeEvidence(sanitizeEvidenceList(evidence))).slice(0, 36);
+  const marketEvidence = decorateEvidence(rankEvidence(dedupeEvidence(sanitizeEvidenceList(evidence))).slice(0, 36));
   const { fairValueUsd, fairValueBasis } = deriveFairValueResult(marketEvidence, {
+    card,
+    gradeCard: card,
     stickerUsd: typeof card.extractedPrice === "number" ? card.extractedPrice : null,
+    targetGradeBucket: inferCardTargetGradeBucket(card),
   });
   return {
     marketEvidence,

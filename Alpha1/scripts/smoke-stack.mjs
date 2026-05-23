@@ -102,9 +102,18 @@ async function testDevServer() {
     if (home.status >= 200 && home.status < 400) pass(`GET /`, `status ${home.status}`);
     else fail(`GET /`, `status ${home.status}`);
 
+    const liquid = await get("/liquid-scan");
+    if (liquid.status === 307 || liquid.status === 302 || liquid.status === 200) {
+      pass(`GET /liquid-scan`, `status ${liquid.status} (auth may redirect)`);
+    } else fail(`GET /liquid-scan`, `status ${liquid.status}`);
+
+    const legacyDisabled = process.env.LEGACY_SCANNER_ENABLED === "0";
     const scanner = await get("/scanner");
-    if (scanner.status === 307 || scanner.status === 302 || scanner.status === 200) {
-      pass(`GET /scanner`, `status ${scanner.status} (auth may redirect)`);
+    if (legacyDisabled) {
+      if (scanner.status === 410) pass(`GET /scanner`, "410 Gone (legacy disabled)");
+      else fail(`GET /scanner`, `expected 410, got ${scanner.status}`);
+    } else if (scanner.status === 307 || scanner.status === 302 || scanner.status === 200) {
+      pass(`GET /scanner`, `legacy redirect status ${scanner.status}`);
     } else fail(`GET /scanner`, `status ${scanner.status}`);
 
     const webhook = await fetch(`${baseUrl}/api/webhooks/clerk`, {

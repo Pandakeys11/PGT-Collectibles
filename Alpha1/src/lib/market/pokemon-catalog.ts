@@ -6,6 +6,11 @@ import type {
 } from "@/lib/scan/schemas";
 import { parseCollectorFraction } from "@/lib/scan/collector-fraction";
 import {
+  canonicalPromoSetName,
+  normalizePromoCardIdentity,
+  resolvePokemonPromoSet,
+} from "@/lib/scan/promo-set-aliases";
+import {
   catalogHitMatchesPrintedTotal,
   isEditionOnlySetName,
   setNamesMatch,
@@ -15,6 +20,9 @@ import {
   type TcgDexAlias,
 } from "@/lib/market/tcgdex-client";
 import { effectiveCatalogSearchName } from "@/lib/scan/card-display";
+import { inferCardFranchise } from "@/lib/scan/franchise";
+import { resolvePrintEdition } from "@/lib/scan/print-edition";
+import { hasReadableCertNumber } from "@/lib/scan/graded-slab";
 
 export type TcgPlayerVariantPrice = {
   variant: string;
@@ -512,6 +520,48 @@ function scoreCatalogCandidate(
     }
   }
 
+  const edition = resolvePrintEdition(scoringCard);
+  if (edition && edition.id !== "unknown") {
+    score += pushEvidence(evidence, {
+      field: "print edition",
+      extracted: scoringCard.printStamps ?? edition.label,
+      catalog: "Official API spine (name/set/number); edition from vision printStamps",
+      status: "match",
+      weight: 14,
+      reason: `Print run locked to ${edition.label} for comps and FMV.`,
+    });
+    reasons.push(`edition:${edition.id}`);
+  } else if (scoringCard.printStamps?.trim()) {
+    score += pushEvidence(evidence, {
+      field: "print edition",
+      extracted: scoringCard.printStamps,
+      catalog: null,
+      status: "info",
+      weight: 4,
+      reason: "Print stamps present but edition not fully resolved.",
+    });
+  }
+
+  const slabTrusted =
+    hasReadableCertNumber(scoringCard.cert) &&
+    (scoringCard.encapsulation === "graded_slab" ||
+      scoringCard.visionLane === "graded");
+  if (slabTrusted) {
+    const nameOk = evidence.some((e) => e.field === "name" && e.status === "match");
+    const numOk = evidence.some((e) => e.field === "collector number" && e.status === "match");
+    if (nameOk && numOk) {
+      score += pushEvidence(evidence, {
+        field: "slab label",
+        extracted: [scoringCard.grader, scoringCard.cert].filter(Boolean).join(" "),
+        catalog: "Graded label identity agrees with catalog",
+        status: "match",
+        weight: 14,
+        reason: "Slab cert present with matching name and collector number.",
+      });
+      reasons.push("slab label");
+    }
+  }
+
   const extractedRarity = scoringCard.rarity?.trim();
   if (extractedRarity && hit.rarity) {
     if (
@@ -553,38 +603,58 @@ function scoreCatalogCandidate(
 
 function resolveCatalogIdentityStatus(
   scored: ScoredCatalogCandidate[],
+  card?: ExtractedCard,
 ): CatalogIdentityStatus {
   if (scored.length === 0) return "failed";
   const [top, runnerUp] = scored;
   const gap = top.score - (runnerUp?.score ?? 0);
+  const slabTrusted =
+    hasReadableCertNumber(card?.cert) &&
+    (card?.encapsulation === "graded_slab" || card?.visionLane === "graded");
   if (top.score >= 90 && gap >= 15) return "confirmed";
   if (top.score >= 85 && scored.length === 1) return "confirmed";
+  if (slabTrusted && top.score >= 82 && gap >= 8 && top.reasons.includes("slab label")) {
+    return "confirmed";
+  }
   if (top.score >= 75 && gap >= 10) return "likely";
   if (top.score >= 55) return "ambiguous";
   return "failed";
-}
-
-function dedupeCatalogHits(hits: PokemonTcgCard[]): PokemonTcgCard[] {
-  const seen = new Set<string>();
-  const unique: PokemonTcgCard[] = [];
-  for (const hit of hits) {
-    if (seen.has(hit.id)) continue;
-    seen.add(hit.id);
-    unique.push(hit);
-  }
-  return unique;
 }
 
 function buildCatalogQueries(
   card: ExtractedCard,
   aliases: TcgDexAlias[] = [],
 ): string[] {
-  const name = (card.name?.trim() || card.printedName?.trim() || "").trim();
+  const promoNorm = normalizePromoCardIdentity({
+    set: card.set,
+    number: card.number,
+  });
+  const searchCard: ExtractedCard = {
+    ...card,
+    set: canonicalPromoSetName(promoNorm.set) ?? promoNorm.set ?? card.set,
+    number: promoNorm.number ?? card.number,
+  };
+
+  const name = (searchCard.name?.trim() || searchCard.printedName?.trim() || "").trim();
   if (!name) return [];
   const queries: string[] = [];
-  const frac = parseCollectorFraction(card.number);
-  const setName = card.set?.trim();
-  const number = card.number?.trim();
+  const frac = parseCollectorFraction(searchCard.number);
+  const setName = searchCard.set?.trim();
+  const number = searchCard.number?.trim();
+  const promoSet = resolvePokemonPromoSet(setName);
+
+  if (setName && number && !isEditionOnlySetName(setName)) {
+    queries.push(
+      `name:"${escapeQueryValue(name)}" set.name:"${escapeQueryValue(setName)}" number:"${escapeQueryValue(number)}"`,
+    );
+  }
+  if (promoSet && number) {
+    queries.push(
+      `set.id:${promoSet.setId} name:"${escapeQueryValue(name)}" number:"${escapeQueryValue(number)}"`,
+    );
+  } else if (promoSet) {
+    queries.push(`set.id:${promoSet.setId} name:"${escapeQueryValue(name)}"`);
+  }
   for (const alias of aliases) {
     queries.push(`id:${alias.tcgdexId}`);
     queries.push(`name:"${escapeQueryValue(alias.englishName)}"`);
@@ -604,13 +674,13 @@ function buildCatalogQueries(
     queries.push(
       `name:"${escapeQueryValue(name)}" number:"${escapeQueryValue(frac.num)}"`,
     );
-  }
-  if (number && looksLikeCollectorNumber(number)) {
+  } else if (number && looksLikeCollectorNumber(number)) {
     const head = number.split("/")[0]?.trim();
-    if (head)
+    if (head) {
       queries.push(
         `name:"${escapeQueryValue(name)}" number:"${escapeQueryValue(head)}"`,
       );
+    }
   }
   if (setName && !isEditionOnlySetName(setName)) {
     queries.push(
@@ -618,27 +688,72 @@ function buildCatalogQueries(
     );
   }
   queries.push(`name:"${escapeQueryValue(name)}"`);
-  return Array.from(new Set(queries));
+  return Array.from(new Set(queries)).slice(0, 6);
+}
+
+const LIVE_CATALOG_PAGE_SIZE = 28;
+const MAX_LIVE_CATALOG_QUERIES = 6;
+
+function needsTcgDexAliasLookup(card: ExtractedCard): boolean {
+  const lang = (card.language ?? "").trim();
+  if (lang && !/^english?$/i.test(lang)) return true;
+  const printed = card.printedName?.trim();
+  const name = card.name?.trim();
+  return Boolean(printed && name && printed.toLowerCase() !== name.toLowerCase());
+}
+
+async function collectCatalogHits(
+  cardForSearch: ExtractedCard,
+  aliases: TcgDexAlias[],
+  apiKey: string | undefined,
+): Promise<PokemonTcgCard[]> {
+  const queries = buildCatalogQueries(cardForSearch, aliases).slice(
+    0,
+    MAX_LIVE_CATALOG_QUERIES,
+  );
+  const seen = new Set<string>();
+  const hits: PokemonTcgCard[] = [];
+
+  for (const query of queries) {
+    const batch = await fetchCatalogCards(query, apiKey, LIVE_CATALOG_PAGE_SIZE);
+    for (const hit of batch) {
+      if (seen.has(hit.id)) continue;
+      seen.add(hit.id);
+      hits.push(hit);
+    }
+    if (hits.length >= 8) {
+      const scored = hits
+        .map((hit) => scoreCatalogCandidate(cardForSearch, hit, aliases))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8);
+      const status = resolveCatalogIdentityStatus(scored, cardForSearch);
+      const top = scored[0];
+      if (status === "confirmed" && top && top.score >= 85) break;
+    }
+  }
+
+  return hits;
 }
 
 export async function matchPokemonCatalog(
   card: ExtractedCard,
 ): Promise<CatalogMatch | null> {
+  if (!inferCardFranchise(card).isPokemon) return null;
   const searchName = effectiveCatalogSearchName(card);
   if (!searchName) return null;
 
-  const cardForSearch = { ...card, name: searchName };
+  const promoNorm = normalizePromoCardIdentity({ set: card.set, number: card.number });
+  const cardForSearch = {
+    ...card,
+    name: searchName,
+    set: canonicalPromoSetName(promoNorm.set) ?? promoNorm.set ?? card.set,
+    number: promoNorm.number ?? card.number,
+  };
   const apiKey = process.env.POKEMON_TCG_API_KEY?.trim();
-  const aliases = await resolveTcgDexAliases(card);
-  const hits = dedupeCatalogHits(
-    (
-      await Promise.all(
-        buildCatalogQueries(cardForSearch, aliases).map((query) =>
-          fetchCatalogCards(query, apiKey, 60),
-        ),
-      )
-    ).flat(),
-  );
+  const aliases = needsTcgDexAliasLookup(card)
+    ? await resolveTcgDexAliases(card)
+    : [];
+  const hits = await collectCatalogHits(cardForSearch, aliases, apiKey);
   if (hits.length === 0) return null;
 
   const scored = hits
@@ -648,7 +763,7 @@ export async function matchPokemonCatalog(
   const top = scored[0];
   if (!top) return null;
 
-  const status = resolveCatalogIdentityStatus(scored);
+  const status = resolveCatalogIdentityStatus(scored, cardForSearch);
   const frac = parseCollectorFraction(card.number);
   const matchBasis: CatalogMatch["matchBasis"] =
     status === "confirmed" && frac

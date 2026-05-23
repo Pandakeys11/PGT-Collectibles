@@ -29,8 +29,8 @@ npm run db:verify
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_test_...` |
 | `CLERK_SECRET_KEY` | `sk_test_...` |
 | `CLERK_WEBHOOK_SECRET` | staging webhook `whsec_...` |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `/scanner` |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `/scanner` |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `/liquid-scan` |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `/liquid-scan` |
 | `NEXT_PUBLIC_SUPABASE_URL` | same as local |
 | `SUPABASE_SERVICE_ROLE_KEY` | same as local |
 | `STRIPE_SECRET_KEY` | `sk_test_...` |
@@ -56,7 +56,7 @@ npm run db:verify
 
 ## 2e. Smoke test on staging URL
 
-- [ ] Sign up / sign in → `/scanner`
+- [ ] Sign up / sign in → `/liquid-scan`
 - [ ] Scan one image → usage increments
 - [ ] `/usage` loads; checkout opens
 - [ ] Test payment `4242 4242 4242 4242` → Pro or bonus scans in Supabase `app_users`

@@ -21,6 +21,22 @@ export const marketEvidenceSchema = z.object({
   url: z.string().url().nullable(),
   source: z.string().nullable().optional(),
   slab: z.string().nullable().optional(),
+  gradeBucket: z
+    .enum([
+      "raw",
+      "psa9",
+      "psa10",
+      "bgs10",
+      "bgsBlackLabel",
+      "cgc10",
+      "cgcPristine10",
+      "tag10",
+      "gradedOther",
+      "unknown",
+    ])
+    .optional(),
+  saleType: z.enum(["auction", "buy_now", "offer", "unknown"]).optional(),
+  confidence: z.number().min(0).max(1).optional(),
 });
 
 export const marketSourceLinkSchema = z.object({
@@ -29,6 +45,7 @@ export const marketSourceLinkSchema = z.object({
     "cardladder",
     "alt",
     "goldin",
+    "fanatics",
     "pricecharting",
     "cardmarket",
     "tcgplayer",
@@ -91,6 +108,10 @@ export const scanCardContextSchema = z.object({
       "reference_median",
       "sticker_anchor",
       "tcg_catalog",
+      "target_sold_median",
+      "target_active_median",
+      "target_reference_median",
+      "nearest_sold_median",
     ])
     .nullable()
     .optional(),
@@ -110,6 +131,11 @@ export const scanCardContextSchema = z.object({
   extraction: z.record(z.string(), z.unknown()),
   /** Official Pokémon TCG API small art when catalog match succeeds (enrich / resolver). */
   catalogImageUrl: z.string().nullable().optional(),
+  /** Grader cert lookup provider id (gemrate, psa_cert_page, web_snippet, …). */
+  certProvider: z.string().nullable().optional(),
+  certGradeDate: z.string().nullable().optional(),
+  /** Sold/active rows tied to this cert # (eBay / snippet harvest). */
+  certMarketEvidence: z.array(marketEvidenceSchema).optional(),
 });
 
 export const structuredBriefSchema = z.object({
@@ -138,6 +164,7 @@ export type ScanCardContext = z.infer<typeof scanCardContextSchema>;
 export type StructuredBrief = z.infer<typeof structuredBriefSchema>;
 
 export const extractedCardSchema = z.object({
+  franchise: z.string().max(80).optional(),
   name: z.string().min(1).max(160),
   printedName: z.string().max(160).optional(),
   language: z.string().max(64).optional(),

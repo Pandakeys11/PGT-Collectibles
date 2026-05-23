@@ -1,17 +1,13 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(process.cwd(), "supabase", "migrations");
-const files = [
-  "202605180002_companion.sql",
-  "202605190001_billing_pro_bonus.sql",
-  "202605190002_master_admin_billing.sql",
-  "202605200001_pokemon_sprite_assets.sql",
-  "202605200002_free_tier_monthly_scans.sql",
-];
+const files = readdirSync(root)
+  .filter((name) => name.endsWith(".sql"))
+  .sort();
 
-const header = `-- AUTO-GENERATED — pending migrations bundle
--- Run once in Supabase SQL Editor, then: npm run db:verify
+const header = `-- AUTO-GENERATED — all migrations bundle
+-- Run once via: npm run db:apply
 -- Regenerate: node scripts/build-pending-sql.mjs
 
 `;
@@ -24,4 +20,4 @@ const body = files
   .join("\n");
 
 writeFileSync(join(process.cwd(), "supabase", "apply-pending-migrations.sql"), header + body);
-console.log("Wrote supabase/apply-pending-migrations.sql");
+console.log(`Wrote supabase/apply-pending-migrations.sql (${files.length} migrations)`);

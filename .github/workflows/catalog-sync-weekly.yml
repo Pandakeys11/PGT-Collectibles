@@ -1,0 +1,50 @@
+name: Weekly catalog sync
+
+on:
+  schedule:
+    # Sundays 08:00 UTC — full franchise refresh for new sets/cards
+    - cron: "0 8 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: catalog-sync-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    defaults:
+      run:
+        working-directory: Alpha1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: Alpha1/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify catalog API sources
+        run: npm run verify:catalog-live
+
+      - name: Sync all franchise catalogs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          POKEMON_TCG_API_KEY: ${{ secrets.POKEMON_TCG_API_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: npm run catalog:sync:all
+
+      - name: Smoke test catalog browse
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run smoke:catalog

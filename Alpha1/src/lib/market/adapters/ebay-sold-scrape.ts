@@ -1,13 +1,21 @@
 import type { MarketApiAdapter, ApiAdapterResult } from "@/lib/market/adapters/types";
+import { fetchApifyEbaySoldForCard, isApifyEbaySoldConfigured } from "@/lib/market/apify-ebay-sold";
 import { fetchEbayFindingCompletedSold } from "@/lib/market/ebay-finding-completed";
+import {
+  fetchEbayMarketplaceInsightsSold,
+  isEbayMarketplaceInsightsConfigured,
+} from "@/lib/market/ebay-marketplace-insights";
 import {
   buildEbaySoldCompletedSearchUrl,
   ebaySoldQueryCandidates,
+  ebaySearchCategoryIdForCard,
   isLikelyBlockedEbayHtml,
   parseEbayCaptionDateIso,
   parseEbayUsdAverage,
   parseEbayUsdFirst,
 } from "@/lib/market/ebay-sold-common";
+import { filterEbaySoldForCard } from "@/lib/market/ebay-evidence-match";
+import { getEbayFindingAppId } from "@/lib/market/env-market";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 
 const EBAY_SOLD_TIMEOUT_MS = 18_000;
@@ -52,8 +60,14 @@ function dedupeSold(items: MarketEvidence[]): MarketEvidence[] {
   return out;
 }
 
-async function scrapeEbaySoldHtml(query: string): Promise<{ evidence: MarketEvidence[]; blocked: boolean }> {
-  const url = buildEbaySoldCompletedSearchUrl(query, { ipg: 60 });
+async function scrapeEbaySoldHtml(
+  card: ExtractedCard,
+  query: string,
+): Promise<{ evidence: MarketEvidence[]; blocked: boolean }> {
+  const url = buildEbaySoldCompletedSearchUrl(query, {
+    ipg: 60,
+    categoryId: ebaySearchCategoryIdForCard(card),
+  });
   let html = "";
   try {
     const response = await fetch(url, {
@@ -138,41 +152,76 @@ async function scrapeEbaySoldHtml(query: string): Promise<{ evidence: MarketEvid
 }
 
 /**
- * Sold comps: Finding API when configured, else completed-listings HTML (Pokémon category 2536).
+ * Sold comps pipeline (recommended order):
+ * 1. Apify sold actor (production)
+ * 2. Marketplace Insights stub (when approved)
+ * 3. Finding API (legacy, non-blocking)
+ * 4. Completed-listings HTML scrape
  */
 async function collectEbaySoldEvidence(card: ExtractedCard): Promise<{ evidence: MarketEvidence[]; warnings: string[] }> {
   const warnings: string[] = [];
   const candidates = ebaySoldQueryCandidates(card);
   if (candidates.length === 0) return { evidence: [], warnings };
 
-  const fromFinding: MarketEvidence[] = [];
-  for (const q of candidates) {
-    const finding = await fetchEbayFindingCompletedSold(q, 24).catch(() => []);
-    fromFinding.push(...finding);
-    if (finding.length >= 3) break;
-  }
-  const findingDeduped = dedupeSold(fromFinding);
-  if (findingDeduped.length >= MAX_ITEMS) {
-    return { evidence: findingDeduped.slice(0, MAX_ITEMS), warnings };
+  const merged: MarketEvidence[] = [];
+
+  if (isApifyEbaySoldConfigured()) {
+    const apifyRows = await fetchApifyEbaySoldForCard(card).catch(() => []);
+    if (apifyRows.length > 0) merged.push(...apifyRows);
   }
 
-  const merged: MarketEvidence[] = [...findingDeduped];
+  if (isEbayMarketplaceInsightsConfigured()) {
+    const insightsRows = await fetchEbayMarketplaceInsightsSold(card).catch(() => []);
+    if (insightsRows.length > 0) merged.push(...insightsRows);
+  }
+
+  const dedupedEarly = filterEbaySoldForCard(card, dedupeSold(merged));
+  if (dedupedEarly.length >= MAX_ITEMS) {
+    return { evidence: dedupedEarly.slice(0, MAX_ITEMS), warnings };
+  }
+
+  const categoryId = ebaySearchCategoryIdForCard(card);
+  const findingDisabled = process.env.EBAY_DISABLE_FINDING === "1";
+  const fromFinding: MarketEvidence[] = [];
+
+  if (!findingDisabled && getEbayFindingAppId()) {
+    for (const q of candidates) {
+      const finding = await fetchEbayFindingCompletedSold(q, 24, categoryId).catch(() => []);
+      fromFinding.push(...finding);
+      if (finding.length >= 3) break;
+    }
+  }
+  merged.push(...fromFinding);
+
+  const dedupedMid = filterEbaySoldForCard(card, dedupeSold(merged));
+  if (dedupedMid.length >= MAX_ITEMS) {
+    return { evidence: dedupedMid.slice(0, MAX_ITEMS), warnings };
+  }
+
   let sawBlocked = false;
   for (const q of candidates) {
-    const { evidence, blocked } = await scrapeEbaySoldHtml(q);
+    const { evidence, blocked } = await scrapeEbaySoldHtml(card, q);
     if (blocked) sawBlocked = true;
     if (evidence.length > 0) {
       merged.push(...evidence);
-      if (evidence.length >= 4) break;
+      if (dedupeSold(merged).length >= MAX_ITEMS) break;
     }
   }
   if (sawBlocked && merged.length === 0) {
     warnings.push("eBay returned a bot/captcha page instead of results (try again or route fetches through a proxy).");
   }
 
-  const evidence = dedupeSold(merged).slice(0, MAX_ITEMS);
+  const evidence = filterEbaySoldForCard(card, dedupeSold(merged)).slice(0, MAX_ITEMS);
   if (evidence.length === 0 && candidates.length > 0) {
-    warnings.push("No eBay sold rows — set EBAY_FINDING_APP_ID or EBAY_CLIENT_ID (production) for Finding, or verify HTML access.");
+    if (isApifyEbaySoldConfigured()) {
+      warnings.push("No eBay sold comps from Apify — check APIFY_API_TOKEN and actor quota, or try again.");
+    } else if (findingDisabled) {
+      warnings.push("No eBay sold rows — set APIFY_API_TOKEN (Apify sold actor) or allow Finding/HTML fallback.");
+    } else if (!getEbayFindingAppId()) {
+      warnings.push("No eBay sold rows — add APIFY_API_TOKEN for Apify sold comps, or EBAY_FINDING_APP_ID / production EBAY_CLIENT_ID.");
+    } else {
+      warnings.push("No eBay sold rows matched this card — tighten scan identity or verify marketplace access.");
+    }
   }
 
   return { evidence, warnings };

@@ -124,7 +124,7 @@ export function CompanionPanel({
           <p className={cn("text-slate-400", isMobile ? "mb-4 text-sm" : "mb-3 text-xs")}>
             Sign in to hatch and care for your partner.
           </p>
-          <AuthControls redirectUrl="/scanner" />
+          <AuthControls />
         </div>
       ) : loading ? (
         <div

@@ -28,7 +28,7 @@ export default function UsageError({
                 Try again
               </Button>
               <Button variant="secondary" size="sm" asChild>
-                <Link href="/scanner">Back to scanner</Link>
+                <Link href="/liquid-scan">Back to Liquid Scan</Link>
               </Button>
             </div>
           </div>

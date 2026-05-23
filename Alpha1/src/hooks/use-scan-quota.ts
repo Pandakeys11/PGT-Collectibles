@@ -16,6 +16,8 @@ export type AccountQuota = {
   isMasterAdmin?: boolean;
 };
 
+let accountMeInflight: Promise<void> | null = null;
+
 export function useScanQuota() {
   const { isSignedIn } = useAuth();
   const [quota, setQuota] = useState<AccountQuota | null>(null);
@@ -26,7 +28,12 @@ export function useScanQuota() {
       setQuota(null);
       return;
     }
+    if (accountMeInflight) {
+      await accountMeInflight;
+      return;
+    }
     setLoading(true);
+    accountMeInflight = (async () => {
     try {
       const res = await fetch("/api/account/me", { cache: "no-store" });
       const data = await readResponseJson<{
@@ -54,7 +61,10 @@ export function useScanQuota() {
       setQuota(null);
     } finally {
       setLoading(false);
+      accountMeInflight = null;
     }
+    })();
+    await accountMeInflight;
   }, [isSignedIn]);
 
   useEffect(() => {
@@ -63,7 +73,7 @@ export function useScanQuota() {
 
   useEffect(() => {
     if (!isSignedIn) return;
-    const id = window.setInterval(() => void refresh(), 45_000);
+    const id = window.setInterval(() => void refresh(), 90_000);
     return () => window.clearInterval(id);
   }, [isSignedIn, refresh]);
 

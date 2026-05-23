@@ -8,6 +8,7 @@ import { VisionBackdrop } from "@/components/effects/vision-backdrop";
 import { GlobalHeader } from "@/components/layout/global-header";
 import { GlobalNavDock } from "@/components/layout/global-nav-dock";
 import { PageTransition } from "@/components/motion/page-transition";
+import { isFullBleedScannerPath } from "@/lib/route-paths";
 import { cn } from "@/lib/cn";
 
 export function GlobalShell({
@@ -18,7 +19,7 @@ export function GlobalShell({
   className?: string;
 }) {
   const pathname = usePathname();
-  const isCommandCenter = pathname.startsWith("/scanner");
+  const isCommandCenter = isFullBleedScannerPath(pathname);
 
   if (isCommandCenter) {
     return (

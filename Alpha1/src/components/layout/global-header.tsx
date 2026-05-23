@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/branding/brand-logo";
 import { AuthControls } from "@/components/auth/auth-controls";
 import { ThemeControl } from "@/components/shell/theme-control";
+import { APP_HOME_PATH } from "@/lib/app-routes";
 import { APP_NAV_ITEMS, activeNavId, pageMetaForPath } from "@/lib/navigation";
 import { cn } from "@/lib/cn";
 
@@ -27,12 +28,12 @@ export function GlobalHeader() {
         <div className="flex min-w-0 items-center justify-between gap-3 lg:flex-1 lg:justify-start">
           <div className="flex min-w-0 items-center gap-3">
             <BrandLogo
-              href="/scanner"
+              href={APP_HOME_PATH}
               variant="icon-only"
               className="shrink-0 lg:hidden"
             />
             <BrandLogo
-              href="/scanner"
+              href={APP_HOME_PATH}
               variant="header"
               className="hidden min-w-0 lg:flex"
             />

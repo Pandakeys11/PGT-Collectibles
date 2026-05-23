@@ -1,5 +1,7 @@
 import type { ExtractedCard } from "@/lib/scan/schemas";
+import { buildMarketSearchIdentity } from "@/lib/market/market-search-identity";
 import { MARKET_SOURCES, type MarketSourceId } from "@/lib/market/sources";
+import { franchiseSearchPrefix } from "@/lib/scan/franchise";
 
 export type MarketQuerySet = {
   rawSold: string;
@@ -23,28 +25,11 @@ function siteQuery(domain: string, query: string): string {
 }
 
 export function buildMarketQueries(card: ExtractedCard): MarketQuerySet {
-  const identity = compact([
-    card.name,
-    card.printedName,
-    card.language,
-    card.set,
-    card.number,
-    card.printStamps,
-    card.details,
-    card.rarity,
-    card.year,
-  ]);
-  const graded = compact([
-    card.name,
-    card.printedName,
-    card.language,
-    card.set,
-    card.number,
-    card.printStamps,
-    card.details,
-    card.grader,
-    card.grade,
-  ]);
+  const searchId = buildMarketSearchIdentity(card);
+  const franchise = franchiseSearchPrefix(card);
+  const identity = searchId.raw;
+  const graded = searchId.graded;
+  const targetGradeSold = compact([searchId.ebayPrimary, "sold"]);
 
   const bySource = Object.fromEntries(
     MARKET_SOURCES.map((source) => [
@@ -57,9 +42,10 @@ export function buildMarketQueries(card: ExtractedCard): MarketQuerySet {
   ) as MarketQuerySet["bySource"];
 
   return {
-    rawSold: compact([identity, "pokemon card sold price"]),
-    active: compact([identity, "pokemon card for sale"]),
-    psa10Sold: compact([graded || identity, "PSA 10", "sold"]),
+    rawSold: compact([identity, "card sold price"]),
+    active: compact([identity, "card for sale"]),
+    psa10Sold:
+      targetGradeSold || compact([graded || identity, "PSA 10", "sold"]),
     bgsBlackLabelSold: compact([graded || identity, "BGS", "Black Label", "sold"]),
     bySource,
   };

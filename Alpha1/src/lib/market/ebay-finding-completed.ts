@@ -1,6 +1,6 @@
 import { getEbayFindingAppId } from "@/lib/market/env-market";
 import type { MarketEvidence } from "@/lib/scan/schemas";
-import { cleanEbaySoldQuery, EBAY_POKEMON_CARD_CATEGORY_ID } from "@/lib/market/ebay-sold-common";
+import { cleanEbaySoldQuery } from "@/lib/market/ebay-sold-common";
 
 const EBAY_FINDING_ENDPOINT = "https://svcs.ebay.com/services/search/FindingService/v1";
 
@@ -67,6 +67,7 @@ function endTimeToObservedAt(endTime: string | undefined): string | null {
 export async function fetchEbayFindingCompletedSold(
   query: string,
   limit: number,
+  categoryId?: string | null,
 ): Promise<MarketEvidence[]> {
   if (process.env.EBAY_DISABLE_FINDING === "1") return [];
   const appId = getEbayFindingAppId();
@@ -76,18 +77,19 @@ export async function fetchEbayFindingCompletedSold(
   const finalQuery = cleanEbaySoldQuery(query);
   if (finalQuery.length < 2) return [];
 
-  const queryString = [
+  const queryParts = [
     `OPERATION-NAME=findCompletedItems`,
     `SERVICE-VERSION=1.0.0`,
     `SECURITY-APPNAME=${encodeURIComponent(appId)}`,
     `RESPONSE-DATA-FORMAT=JSON`,
     `keywords=${encodeURIComponent(finalQuery)}`,
-    `categoryId=${EBAY_POKEMON_CARD_CATEGORY_ID}`,
     `itemFilter(0).name=SoldItemsOnly`,
     `itemFilter(0).value=true`,
     `sortOrder=EndTimeLatest`,
     `paginationInput.entriesPerPage=${Math.min(Math.max(1, limit), 100)}`,
-  ].join("&");
+  ];
+  if (categoryId) queryParts.push(`categoryId=${encodeURIComponent(categoryId)}`);
+  const queryString = queryParts.join("&");
 
   const res = await fetch(`${EBAY_FINDING_ENDPOINT}?${queryString}`, {
     cache: "no-store",

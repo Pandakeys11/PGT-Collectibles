@@ -1,4 +1,5 @@
 import { parseCollectorFraction } from "@/lib/scan/collector-fraction";
+import { promoSetNamesMatch } from "@/lib/scan/promo-set-aliases";
 import { extractedCardSchema, type ExtractedCard } from "@/lib/scan/schemas";
 
 /** Catalogued English set candidate for a printed collector denominator. */
@@ -129,21 +130,21 @@ export const ALL_DENOMINATOR_RULES: DenominatorRule[] = [
 export const PROMO_NUMBER_RULES: PromoNumberRule[] = [
   {
     label: "Scarlet & Violet promos",
-    example: "SVP 045",
-    setName: "Scarlet & Violet Black Star Promos",
-    patternNote: "SVP + number on SV-era promos",
+    example: "SVP045",
+    setName: "Scarlet & Violet Promos",
+    patternNote: "SVP + digits — catalog set name (not Black Star in API)",
   },
   {
     label: "Sword & Shield promos",
     example: "SWSH198",
-    setName: "SWSH Black Star Promos",
+    setName: "Sword & Shield Promos",
     patternNote: "SWSH prefix + digits",
   },
   {
     label: "Sun & Moon promos",
     example: "SM245",
-    setName: "SM Black Star Promos",
-    patternNote: "SM prefix",
+    setName: "Sun & Moon Promos",
+    patternNote: "SM prefix + digits",
   },
   {
     label: "XY promos",
@@ -166,14 +167,20 @@ export const PROMO_NUMBER_RULES: PromoNumberRule[] = [
   {
     label: "Diamond & Pearl promos",
     example: "DP47",
-    setName: "Diamond & Pearl Black Star Promos",
+    setName: "Diamond & Pearl Promos",
     patternNote: "DP prefix",
   },
   {
     label: "Wizards black star",
+    example: "1",
+    setName: "Wizards Black Star Promos",
+    patternNote: "Wizards-era black star (set basep); numeric 1–53",
+  },
+  {
+    label: "Nintendo black star",
     example: "NP35",
     setName: "Nintendo Black Star Promos",
-    patternNote: "NP / classic Wizards promo stamps",
+    patternNote: "NP prefix (set np)",
   },
   {
     label: "Radiant Collection",
@@ -221,10 +228,7 @@ export function setNamesMatch(
   a: string | undefined,
   b: string | undefined,
 ): boolean {
-  const x = normalizeSetNameForMatch(a);
-  const y = normalizeSetNameForMatch(b);
-  if (!x || !y) return false;
-  return x === y || x.includes(y) || y.includes(x);
+  return promoSetNamesMatch(a, b);
 }
 
 export function catalogHitMatchesPrintedTotal(
@@ -708,10 +712,21 @@ export function batchLooksLikeSouthernIslandsVisionConfusion(
 const SOUTHERN_ISLANDS_AUTO_NOTE =
   "Set corrected to Southern Islands (18-card roster).";
 
+function batchMajorityGradedSlabs(cards: ExtractedCard[]): boolean {
+  if (cards.length === 0) return false;
+  const graded = cards.filter((c) => {
+    if (c.visionLane === "graded" || c.encapsulation === "graded_slab") return true;
+    const blob = `${c.grader ?? ""} ${c.grade ?? ""} ${c.labelTitle ?? ""} ${c.details ?? ""}`;
+    return /\b(PSA|CGC|BGS|BVG|SGC)\b/i.test(blob);
+  }).length;
+  return graded >= Math.ceil(cards.length * 0.5);
+}
+
 export function shouldCoerceSouthernIslandsByRoster(
   cards: ExtractedCard[],
 ): boolean {
   if (cards.length < 6) return false;
+  if (batchMajorityGradedSlabs(cards)) return false;
   const rosterHits = cards.filter(
     (c) => southernIslandsRosterIndexForName(c.name) != null,
   ).length;

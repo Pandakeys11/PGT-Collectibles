@@ -30,6 +30,8 @@ export async function enrichExtractedCard(args: {
   identityEvidence?: ScanCardContext["identityEvidence"];
   /** After resync, bypass market cache so identity/comps refresh for the new extraction. */
   skipCache?: boolean;
+  /** Bulk scan: skip slow cert registry chain; load via /api/scan/registry when row is selected. */
+  skipRegistry?: boolean;
 }): Promise<{
   card: ExtractedCard;
   context: ScanCardContext;
@@ -49,10 +51,11 @@ export async function enrichExtractedCard(args: {
 
     let response: Response;
     try {
+      const { skipRegistry: _skipRegistry, ...payload } = args;
       response = await fetch("/api/scan/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(args),
+        body: JSON.stringify({ ...payload, skipRegistry: args.skipRegistry === true ? true : undefined }),
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { scannerHref } from "@/lib/app-routes";
+import { liquidScanHref } from "@/lib/app-routes";
 
-/** Catalog is embedded in the command center. */
+/** Catalog opens inside Liquid Scan. */
 export default function PokedexRedirectPage() {
-  redirect(scannerHref("catalog"));
+  redirect(liquidScanHref("catalog"));
 }

@@ -1,0 +1,394 @@
+/**
+ * Scanner Chat UI — premium AI terminal aesthetic (scoped via .scanner-chat-root)
+ */
+
+.scanner-chat-root {
+  --sc-bg: 5 6 9;                   /* Deep space obsidian */
+  --sc-panel: 10 13 18;             /* Sleek dark panel */
+  --sc-panel-raised: 15 20 28;      /* Higher elevation slate */
+  --sc-cyan: 34 211 238;            /* Cyan Neon (#22d3ee) */
+  --sc-emerald: 16 185 129;         /* Emerald Neon (#10b981) */
+  --sc-amber: 245 158 11;           /* Amber Warning (#f59e0b) */
+  --sc-rose: 244 63 94;             /* Rose Danger (#f43f5e) */
+  --sc-border: 255 255 255;
+  --sc-glow-emerald: 16 185 129;
+  --sc-glow-blue: 34 211 238;       /* Map glow blue to cyan neon */
+}
+
+.scanner-chat-root {
+  background-color: rgb(var(--sc-bg));
+  color: rgb(248 250 252);
+  min-height: 100dvh;
+}
+
+.sc-glass {
+  background: rgb(var(--sc-panel) / 0.76);
+  backdrop-filter: blur(24px) saturate(120%);
+  -webkit-backdrop-filter: blur(24px) saturate(120%);
+  border: 1px solid rgb(var(--sc-border) / 0.06);
+  box-shadow:
+    inset 0 1px 1px 0 rgb(255 255 255 / 0.03),
+    0 12px 30px -10px rgb(0 0 0 / 0.7);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sc-glass-raised {
+  background: rgb(var(--sc-panel-raised) / 0.82);
+  backdrop-filter: blur(28px) saturate(120%);
+  -webkit-backdrop-filter: blur(28px) saturate(120%);
+  border: 1px solid rgb(var(--sc-border) / 0.08);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 16px 40px -12px rgb(0 0 0 / 0.85);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sc-glow-border {
+  position: relative;
+}
+
+.sc-glow-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgb(var(--sc-glow-emerald) / 0.45),
+    rgb(var(--sc-glow-blue) / 0.35),
+    rgb(var(--sc-glow-emerald) / 0.2)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+.sc-holo-shimmer {
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgb(255 255 255 / 0.12) 48%,
+    transparent 58%
+  );
+  background-size: 200% 100%;
+  animation: sc-shimmer 2.8s ease-in-out infinite;
+}
+
+@keyframes sc-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.sc-timeline-pulse {
+  animation: sc-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sc-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.sc-confidence-glow-high {
+  box-shadow: 0 0 12px rgb(var(--sc-glow-emerald) / 0.35);
+}
+
+.sc-confidence-glow-mid {
+  box-shadow: 0 0 10px rgb(234 179 8 / 0.25);
+}
+
+.sc-confidence-glow-low {
+  box-shadow: 0 0 8px rgb(248 113 113 / 0.2);
+}
+
+/* Master catalog embedded in Liquid Scan chat */
+.scanner-chat-root .sc-catalog-embed-panel,
+.scanner-chat-root .sc-chat-output-panel {
+  min-height: min(20rem, 50dvh);
+}
+
+.scanner-chat-root .liquid-catalog-embed .desk-surface-raised,
+.scanner-chat-root .liquid-catalog-embed .desk-surface {
+  background: rgb(var(--sc-panel-raised) / 0.72);
+  border-color: rgb(255 255 255 / 0.08);
+  box-shadow: none;
+}
+
+.scanner-chat-root .liquid-catalog-embed .text-primary {
+  color: rgb(248 250 252);
+}
+
+.scanner-chat-root .liquid-catalog-embed .text-muted,
+.scanner-chat-root .liquid-catalog-embed .text-faint {
+  color: rgb(148 163 184);
+}
+
+.scanner-chat-root .liquid-catalog-embed .text-secondary {
+  color: rgb(203 213 225);
+}
+
+.scanner-chat-root .liquid-catalog-embed .border-border-subtle {
+  border-color: rgb(255 255 255 / 0.08);
+}
+
+.scanner-chat-root .liquid-catalog-embed .bg-accent {
+  background-color: rgb(245 158 11 / 0.92);
+  color: rgb(8 10 14);
+}
+
+.scanner-chat-root .liquid-catalog-embed input,
+.scanner-chat-root .liquid-catalog-embed select,
+.scanner-chat-root .liquid-catalog-embed textarea {
+  font-size: 16px !important;
+}
+
+@media (min-width: 640px) {
+  .scanner-chat-root .liquid-catalog-embed input,
+  .scanner-chat-root .liquid-catalog-embed select,
+  .scanner-chat-root .liquid-catalog-embed textarea {
+    font-size: 11px !important;
+  }
+}
+
+.scanner-chat-root .liquid-catalog-embed .divide-border-subtle > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgb(255 255 255 / 0.06);
+}
+
+.scanner-chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--sc-border) / 0.15) transparent;
+}
+
+.scanner-chat-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scanner-chat-scrollbar::-webkit-scrollbar-thumb {
+  background: rgb(var(--sc-border) / 0.12);
+  border-radius: 999px;
+}
+
+.sc-laser-scan {
+  position: relative;
+  overflow: hidden;
+}
+
+.sc-laser-scan::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgb(var(--sc-cyan)), transparent);
+  box-shadow: 0 0 10px rgb(var(--sc-cyan));
+  animation: sc-laser-sweep 2.2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes sc-laser-sweep {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+/* —— Mobile Liquid Scan (< lg) — iOS & Android native feel —— */
+@media (max-width: 1023px) {
+  .scanner-chat-root {
+    height: 100dvh;
+    height: 100svh;
+    max-height: 100dvh;
+    max-height: 100svh;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  @supports (-webkit-touch-callout: none) {
+    .scanner-chat-root {
+      min-height: -webkit-fill-available;
+    }
+  }
+
+  .scanner-chat-root .text-sm {
+    font-size: 0.8125rem;
+  }
+
+  .scanner-chat-root .text-xs {
+    font-size: 0.6875rem;
+  }
+
+  .scanner-chat-root .text-lg {
+    font-size: 0.9375rem;
+  }
+
+  .scanner-chat-root .text-2xl {
+    font-size: 1.125rem;
+    line-height: 1.3;
+  }
+
+  .scanner-chat-root h4 {
+    font-size: 0.875rem;
+  }
+
+  /* Safe areas (notch, home indicator) */
+  .sc-mobile-header {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .sc-mobile-quota-bar {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Chat feed: momentum scroll, no rubber-band bleed into body */
+  .scanner-chat-root main > div:first-of-type {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  /* 16px inputs prevent iOS zoom-on-focus */
+  .sc-composer-input {
+    font-size: 16px !important;
+  }
+
+  @media (min-width: 640px) {
+    .sc-composer-input {
+      font-size: 0.875rem !important;
+    }
+  }
+
+  .sc-composer-modes {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+
+  .sc-composer-modes button {
+    scroll-snap-align: start;
+  }
+
+  .sc-scan-sheet-scroll {
+    max-height: min(56dvh, 24rem);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sc-scan-table {
+    min-width: 36rem;
+  }
+
+  .sc-scan-sticky-col {
+    position: sticky;
+    z-index: 2;
+    background: rgb(12 16 22 / 0.97);
+  }
+
+  .sc-scan-sticky-col-0 {
+    left: 0;
+  }
+
+  .sc-scan-sticky-col-1 {
+    left: 2.25rem;
+    box-shadow: 4px 0 8px -4px rgb(0 0 0 / 0.45);
+  }
+
+  .sc-scan-sticky-col-2 {
+    left: calc(2.25rem + 7.5rem);
+    box-shadow: 4px 0 8px -4px rgb(0 0 0 / 0.45);
+  }
+
+  .sc-scan-mobile-list li button {
+    min-height: 3.25rem;
+  }
+
+  /* Card identity panel — align with scan sheet density */
+  .sc-identity-panel .sc-identity-sheet-grid {
+    font-size: 11px;
+  }
+
+  .sc-identity-panel input,
+  .sc-identity-panel select,
+  .sc-identity-panel textarea {
+    font-size: 16px !important;
+  }
+
+  @media (min-width: 640px) {
+    .sc-identity-panel input,
+    .sc-identity-panel select,
+    .sc-identity-panel textarea {
+      font-size: 11px !important;
+    }
+  }
+
+  /* FAB sits above composer + home indicator */
+  .sc-mobile-results-fab {
+    bottom: calc(var(--sc-composer-height, 7.5rem) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .sc-mobile-composer {
+    --sc-composer-height: 8.5rem;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .sc-mobile-drawer-sheet {
+    box-shadow: 0 -24px 48px rgb(0 0 0 / 0.55);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .sc-mobile-drawer-sheet .grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.375rem;
+  }
+
+  .sc-mobile-drawer-sheet .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sc-mobile-drawer-sheet [class*="grid-cols-2"]:not(.grid-cols-4) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Touch targets */
+  .scanner-chat-root button,
+  .scanner-chat-root a[role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sc-holo-shimmer,
+    .sc-laser-scan::after,
+    .sc-timeline-pulse {
+      animation: none;
+    }
+  }
+}

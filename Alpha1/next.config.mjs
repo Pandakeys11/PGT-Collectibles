@@ -5,7 +5,32 @@ const nextConfig = {
     return [
       {
         source: "/",
-        destination: "/scanner",
+        destination: "/liquid-scan",
+        permanent: false,
+      },
+      {
+        source: "/redesign",
+        destination: "/liquid-scan",
+        permanent: true,
+      },
+      {
+        source: "/scanner-chat",
+        destination: "/liquid-scan",
+        permanent: false,
+      },
+      {
+        source: "/scanner-chat/:path*",
+        destination: "/liquid-scan/:path*",
+        permanent: false,
+      },
+      {
+        source: "/scanner/chat",
+        destination: "/liquid-scan",
+        permanent: false,
+      },
+      {
+        source: "/scanner/chat/:path*",
+        destination: "/liquid-scan/:path*",
         permanent: false,
       },
     ];

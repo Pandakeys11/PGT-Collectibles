@@ -2,6 +2,14 @@ import type { VisionGridLocation } from "@/lib/scan/spatial";
 
 export type VisionCropRectPx = { sx: number; sy: number; sw: number; sh: number };
 
+/** Sub-pixel crop rect — avoids rounding parent grid when mapping crop vision back. */
+export type VisionCropRectFloat = {
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+};
+
 /**
  * One knob for how large the card window is around the grid center (raw square + graded slab axes).
  * Used for evidence JPEGs, the adjust-crop dialog overlay, `extractCardRegionDataUrl` / resync vision,
@@ -31,12 +39,12 @@ export type EvidenceCropAdjustment = {
  * Maps vision grid center [y,x] on 0–1000 to a crop rect in source pixels.
  * Raw cards: square window. Graded slabs: taller portrait window (typical PSA/CGC aspect).
  */
-export function visionLocationToCropRectPx(
+export function visionLocationToCropRectFloat(
   naturalWidth: number,
   naturalHeight: number,
   location: VisionGridLocation,
-  opts?: { gradedSlab?: boolean; /** Widen/narrow the raw-card crop (default 1). */ radiusMultiplier?: number },
-): VisionCropRectPx {
+  opts?: { gradedSlab?: boolean; radiusMultiplier?: number },
+): VisionCropRectFloat {
   const [gyThousand, gxThousand] = location;
   const cx = (gxThousand / 1000) * naturalWidth;
   const cy = (gyThousand / 1000) * naturalHeight;
@@ -50,10 +58,10 @@ export function visionLocationToCropRectPx(
     halfH = Math.min(halfH, cy - 1, naturalHeight - cy - 1);
     halfW = Math.max(24, halfW);
     halfH = Math.max(40, halfH);
-    const sw = Math.min(Math.round(halfW * 2), naturalWidth);
-    const sh = Math.min(Math.round(halfH * 2), naturalHeight);
-    let sx = Math.round(cx - sw / 2);
-    let sy = Math.round(cy - sh / 2);
+    const sw = Math.min(halfW * 2, naturalWidth);
+    const sh = Math.min(halfH * 2, naturalHeight);
+    let sx = cx - sw / 2;
+    let sy = cy - sh / 2;
     sx = Math.max(0, Math.min(sx, naturalWidth - sw));
     sy = Math.max(0, Math.min(sy, naturalHeight - sh));
     return { sx, sy, sw, sh };
@@ -63,10 +71,26 @@ export function visionLocationToCropRectPx(
   let half = normRadius * minDim;
   half = Math.min(half, cx - 1, naturalWidth - cx - 1, cy - 1, naturalHeight - cy - 1);
   half = Math.max(28, half);
-  const sw = Math.min(Math.round(half * 2), naturalWidth);
-  const sh = Math.min(Math.round(half * 2), naturalHeight);
-  let sx = Math.round(cx - sw / 2);
-  let sy = Math.round(cy - sh / 2);
+  const sw = Math.min(half * 2, naturalWidth);
+  const sh = Math.min(half * 2, naturalHeight);
+  let sx = cx - sw / 2;
+  let sy = cy - sh / 2;
+  sx = Math.max(0, Math.min(sx, naturalWidth - sw));
+  sy = Math.max(0, Math.min(sy, naturalHeight - sh));
+  return { sx, sy, sw, sh };
+}
+
+export function visionLocationToCropRectPx(
+  naturalWidth: number,
+  naturalHeight: number,
+  location: VisionGridLocation,
+  opts?: { gradedSlab?: boolean; /** Widen/narrow the raw-card crop (default 1). */ radiusMultiplier?: number },
+): VisionCropRectPx {
+  const rect = visionLocationToCropRectFloat(naturalWidth, naturalHeight, location, opts);
+  const sw = Math.max(1, Math.round(rect.sw));
+  const sh = Math.max(1, Math.round(rect.sh));
+  let sx = Math.round(rect.sx);
+  let sy = Math.round(rect.sy);
   sx = Math.max(0, Math.min(sx, naturalWidth - sw));
   sy = Math.max(0, Math.min(sy, naturalHeight - sh));
   return { sx, sy, sw, sh };
@@ -144,7 +168,7 @@ export function mapVisionLocationFromSubCropToParent(
   childLoc: VisionGridLocation | undefined,
   opts?: { gradedSlab?: boolean; radiusMultiplier?: number },
 ): VisionGridLocation {
-  const rect = visionLocationToCropRectPx(parentW, parentH, parentCropCenter, opts);
+  const rect = visionLocationToCropRectFloat(parentW, parentH, parentCropCenter, opts);
   const [cy, cx] = childLoc ?? ([500, 500] as const);
   const px = rect.sx + (cx / 1000) * rect.sw;
   const py = rect.sy + (cy / 1000) * rect.sh;

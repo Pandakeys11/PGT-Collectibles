@@ -10,6 +10,7 @@ export function planTier(plan: UserPlan): PlanTier {
 export const FREE_TIER_FEATURES = [
   "Full scanner, catalog, and export workflow",
   "Free vision providers (Groq + OpenRouter)",
+  "Liquid Ask: Gemini web brief + DuckDuckGo + session comps",
   "15 scan credits per month (resets on the 1st UTC)",
   "First 200 signups: +50 bonus starter scans (auto-granted)",
   "1 scan credit per photo or precision crop",
@@ -17,6 +18,7 @@ export const FREE_TIER_FEATURES = [
 
 export const PRO_TIER_FEATURES = [
   "Premium vision models (Gemini, OpenAI when enabled)",
+  "Liquid Ask: OpenRouter market brief + eBay sold enrich",
   "Higher daily and monthly scan limits",
   "Priority extraction queue",
   "Deeper AI narration and enrichment",

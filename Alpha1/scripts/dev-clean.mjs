@@ -38,7 +38,42 @@ function freePortWindows(p) {
   }
 }
 
+function portOwnerCommandLine(p) {
+  if (process.platform !== "win32") return null;
+  try {
+    const out = execSync(`netstat -ano | findstr ":${p}"`, { encoding: "utf8" });
+    for (const line of out.split(/\r?\n/)) {
+      if (!line.includes("LISTENING")) continue;
+      const parts = line.trim().split(/\s+/);
+      const pid = Number(parts[parts.length - 1]);
+      if (!(pid > 0)) continue;
+      try {
+        const cmd = execSync(
+          `powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}').CommandLine"`,
+          { encoding: "utf8" },
+        ).trim();
+        return { pid, cmd };
+      } catch {
+        return { pid, cmd: null };
+      }
+    }
+  } catch {
+    /* nothing listening */
+  }
+  return null;
+}
+
 console.log(`Cleaning dev environment (port ${port})…`);
+const before = portOwnerCommandLine(port);
+if (before?.cmd) {
+  const normalizedRoot = root.replace(/\\/g, "/").toLowerCase();
+  const normalizedCmd = before.cmd.replace(/\\/g, "/").toLowerCase();
+  if (!normalizedCmd.includes(normalizedRoot)) {
+    console.warn(
+      `Warning: port ${port} was used by another project (PID ${before.pid}):\n  ${before.cmd}\n`,
+    );
+  }
+}
 if (process.platform === "win32") freePortWindows(port);
 
 const nextDir = path.join(root, ".next");

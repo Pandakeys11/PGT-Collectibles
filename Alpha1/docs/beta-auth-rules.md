@@ -89,7 +89,7 @@ npm run db:verify  # confirm schema
 - Clerk webhook creates a row in `app_users`.
 - First created users receive `beta_pro` and a `beta_number`.
 - User 501 receives `trial`.
-- `/scanner` redirects anonymous users to sign in.
+- `/liquid-scan` (and legacy `/scanner` redirect) require sign-in for protected routes.
 - `/api/vision/extract` rejects anonymous users.
 - `/api/vision/extract` returns `429` after usage is exhausted.
 - Saving a scanner session creates one `scan_sessions` row and matching `extracted_cards` rows.

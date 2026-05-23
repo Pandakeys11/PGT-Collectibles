@@ -5,22 +5,28 @@ import {
   getEbayClientSecret,
   type EbayApiEnv,
 } from "@/lib/market/env-market";
-import { buildEbayPokemonCardKeywordQuery } from "@/lib/market/ebay-sold-common";
+import {
+  buildEbayCardKeywordQuery,
+  ebaySearchCategoryIdForCard,
+} from "@/lib/market/ebay-sold-common";
+import { classifyCardLane } from "@/lib/scan/lane";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 
 /** Same scope string for Sandbox and Production OAuth. */
 const EBAY_CLIENT_CREDENTIALS_SCOPE = "https://api.ebay.com/oauth/api_scope";
 
-function ebayHosts(env: EbayApiEnv): { tokenUrl: string; searchUrl: string } {
+function ebayHosts(env: EbayApiEnv): { tokenUrl: string; searchUrl: string; itemBaseUrl: string } {
   if (env === "sandbox") {
     return {
       tokenUrl: "https://api.sandbox.ebay.com/identity/v1/oauth2/token",
       searchUrl: "https://api.sandbox.ebay.com/buy/browse/v1/item_summary/search",
+      itemBaseUrl: "https://api.sandbox.ebay.com/buy/browse/v1/item/",
     };
   }
   return {
     tokenUrl: "https://api.ebay.com/identity/v1/oauth2/token",
     searchUrl: "https://api.ebay.com/buy/browse/v1/item_summary/search",
+    itemBaseUrl: "https://api.ebay.com/buy/browse/v1/item/",
   };
 }
 
@@ -28,7 +34,7 @@ function ebayHosts(env: EbayApiEnv): { tokenUrl: string; searchUrl: string } {
 const tokenCache = new Map<EbayApiEnv, { accessToken: string; expiresAt: number }>();
 
 function compactQuery(card: ExtractedCard): string {
-  const q = buildEbayPokemonCardKeywordQuery(card);
+  const q = buildEbayCardKeywordQuery(card);
   return q.length > 120 ? q.slice(0, 120).trim() : q;
 }
 
@@ -92,6 +98,71 @@ function inferSlabFromTitle(title: string): string | null {
   return null;
 }
 
+function browseConditionFilter(card: ExtractedCard): string | null {
+  const lane = classifyCardLane(card as Record<string, unknown>).lane;
+  if (lane === "graded") return "conditions:{USED|LIKE_NEW}";
+  if (lane === "raw") return "conditions:{NEW|USED}";
+  return null;
+}
+
+async function enrichBrowseItems(
+  env: EbayApiEnv,
+  token: string,
+  itemBaseUrl: string,
+  summaries: Array<{
+    itemId?: string;
+    title?: string;
+    itemWebUrl?: string;
+    price?: { value?: string; currency?: string };
+  }>,
+  maxEnrich: number,
+): Promise<
+  Array<{
+    itemId?: string;
+    title?: string;
+    itemWebUrl?: string;
+    price?: { value?: string; currency?: string };
+  }>
+> {
+  const top = summaries.slice(0, maxEnrich).filter((s) => s.itemId);
+  if (top.length === 0) return summaries;
+
+  const enriched = await Promise.all(
+    top.map(async (summary) => {
+      const itemId = summary.itemId;
+      if (!itemId) return summary;
+      try {
+        const url = `${itemBaseUrl}${encodeURIComponent(itemId)}?fieldgroups=PRODUCT`;
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+            Accept: "application/json",
+          },
+          signal: AbortSignal.timeout(6_000),
+        });
+        if (!res.ok) return summary;
+        const detail = (await res.json()) as {
+          title?: string;
+          itemWebUrl?: string;
+          price?: { value?: string; currency?: string };
+        };
+        return {
+          itemId,
+          title: detail.title ?? summary.title,
+          itemWebUrl: detail.itemWebUrl ?? summary.itemWebUrl,
+          price: detail.price ?? summary.price,
+        };
+      } catch {
+        return summary;
+      }
+    }),
+  );
+
+  const byId = new Map(enriched.map((row) => [row.itemId, row]));
+  return summaries.map((row) => (row.itemId && byId.has(row.itemId) ? byId.get(row.itemId)! : row));
+}
+
 function itemToEvidence(
   item: {
     itemId?: string;
@@ -129,7 +200,7 @@ export const ebayBrowseAdapter: MarketApiAdapter = {
   async collect(card: ExtractedCard): Promise<ApiAdapterResult> {
     const warnings: string[] = [];
     const env = getEbayApiEnv();
-    const { searchUrl } = ebayHosts(env);
+    const { searchUrl, itemBaseUrl } = ebayHosts(env);
 
     if (!getEbayClientId() || !getEbayClientSecret()) {
       if (env === "sandbox") {
@@ -166,6 +237,10 @@ export const ebayBrowseAdapter: MarketApiAdapter = {
       limit: "12",
     });
     params.append("filter", "marketplaceIds:{EBAY_US}");
+    const categoryId = ebaySearchCategoryIdForCard(card);
+    if (categoryId) params.set("category_ids", categoryId);
+    const conditionFilter = browseConditionFilter(card);
+    if (conditionFilter) params.append("filter", conditionFilter);
 
     const response = await fetch(`${searchUrl}?${params.toString()}`, {
       headers: {
@@ -196,7 +271,14 @@ export const ebayBrowseAdapter: MarketApiAdapter = {
       }>;
     };
 
-    const summaries = payload.itemSummaries ?? [];
+    const enrichCount = Math.min(
+      Math.max(Number(process.env.EBAY_BROWSE_ENRICH_COUNT ?? 4) || 4, 0),
+      8,
+    );
+    const summaries =
+      enrichCount > 0
+        ? await enrichBrowseItems(env, token, itemBaseUrl, payload.itemSummaries ?? [], enrichCount)
+        : (payload.itemSummaries ?? []);
     const evidence: MarketEvidence[] = [];
     for (const row of summaries) {
       const rowEvidence = itemToEvidence(row, "active", slabHint);

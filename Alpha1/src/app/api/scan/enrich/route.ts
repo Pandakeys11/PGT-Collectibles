@@ -1,20 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enrichCacheKey, getEnrichMarketCache, setEnrichMarketCache } from "@/lib/market/enrich-cache";
-import { matchPokemonCatalog } from "@/lib/market/pokemon-catalog";
+import { matchCatalogWithFallback } from "@/lib/market/catalog-router";
+import { hydrateRegistryFromCard } from "@/lib/market/hydrate-registry-from-card";
 import { researchCardMarket } from "@/lib/market/research";
 import { catalogMatchIsAuthoritative, mergeExtractedCardWithCatalog } from "@/lib/scan/catalog-merge";
 import { buildScanCardContext } from "@/lib/scan/context-builder";
+import { mergeRegistrySlabIntoCard, normalizeGradedSlabFields } from "@/lib/scan/graded-slab";
+import { classifyCardLane } from "@/lib/scan/lane";
+import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 import { catalogCandidateSchema, extractedCardSchema, identityEvidenceSchema } from "@/lib/scan/schemas";
+import { syncCurrentAppUser } from "@/lib/auth/app-user";
 
 export const maxDuration = 300;
 
 type EnrichPhase = "full" | "catalog" | "market";
+
+const EMPTY_REGISTRY = {
+  registry: null,
+  populationSummary: null,
+  provider: null,
+  gradeDate: null,
+  gemrateId: null,
+  certMarketEvidence: [] as MarketEvidence[],
+  fromCache: false,
+  pgtCardIdentityId: null,
+};
+
+async function registryHydrationForCard(
+  card: ExtractedCard,
+  skipRegistry: boolean,
+  userId: string | null,
+) {
+  const lane = classifyCardLane(card as Record<string, unknown>).lane;
+  if (lane !== "graded" || skipRegistry) return EMPTY_REGISTRY;
+  return hydrateRegistryFromCard(card, {
+    includeCertMarket: !skipRegistry,
+    persist: true,
+    userId,
+  });
+}
+
+function mergeCertIntoMarketEvidence(
+  base: MarketEvidence[],
+  certRows: MarketEvidence[],
+): MarketEvidence[] {
+  if (!certRows.length) return base;
+  const seen = new Set<string>();
+  const out = [...certRows, ...base];
+  return out.filter((it) => {
+    const key = `${it.kind}|${it.url ?? ""}|${it.title}|${it.priceUsd ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export async function POST(req: NextRequest) {
   let body: {
     specimenId?: string;
     card?: unknown;
     skipCache?: boolean;
+    skipRegistry?: boolean;
     phase?: string;
     catalogId?: string | null;
     catalogImageUrl?: string | null;
@@ -42,12 +88,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid card payload" }, { status: 400 });
   }
 
+  const inputCard = normalizeGradedSlabFields(parsedCard.data);
+  const skipRegistry = body.skipRegistry === true;
+  const appUser = skipRegistry ? null : await syncCurrentAppUser();
+  const userId = appUser?.id ?? null;
+
   if (phase === "market") {
     const skipCache = body.skipCache === true;
-    const cacheKey = enrichCacheKey(parsedCard.data);
+    const cacheKey = enrichCacheKey(inputCard);
     let market = skipCache ? null : getEnrichMarketCache(cacheKey);
     if (!market) {
-      market = await researchCardMarket(parsedCard.data);
+      market = await researchCardMarket(inputCard);
       if (!skipCache) setEnrichMarketCache(cacheKey, market);
     }
 
@@ -74,33 +125,44 @@ export async function POST(req: NextRequest) {
     const identityEvidenceParsed = identityEvidenceSchema.array().safeParse(body.identityEvidence);
     const identityEvidence = identityEvidenceParsed.success ? identityEvidenceParsed.data : undefined;
 
+    const reg = await registryHydrationForCard(inputCard, skipRegistry, userId);
+    const cardOut = skipRegistry ? inputCard : mergeRegistrySlabIntoCard(inputCard, reg.registry);
+    const marketEvidence = mergeCertIntoMarketEvidence(
+      market.marketEvidence,
+      reg.certMarketEvidence,
+    );
     const context = buildScanCardContext({
       specimenId,
-      card: parsedCard.data,
+      card: cardOut,
+      registry: reg.registry,
+      populationSummary: reg.populationSummary,
+      certProvider: reg.provider,
+      certGradeDate: reg.gradeDate,
+      certMarketEvidence: reg.certMarketEvidence,
       catalogId,
-      year: parsedCard.data.year ?? null,
+      year: cardOut.year ?? null,
       catalogImageUrl,
       catalogIdentityStatus,
       catalogConfidence,
       catalogCandidates,
       identityEvidence,
-      marketEvidence: market.marketEvidence,
+      marketEvidence,
       marketSourceLinks: market.marketSourceLinks,
       fairValueUsd: market.fairValueUsd,
       fairValueBasis: market.fairValueBasis,
     });
 
     return NextResponse.json({
-      card: parsedCard.data,
+      card: cardOut,
       context,
       catalogMatched: Boolean(catalogId),
       catalogId,
     });
   }
 
-  const catalog = await matchPokemonCatalog(parsedCard.data);
-  const mergedCard = mergeExtractedCardWithCatalog(parsedCard.data, catalog);
-  const authoritativeCatalog = catalogMatchIsAuthoritative(catalog);
+  const catalog = await matchCatalogWithFallback(inputCard);
+  const mergedCard = mergeExtractedCardWithCatalog(inputCard, catalog);
+  const authoritativeCatalog = catalogMatchIsAuthoritative(catalog, mergedCard);
   const resolvedCatalogImageUrl =
     authoritativeCatalog ? (catalog?.imageSmallUrl ?? catalog?.imageLargeUrl ?? catalog?.imageUrl ?? null) : null;
 
@@ -137,9 +199,20 @@ export async function POST(req: NextRequest) {
     if (!skipCache) setEnrichMarketCache(cacheKey, market);
   }
 
+  const reg = await registryHydrationForCard(mergedCard, skipRegistry, userId);
+  const cardOut = skipRegistry ? mergedCard : mergeRegistrySlabIntoCard(mergedCard, reg.registry);
+  const marketEvidence = mergeCertIntoMarketEvidence(
+    market.marketEvidence,
+    reg.certMarketEvidence,
+  );
   const context = buildScanCardContext({
     specimenId,
-    card: mergedCard,
+    card: cardOut,
+    registry: reg.registry,
+    populationSummary: reg.populationSummary,
+    certProvider: reg.provider,
+    certGradeDate: reg.gradeDate,
+    certMarketEvidence: reg.certMarketEvidence,
     catalogId: authoritativeCatalog ? (catalog?.catalogId ?? null) : null,
     year: mergedCard.year ?? (authoritativeCatalog ? (catalog?.year ?? null) : null),
     catalogImageUrl: resolvedCatalogImageUrl,
@@ -147,14 +220,14 @@ export async function POST(req: NextRequest) {
     catalogConfidence: catalog?.catalogConfidence ?? 0,
     catalogCandidates: catalog?.candidates ?? [],
     identityEvidence: catalog?.identityEvidence ?? [],
-    marketEvidence: market.marketEvidence,
+    marketEvidence,
     marketSourceLinks: market.marketSourceLinks,
     fairValueUsd: market.fairValueUsd,
     fairValueBasis: market.fairValueBasis,
   });
 
   return NextResponse.json({
-    card: mergedCard,
+    card: cardOut,
     context,
     catalogMatched: authoritativeCatalog,
     catalogId: authoritativeCatalog ? (catalog?.catalogId ?? null) : null,

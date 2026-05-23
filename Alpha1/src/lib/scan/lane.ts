@@ -26,6 +26,10 @@ function extractGraderPrefix(value: string | null | undefined): string | null {
   if (text.includes("BGS")) return "BGS";
   if (text.includes("BVG")) return "BVG";
   if (text.includes("SGC")) return "SGC";
+  if (text.includes("ACE")) return "ACE";
+  if (text.includes("TAG")) return "TAG";
+  if (text.includes("HGA")) return "HGA";
+  if (text.includes("GMA")) return "GMA";
   return null;
 }
 
@@ -118,7 +122,7 @@ export function classifyCardLane(card: Record<string, unknown>): LaneClassificat
   const slabCueBlob = `${labelText} ${detailsText}`;
   const graderBlob = [probe.grader, probe.grade, probe.labelTitle].filter(Boolean).join(" ").toUpperCase();
 
-  const graderAcronym = /\b(PSA|CGC|BGS|BVG|SGC)\b/.test(graderBlob) ? 0.45 : 0;
+  const graderAcronym = /\b(PSA|CGC|BGS|BVG|SGC|ACE|TAG|HGA|GMA)\b/.test(graderBlob) ? 0.45 : 0;
   const slabHolderCue = /\b(slab|graded|certification|population|gem\s*mint|black\s*label)\b/i.test(slabCueBlob)
     ? 0.22
     : 0;
@@ -126,7 +130,9 @@ export function classifyCardLane(card: Record<string, unknown>): LaneClassificat
     graderAcronym > 0 && /\b(10|9\.5|9|8\.5|8|7\.5|7|6|5|4|3|2|1)\b/.test(graderBlob) ? 0.22 : 0;
 
   const certDigits = String(probe.cert ?? "").replace(/\D/g, "");
-  const certSignal = graderAcronym > 0 && certDigits.length >= 6 ? 0.26 : 0;
+  const certIsNa = /^(NA|N\/A)$/i.test(String(probe.cert ?? "").trim());
+  const certSignal =
+    graderAcronym > 0 && !certIsNa && certDigits.length >= 6 ? 0.26 : 0;
 
   const confidence = Math.min(1, graderAcronym + slabHolderCue + gradeWithGrader + certSignal);
   if (confidence >= 0.55) {

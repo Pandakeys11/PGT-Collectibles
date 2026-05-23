@@ -2,7 +2,7 @@
 
 ## Symptom
 
-Build logs show `/scanner`, `/api/...`, etc., but opening the deployment URL shows **404: NOT_FOUND**.
+Build logs show `/liquid-scan`, `/api/...`, etc., but opening the deployment URL shows **404: NOT_FOUND**.
 
 ## Cause
 
@@ -26,9 +26,10 @@ That means the **live** site was built with old settings (often Framework **Othe
 
 ## After redeploy
 
-1. Open `https://YOUR-URL/scanner` (should load, not 404).
-2. Open `https://YOUR-URL/` → should redirect to `/scanner`.
-3. Set `NEXT_PUBLIC_APP_URL` to your Vercel URL (Phase 2).
+1. Open `https://YOUR-URL/liquid-scan` (should load, not 404).
+2. Open `https://YOUR-URL/` → should redirect to `/liquid-scan`.
+3. Open `https://YOUR-URL/scanner` → should redirect to `/liquid-scan` (legacy bookmark).
+4. Set `NEXT_PUBLIC_APP_URL` to your Vercel URL (Phase 2).
 
 ## Production domain
 

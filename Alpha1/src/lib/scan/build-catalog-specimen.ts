@@ -10,6 +10,7 @@ function makeId() {
 export function buildSpecimenFromCatalogPrefill(prefill: CatalogScanPrefill): BuiltScanSpecimen {
   const id = makeId();
   const card: ExtractedCard = {
+    franchise: prefill.franchise,
     name: prefill.name,
     set: prefill.set,
     number: prefill.number,

@@ -1,0 +1,101 @@
+"use client";
+
+import { BookOpen, Sparkles, X } from "lucide-react";
+import { CompanionPanel } from "@/components/companion/companion-panel";
+import { MasterCatalogBrowser } from "@/components/catalog/master-catalog-browser";
+import type { CompanionController } from "@/hooks/use-companion";
+import { LIQUID_SCAN_PATH } from "@/lib/app-routes";
+import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import type { ChatOutputKind } from "@/lib/scanner-chat/types";
+import { cn } from "@/lib/cn";
+
+export function LiquidChatOutputPanel({
+  kind,
+  companion,
+  onCatalogScanPrefill,
+  onDismiss,
+  className,
+}: {
+  kind: ChatOutputKind;
+  companion?: CompanionController;
+  onCatalogScanPrefill?: (prefill: CatalogScanPrefill) => void;
+  onDismiss?: () => void;
+  className?: string;
+}) {
+  if (kind === "companion") {
+    if (!companion) return null;
+    return (
+      <div
+        className={cn(
+          "sc-chat-output-panel flex max-h-[min(85dvh,640px)] flex-col overflow-hidden rounded-xl border border-violet-500/20 sc-glass-raised",
+          className,
+        )}
+      >
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/8 bg-white/[0.02] px-3 py-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-violet-300" aria-hidden />
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-200/90">
+              PGT Companion
+            </p>
+          </div>
+          {onDismiss ? (
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5"
+              aria-label="Close companion"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-2.5 sm:p-3 scanner-chat-scrollbar">
+          <CompanionPanel layout="mobile" {...companion} />
+        </div>
+      </div>
+    );
+  }
+
+  if (!onCatalogScanPrefill) return null;
+
+  return (
+    <div
+      className={cn(
+        "sc-catalog-embed-panel sc-chat-output-panel flex max-h-[min(88dvh,820px)] flex-col overflow-hidden rounded-xl border border-amber-500/20 sc-glass-raised",
+        className,
+      )}
+    >
+      <div className="flex shrink-0 items-start justify-between gap-2 border-b border-white/8 bg-[rgb(8,10,14)]/95 px-3 py-2 backdrop-blur-md">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 shrink-0 text-amber-300" aria-hidden />
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-200/90">
+              Master catalog
+            </p>
+          </div>
+          <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+            Browse sets · open a card · tap <span className="text-amber-200/90">Scan this card</span> to
+            load it into your session
+          </p>
+        </div>
+        {onDismiss ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5 touch-manipulation"
+            aria-label="Close catalog"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+      <div className="liquid-catalog-embed min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 sm:px-3 sm:py-2.5 scanner-chat-scrollbar">
+        <MasterCatalogBrowser
+          embedded
+          scanTargetPath={LIQUID_SCAN_PATH}
+          onScanPrefill={onCatalogScanPrefill}
+        />
+      </div>
+    </div>
+  );
+}

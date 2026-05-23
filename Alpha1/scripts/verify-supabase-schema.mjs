@@ -85,6 +85,48 @@ async function main() {
     fail("table:user_companions", "missing — run 202605180002_companion.sql");
   }
 
+  if (await tableExists(supabase, "tcg_catalog_cards")) {
+    pass("table:tcg_catalog_cards", "present");
+  } else {
+    fail("table:tcg_catalog_cards", "missing — run 202605220001_tcg_catalog.sql");
+  }
+
+  if (await tableExists(supabase, "tcg_catalog_sources")) {
+    pass("table:tcg_catalog_sources", "present");
+  } else {
+    fail("table:tcg_catalog_sources", "missing — run 202605220001_tcg_catalog.sql");
+  }
+
+  if (await tableExists(supabase, "tcg_catalog_sets")) {
+    pass("table:tcg_catalog_sets", "present");
+  } else {
+    fail("table:tcg_catalog_sets", "missing — run 202605220001_tcg_catalog.sql");
+  }
+
+  if (await tableExists(supabase, "market_snapshots")) {
+    pass("table:market_snapshots", "present");
+  } else {
+    fail("table:market_snapshots", "missing — run 202605210001_market_snapshots.sql");
+  }
+
+  for (const table of [
+    "pgt_card_identities",
+    "pgt_slab_registry",
+    "pgt_card_observations",
+  ]) {
+    if (await tableExists(supabase, table)) pass(`table:${table}`, "present");
+    else fail(`table:${table}`, "missing — run 202605230001_pgt_registry.sql");
+  }
+
+  if (await columnExists(supabase, "extracted_cards", "pgt_card_identity_id")) {
+    pass("column:extracted_cards.pgt_card_identity_id", "present");
+  } else {
+    fail(
+      "column:extracted_cards.pgt_card_identity_id",
+      "missing — run 202605230001_pgt_registry.sql",
+    );
+  }
+
   if (await tableExists(supabase, "pokemon_sprite_assets")) {
     pass("table:pokemon_sprite_assets", "present");
   } else {

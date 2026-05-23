@@ -1,4 +1,6 @@
+import { buildMarketSearchIdentity } from "@/lib/market/market-search-identity";
 import type { ExtractedCard } from "@/lib/scan/schemas";
+import { inferCardFranchise } from "@/lib/scan/franchise";
 
 function compact(parts: Array<string | null | undefined>): string {
   return parts
@@ -52,15 +54,20 @@ export function buildCardLadderLadderSearchUrl(searchQuery: string): string {
   return `https://www.cardladder.com/ladder?query=${encodeURIComponent(q)}&category=Pokemon`;
 }
 
+function buildCardLadderSearchUrlForCard(card: ExtractedCard, searchQuery: string): string {
+  const q = searchQuery.trim() || card.name || "trading card";
+  const params = new URLSearchParams({ query: q });
+  if (inferCardFranchise(card).isPokemon) params.set("category", "Pokemon");
+  return `https://www.cardladder.com/ladder?${params.toString()}`;
+}
+
 export function cardLadderLadderSearchQuery(card: ExtractedCard): string {
-  const base = compact([card.year, card.set, card.printedName, card.name, card.language]);
+  const identity = buildMarketSearchIdentity(card);
   const deep = buildCardLadderCardPageUrl(card);
-  if (deep) return base;
-  const g = card.grader?.trim().toUpperCase();
-  const gradeNorm = normalizePsaSlugGrade(card.grade);
-  if (g === "PSA" && gradeNorm) return compact([base, `PSA ${gradeNorm}`]);
-  if (g && card.grade?.trim()) return compact([base, `${g} ${card.grade.trim()}`]);
-  return base || compact([card.printedName, card.name, card.language, card.set, card.number]);
+  if (deep) {
+    return compact([card.year, card.set, card.name, identity.gradeLabel]);
+  }
+  return identity.platform || identity.graded || identity.raw;
 }
 
 /** PSA `/ladder/card/...` URL when year, set, name, #, and grade support Card Ladder’s slug pattern. */
@@ -89,6 +96,23 @@ export function cardLadderHubUrls(card: ExtractedCard): { sold: string; active: 
   const deep = buildCardLadderCardPageUrl(card);
   if (deep) return { sold: deep, active: deep };
   const q = cardLadderLadderSearchQuery(card);
-  const u = buildCardLadderLadderSearchUrl(q);
+  const u = buildCardLadderSearchUrlForCard(card, q);
   return { sold: u, active: u };
+}
+
+/**
+ * Best-effort cert search URL (Card Ladder UI also has a # cert dialog).
+ * Query embeds grader + cert so users land on sales history for that slab class.
+ */
+export function buildCardLadderSearchUrlForCert(
+  grader: string,
+  cert: string,
+  category?: string,
+): string {
+  const digits = cert.replace(/\D/g, "");
+  const q = `${grader.trim()} ${digits}`.trim();
+  const params = new URLSearchParams({ query: q });
+  if (category) params.set("category", category);
+  else params.set("category", "Pokemon");
+  return `https://www.cardladder.com/ladder?${params.toString()}`;
 }

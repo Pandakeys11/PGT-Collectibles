@@ -1,4 +1,5 @@
 import type { ScanCardContext, StructuredBrief } from "@/lib/scan/schemas";
+import { analyzeMarketEvidence, gradeBucketLabel } from "@/lib/market/market-intelligence";
 
 function formatUsd(value: number | null): string {
   if (value == null) return "—";
@@ -36,7 +37,21 @@ function basisLabel(basis: ScanCardContext["fairValueBasis"]): string {
   return map[basis] ?? basis.replace(/_/g, " ");
 }
 
+function editionScopeFromExtraction(
+  extraction: ScanCardContext["extraction"],
+): { printStamps?: string; details?: string } {
+  return {
+    printStamps: typeof extraction.printStamps === "string" ? extraction.printStamps : undefined,
+    details: typeof extraction.details === "string" ? extraction.details : undefined,
+  };
+}
+
 export function buildLocalStructuredBrief(context: ScanCardContext): StructuredBrief {
+  const marketIntel = analyzeMarketEvidence(context.marketEvidence, {
+    card: editionScopeFromExtraction(context.extraction),
+    stickerUsd: context.askingUsd,
+    targetGradeBucket: context.lane === "graded" ? undefined : "raw",
+  });
   const verification =
     context.verificationFields.length > 0
       ? context.verificationFields
@@ -61,7 +76,7 @@ export function buildLocalStructuredBrief(context: ScanCardContext): StructuredB
   const summary = summaryParts.join(" ");
 
   const valuationParts = [
-    `**Sticker / ask:** ${formatUsd(context.askingUsd)} · **FMV:** ${formatUsd(context.fairValueUsd)}${context.fairValueBasis ? ` (${basisLabel(context.fairValueBasis)})` : ""}.`,
+    `**Sticker / ask:** ${formatUsd(context.askingUsd)} · **FMV:** ${formatUsd(context.fairValueUsd)}${context.fairValueBasis ? ` (${basisLabel(context.fairValueBasis)})` : ""} · **Target grade:** ${gradeBucketLabel(marketIntel.targetBucket)} (${marketIntel.confidenceLabel} confidence).`,
     lane === "graded"
       ? "Graded: cert + grade drive price — cross-check auction prints (Goldin, eBay sold) with index tools (Card Ladder, ALT) when relevant."
       : "Raw: use **TCGPlayer / Cardmarket** for catalog depth, **eBay sold** for what actually clears, **PriceCharting** when the print maps cleanly.",
@@ -77,16 +92,23 @@ export function buildLocalStructuredBrief(context: ScanCardContext): StructuredB
   const refCount = context.marketEvidence.filter((e) => e.kind === "reference").length;
 
   const marketSnapshot = [
-    `Session comps: **${soldCount} sold** · **${activeCount} active** · **${refCount} reference** (enriched as of ${new Date(context.marketAsOf).toLocaleDateString()}).`,
+    `Session comps: **${soldCount} sold** · **${activeCount} active** · **${refCount} reference** · **${marketIntel.auctionCount} auction-like** (enriched as of ${new Date(context.marketAsOf).toLocaleDateString()}).`,
     context.fairValueUsd != null
       ? `Model FMV **${formatUsd(context.fairValueUsd)}**${context.fairValueBasis ? ` (${basisLabel(context.fairValueBasis)})` : ""}${context.askingUsd != null ? ` vs sticker/ask **${formatUsd(context.askingUsd)}**` : ""}.`
       : "FMV not computed — confirm identity, then refresh market enrich.",
   ].join(" ");
 
   const compLines = topSoldEvidenceLines(context, 5);
+  const bucketLines = marketIntel.buckets
+    .filter((bucket) => bucket.soldCount > 0 || bucket.activeCount > 0 || bucket.bucket === marketIntel.targetBucket)
+    .slice(0, 5)
+    .map(
+      (bucket) =>
+        `• ${bucket.label}: ${formatUsd(bucket.medianSoldUsd ?? bucket.medianActiveUsd)} · ${bucket.soldCount} sold · ${bucket.activeCount} listed`,
+    );
   const compAnalysis =
     compLines.length > 0
-      ? compLines.join("\n")
+      ? [...bucketLines, ...compLines].join("\n")
       : "No priced sold rows in-session. Use hub **Sold** links and re-run market enrich after set/number are confirmed.";
 
   const nextChecksRaw = [

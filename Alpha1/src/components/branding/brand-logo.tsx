@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { APP_HOME_PATH } from "@/lib/app-routes";
 import { BRAND, BRAND_COPY } from "@/lib/branding";
 import { cn } from "@/lib/cn";
 
@@ -9,7 +10,7 @@ export type BrandLogoVariant = "header" | "command" | "auth" | "icon-only";
 
 export function BrandLogo({
   variant = "header",
-  href = "/scanner",
+  href = APP_HOME_PATH,
   className,
   showTagline = true,
 }: {

@@ -1,6 +1,12 @@
 import { normalizeGradedSlabFields } from "@/lib/scan/graded-slab";
+import {
+  canonicalPromoSetName,
+  normalizePromoCardIdentity,
+} from "@/lib/scan/promo-set-aliases";
 import { classifyCardLane } from "@/lib/scan/lane";
+import { applyResolvedPrintEdition } from "@/lib/scan/print-edition";
 import { isDexLikeCardNumberOnly } from "@/lib/scan/collector-fraction";
+import { inferCardFranchise } from "@/lib/scan/franchise";
 import { applySetFromCollectorFraction, applyWizardsTitleAndFractionHeuristics } from "@/lib/scan/set-identification";
 import { extractedCardSchema, type ExtractedCard } from "@/lib/scan/schemas";
 
@@ -137,17 +143,45 @@ export function normalizeVisionCard(raw: unknown): ExtractedCard | null {
 
   const rawNumber = asString(record.number);
   const rawDetails = asString(record.details);
-  const { number: numAfterDex, details: detailsAfterDex } = stripDexLikeCollectorNumber(rawNumber, rawDetails);
+  const laneEarly = classifyCardLane(record);
+  const { number: numAfterDex, details: detailsAfterDex } =
+    laneEarly.lane === "graded"
+      ? { number: rawNumber, details: rawDetails }
+      : stripDexLikeCollectorNumber(rawNumber, rawDetails);
   const { number, details: numDetails } = sanitizeNumberAndDetails(numAfterDex, detailsAfterDex);
   const rawSet = asString(record.set);
   const { set: setAfterEdition, details: detailsAfterEdition } = moveEditionFromSetToDetails(rawSet, numDetails);
   const nameEarly = fallbackName(record);
-  const wiz = applyWizardsTitleAndFractionHeuristics(nameEarly, setAfterEdition, number, detailsAfterEdition);
+  const franchiseHint = inferCardFranchise({
+    franchise: asString(record.franchise) ?? asString(record.game) ?? asString(record.category),
+    name: nameEarly,
+    printedName: asString(record.printedName),
+    set: setAfterEdition,
+    number,
+    details: detailsAfterEdition,
+    printStamps: asString(record.printStamps),
+    rarity: asString(record.rarity),
+    labelTitle: asString(record.labelTitle),
+  } as ExtractedCard);
+  const wiz = franchiseHint.isPokemon
+    ? applyWizardsTitleAndFractionHeuristics(nameEarly, setAfterEdition, number, detailsAfterEdition)
+    : {
+        number,
+        set: setAfterEdition,
+        details: detailsAfterEdition,
+        clearSet: false,
+      };
   const numAfterWiz = wiz.number ?? number;
   const setAfterWiz = wiz.clearSet ? undefined : (wiz.set !== undefined ? wiz.set : setAfterEdition);
   const detAfterWiz = wiz.details ?? detailsAfterEdition;
   const setFromFraction = applySetFromCollectorFraction(setAfterWiz, numAfterWiz, detAfterWiz);
-  const finalSet = setFromFraction.set !== undefined ? setFromFraction.set : setAfterWiz;
+  const setBeforePromo =
+    setFromFraction.set !== undefined ? setFromFraction.set : setAfterWiz;
+  const promoNorm = franchiseHint.isPokemon
+    ? normalizePromoCardIdentity({ set: setBeforePromo, number: numAfterWiz })
+    : { set: setBeforePromo, number: numAfterWiz };
+  const finalSet = canonicalPromoSetName(promoNorm.set) ?? promoNorm.set;
+  const finalNumber = promoNorm.number ?? numAfterWiz;
   const yearFromVision = asString(record.year);
   const year = setFromFraction.year ?? yearFromVision;
   const bbox = asBbox(record.bbox);
@@ -160,11 +194,12 @@ export function normalizeVisionCard(raw: unknown): ExtractedCard | null {
   const mergedDetails = printFromDetails.details ?? detAfterWiz;
 
   const normalized = {
+    franchise: asString(record.franchise) ?? asString(record.game) ?? asString(record.category),
     name: nameEarly,
     printedName: asString(record.printedName),
     language: asString(record.language),
     set: finalSet,
-    number: numAfterWiz,
+    number: finalNumber,
     year,
     rarity: asString(record.rarity),
     grader: asString(record.grader),
@@ -192,5 +227,8 @@ export function normalizeVisionCard(raw: unknown): ExtractedCard | null {
 
   const parsed = extractedCardSchema.safeParse(normalized);
   if (!parsed.success) return null;
-  return normalizeGradedSlabFields(parsed.data, lane.lane);
+  const graded = normalizeGradedSlabFields(parsed.data, lane.lane);
+  const profile = inferCardFranchise(graded);
+  const withFranchise = { ...graded, franchise: graded.franchise ?? profile.id };
+  return applyResolvedPrintEdition(withFranchise);
 }

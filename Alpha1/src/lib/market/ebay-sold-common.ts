@@ -1,4 +1,5 @@
-import { classifyCardLane } from "@/lib/scan/lane";
+import { buildMarketSearchIdentity } from "@/lib/market/market-search-identity";
+import { franchiseSearchPrefix, inferCardFranchise } from "@/lib/scan/franchise";
 import type { ExtractedCard } from "@/lib/scan/schemas";
 
 /** eBay Pokémon TCG category (Finding + completed search). */
@@ -14,25 +15,15 @@ function joinEbayKeywords(parts: Array<string | null | undefined>): string {
 }
 
 /**
- * Keyword string for eBay Pokémon TCG searches (`_sacat` already pins the category).
- * - **Raw:** `Pokemon {name} {set} {printStamps} {rarity} {year}` — no collector number.
- * - **Graded slab:** same + `{grader} {grade}` (e.g. `PSA 10`).
+ * Primary eBay sold keyword string — matches user-verified patterns like
+ * `Pokemon Raichu Fossil Rare 1999 PSA 9` (set + rarity + year + normalized grade).
  */
+export function buildEbayCardKeywordQuery(card: ExtractedCard): string {
+  return buildMarketSearchIdentity(card).ebayPrimary;
+}
+
 export function buildEbayPokemonCardKeywordQuery(card: ExtractedCard): string {
-  const { lane } = classifyCardLane(card as Record<string, unknown>);
-  const head = joinEbayKeywords([
-    "Pokemon",
-    card.name,
-    card.printedName,
-    card.language,
-    card.set,
-    card.printStamps,
-    card.rarity,
-    card.year,
-  ]);
-  if (lane !== "graded") return head;
-  const tail = joinEbayKeywords([card.grader, card.grade]);
-  return joinEbayKeywords([head, tail]);
+  return buildEbayCardKeywordQuery(card);
 }
 
 const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
@@ -60,7 +51,9 @@ export function cleanEbaySoldQuery(query: string): string {
 
 /** Query variants tried in order until sold rows are found. */
 export function ebaySoldQueryCandidates(card: ExtractedCard): string[] {
-  const primary = buildEbayPokemonCardKeywordQuery(card);
+  const identity = buildMarketSearchIdentity(card);
+  const primary = identity.ebayPrimary;
+  const prefix = franchiseSearchPrefix(card);
   const name = card.name?.trim();
   const set = card.set?.trim();
   const num = card.number?.trim();
@@ -76,16 +69,23 @@ export function ebaySoldQueryCandidates(card: ExtractedCard): string[] {
   };
 
   push(primary);
+  if (identity.graded && identity.graded !== primary) push(identity.graded);
+  if (identity.platform && identity.platform !== primary) push(identity.platform);
+  const certDigits = card.cert?.replace(/\D/g, "") ?? "";
+  if (certDigits.length >= 6 && card.grader?.trim()) {
+    push(joinEbayKeywords([card.grader, certDigits]));
+    push(joinEbayKeywords([card.grader, "cert", certDigits, name, identity.gradeLabel]));
+  }
   if (name && num) {
-    push(joinEbayKeywords(["Pokemon", name, set, num, stamps, rarity, y]));
-    push(joinEbayKeywords(["Pokemon", name, num, set, stamps, rarity, y]));
+    push(joinEbayKeywords([prefix, name, set, num, stamps, rarity, y]));
+    push(joinEbayKeywords([prefix, name, num, set, stamps, rarity, y]));
   }
   if (details) {
     push(joinEbayKeywords([primary, details]));
   }
   if (name) {
-    push(joinEbayKeywords(["Pokemon", name, set, stamps, rarity, y]));
-    push(joinEbayKeywords(["Pokemon", name, set, y]));
+    push(joinEbayKeywords([prefix, name, set, stamps, rarity, y]));
+    push(joinEbayKeywords([prefix, name, set, y]));
     push(name);
   }
   const uniq: string[] = [];
@@ -101,21 +101,31 @@ export function ebaySoldQueryCandidates(card: ExtractedCard): string[] {
 /** Completed listings search URL (`_sacat` = Pokémon TCG). */
 export function buildEbaySoldCompletedSearchUrl(
   query: string,
-  options: { ipg?: number; auctionOnly?: boolean } = {},
+  options: { ipg?: number; auctionOnly?: boolean; categoryId?: string | null } = {},
 ): string {
   const q = cleanEbaySoldQuery(query);
   const ipg = Math.min(options.ipg ?? 60, 100);
   const params = new URLSearchParams({
     _nkw: q,
-    _sacat: EBAY_POKEMON_CARD_CATEGORY_ID,
     LH_Sold: "1",
     LH_Complete: "1",
     rt: "nc",
     _sop: "1",
     _ipg: String(ipg),
   });
+  if (options.categoryId) params.set("_sacat", options.categoryId);
   if (options.auctionOnly) params.set("LH_Auction", "1");
   return `https://www.ebay.com/sch/i.html?${params.toString()}`;
+}
+
+/** eBay category: Sports Trading Cards */
+export const EBAY_SPORTS_CARD_CATEGORY_ID = "212";
+
+export function ebaySearchCategoryIdForCard(card: ExtractedCard): string | null {
+  const profile = inferCardFranchise(card);
+  if (profile.isPokemon) return EBAY_POKEMON_CARD_CATEGORY_ID;
+  if (profile.id === "sports") return EBAY_SPORTS_CARD_CATEGORY_ID;
+  return null;
 }
 
 export function isLikelyBlockedEbayHtml(html: string): boolean {

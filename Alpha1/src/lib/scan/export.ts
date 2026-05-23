@@ -1,4 +1,9 @@
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
+import { franchiseLabel } from "@/lib/scan/franchise";
+import {
+  liquidScanSheetRowsToCsv,
+  specimensToLiquidScanSheetRows,
+} from "@/lib/scan/liquid-scan-sheet";
 import {
   formatFairMarketValue,
   formatLatestActive,
@@ -11,6 +16,7 @@ import {
 
 export type SpecimenSheetRow = {
   row: number;
+  franchise: string;
   name: string;
   printedName: string;
   language: string;
@@ -36,6 +42,7 @@ export function specimensToSheetRows(
 ): SpecimenSheetRow[] {
   return specimens.map((item, index) => ({
     row: index + 1,
+    franchise: item.card.franchise ?? franchiseLabel(item.card),
     name: item.card.name,
     printedName: item.card.printedName ?? "",
     language: item.card.language ?? "",
@@ -72,6 +79,7 @@ function timestampSlug() {
 
 const EMPTY_ROW: SpecimenSheetRow = {
   row: 1,
+  franchise: "",
   name: "",
   printedName: "",
   language: "",
@@ -93,6 +101,15 @@ const EMPTY_ROW: SpecimenSheetRow = {
 };
 
 export function downloadSpecimensCsv(specimens: ScanSpecimen[]) {
+  const rows = specimensToLiquidScanSheetRows(specimens);
+  downloadBlob(
+    `pgt-liquid-scan-sheet-${timestampSlug()}.csv`,
+    new Blob([liquidScanSheetRowsToCsv(rows)], { type: "text/csv;charset=utf-8" }),
+  );
+}
+
+/** Legacy wide export (franchise, PSA10, BGS BL columns) — internal / tooling. */
+export function downloadSpecimensCsvLegacy(specimens: ScanSpecimen[]) {
   const rows = specimensToSheetRows(specimens);
   const headers = Object.keys(rows[0] ?? EMPTY_ROW);
   const escape = (value: string | number) => {

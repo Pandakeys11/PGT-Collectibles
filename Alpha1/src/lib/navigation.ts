@@ -1,5 +1,7 @@
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, MoreHorizontal, ScanLine, UserRound } from "lucide-react";
+import { BookOpen, Droplets, MoreHorizontal, UserRound } from "lucide-react";
+import { LIQUID_SCAN_PATH } from "@/lib/app-routes";
+import { isLegacyScannerPath, isLiquidScanPath } from "@/lib/route-paths";
 
 export type AppNavId = "scan" | "catalog" | "profile" | "more";
 
@@ -9,26 +11,26 @@ export type AppNavItem = {
   label: string;
   shortLabel: string;
   icon: LucideIcon;
-  /** Match pathname prefix (e.g. /scanner matches /scanner?x=1) */
   match: (pathname: string) => boolean;
 };
 
 export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: "scan",
-    href: "/scanner",
-    label: "Scan",
+    href: LIQUID_SCAN_PATH,
+    label: "PGT Liquid Scan",
     shortLabel: "Scan",
-    icon: ScanLine,
-    match: (pathname) => pathname.startsWith("/scanner"),
+    icon: Droplets,
+    match: (pathname) => isLiquidScanPath(pathname) || isLegacyScannerPath(pathname),
   },
   {
     id: "catalog",
-    href: "/scanner?view=catalog",
+    href: `${LIQUID_SCAN_PATH}?panel=catalog`,
     label: "Catalog",
     shortLabel: "Catalog",
     icon: BookOpen,
-    match: (pathname) => pathname.startsWith("/pokedex"),
+    match: (pathname) =>
+      pathname.startsWith("/pokedex") || isLiquidScanPath(pathname),
   },
   {
     id: "profile",
@@ -53,7 +55,7 @@ export const APP_NAV_MORE: AppNavItem = {
 };
 
 export function activeNavId(pathname: string): AppNavId {
-  if (pathname.startsWith("/scanner")) return "scan";
+  if (isLiquidScanPath(pathname) || isLegacyScannerPath(pathname)) return "scan";
   if (pathname.startsWith("/pokedex")) return "catalog";
   if (pathname.startsWith("/profile") || pathname.startsWith("/saved") || pathname.startsWith("/usage")) {
     return "profile";
@@ -67,10 +69,10 @@ export type AppPageMeta = {
 };
 
 export function pageMetaForPath(pathname: string): AppPageMeta {
-  if (pathname.startsWith("/scanner")) {
+  if (isLiquidScanPath(pathname) || isLegacyScannerPath(pathname)) {
     return {
-      title: "Command center",
-      subtitle: "Scan, catalog, market, and AI insight",
+      title: "PGT Liquid Scan",
+      subtitle: "AI chat scan, match, and market intelligence",
     };
   }
   if (pathname.startsWith("/pokedex")) {
@@ -98,7 +100,7 @@ export function pageMetaForPath(pathname: string): AppPageMeta {
     };
   }
   return {
-    title: "Scan desk",
-    subtitle: "Vision, session, and market comps",
+    title: "PGT Liquid Scan",
+    subtitle: "AI chat scan, match, and market intelligence",
   };
 }

@@ -1,5 +1,7 @@
 import type { MarketApiAdapter, ApiAdapterResult } from "@/lib/market/adapters/types";
 import { matchPokemonCatalog, type CatalogMatch } from "@/lib/market/pokemon-catalog";
+import { inferCardFranchise } from "@/lib/scan/franchise";
+import { tcgPlayerVariantKeyForEdition } from "@/lib/scan/print-edition";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 
 function variantLabel(variant: string): string {
@@ -19,12 +21,18 @@ function safeDate(updatedAt: string | null): string | null {
   return null;
 }
 
-function pushTcgPlayer(catalog: CatalogMatch, evidence: MarketEvidence[]) {
+function pushTcgPlayer(catalog: CatalogMatch, card: ExtractedCard, evidence: MarketEvidence[]) {
   const url = catalog.prices.tcgPlayerUrl;
   if (!url) return;
   const observedAt = safeDate(catalog.prices.tcgPlayerUpdatedAt);
 
-  for (const variant of catalog.prices.tcgPlayerPrices) {
+  const variantKeys = catalog.prices.tcgPlayerPrices.map((v) => v.variant);
+  const preferredKey = tcgPlayerVariantKeyForEdition(variantKeys, card);
+  const priceRows = preferredKey
+    ? catalog.prices.tcgPlayerPrices.filter((v) => v.variant === preferredKey)
+    : catalog.prices.tcgPlayerPrices;
+
+  for (const variant of priceRows) {
     const label = variantLabel(variant.variant);
     if (variant.market != null) {
       evidence.push({
@@ -121,11 +129,14 @@ function pushCardMarket(catalog: CatalogMatch, evidence: MarketEvidence[]) {
 export const pokemonTcgPricesAdapter: MarketApiAdapter = {
   id: "pokemon_tcg_prices",
   async collect(card: ExtractedCard): Promise<ApiAdapterResult> {
+    if (!inferCardFranchise(card).isPokemon) {
+      return { adapter: "pokemon_tcg_prices", evidence: [] };
+    }
     const catalog = await matchPokemonCatalog(card);
     if (!catalog) return { adapter: "pokemon_tcg_prices", evidence: [] };
 
     const evidence: MarketEvidence[] = [];
-    pushTcgPlayer(catalog, evidence);
+    pushTcgPlayer(catalog, card, evidence);
     pushCardMarket(catalog, evidence);
 
     return { adapter: "pokemon_tcg_prices", evidence };

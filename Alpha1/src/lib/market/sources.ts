@@ -1,13 +1,15 @@
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 import { classifyCardLane } from "@/lib/scan/lane";
+import { franchiseSearchPrefix, inferCardFranchise } from "@/lib/scan/franchise";
 import {
   buildCardLadderLadderSearchUrl,
   cardLadderHubUrls,
   cardLadderLadderSearchQuery,
 } from "@/lib/market/cardladder-urls";
+import { buildMarketSearchIdentity } from "@/lib/market/market-search-identity";
 import {
-  buildEbayPokemonCardKeywordQuery,
-  EBAY_POKEMON_CARD_CATEGORY_ID,
+  buildEbayCardKeywordQuery,
+  ebaySearchCategoryIdForCard,
 } from "@/lib/market/ebay-sold-common";
 
 export type MarketSourceId =
@@ -15,6 +17,7 @@ export type MarketSourceId =
   | "cardladder"
   | "alt"
   | "goldin"
+  | "fanatics"
   | "pricecharting"
   | "cardmarket"
   | "tcgplayer";
@@ -69,7 +72,6 @@ function ebaySoldSearchQueryFromCompTitle(title: string): string {
 export function buildEbaySoldSearchUrl(query: string): string {
   const params = new URLSearchParams({
     _nkw: query.trim(),
-    _sacat: EBAY_POKEMON_CARD_CATEGORY_ID,
     LH_Sold: "1",
     LH_Complete: "1",
     _sop: "1",
@@ -81,45 +83,73 @@ export function buildEbaySoldSearchUrl(query: string): string {
 export function buildEbayActiveSearchUrl(query: string): string {
   const params = new URLSearchParams({
     _nkw: query.trim(),
-    _sacat: EBAY_POKEMON_CARD_CATEGORY_ID,
     rt: "nc",
   });
   return `https://www.ebay.com/sch/i.html?${params.toString()}`;
 }
 
-export type EbayGradeHubKey = "raw" | "psa10" | "psa9" | "bgsBlackLabel" | "cgcPristine10";
+function buildEbaySoldSearchUrlForCard(card: ExtractedCard, query: string): string {
+  const params = new URLSearchParams({
+    _nkw: query.trim(),
+    LH_Sold: "1",
+    LH_Complete: "1",
+    _sop: "1",
+    rt: "nc",
+  });
+  const categoryId = ebaySearchCategoryIdForCard(card);
+  if (categoryId) params.set("_sacat", categoryId);
+  return `https://www.ebay.com/sch/i.html?${params.toString()}`;
+}
+
+function buildEbayActiveSearchUrlForCard(card: ExtractedCard, query: string): string {
+  const params = new URLSearchParams({
+    _nkw: query.trim(),
+    rt: "nc",
+  });
+  const categoryId = ebaySearchCategoryIdForCard(card);
+  if (categoryId) params.set("_sacat", categoryId);
+  return `https://www.ebay.com/sch/i.html?${params.toString()}`;
+}
+
+export type EbayGradeHubKey =
+  | "raw"
+  | "psa10"
+  | "psa9"
+  | "bgsBlackLabel"
+  | "cgcPristine10";
 
 export type EbayGradeHub = { sold: string; active: string };
 
-export function buildEbayGradeHubs(card: ExtractedCard): Record<EbayGradeHubKey, EbayGradeHub> {
-  const ebay = MARKET_SOURCES.find((s) => s.id === "ebay");
-  if (!ebay) {
-    const empty = { sold: "", active: "" };
-    return {
-      raw: empty,
-      psa10: empty,
-      psa9: empty,
-      bgsBlackLabel: empty,
-      cgcPristine10: empty,
-    };
-  }
-  const hubFor = (c: ExtractedCard): EbayGradeHub => ({
-    sold: ebay.soldUrl(ebay.soldSearchQuery(c)),
-    active: ebay.activeUrl(ebay.activeSearchQuery(c)),
-  });
+/** eBay sold + active hubs for the scanned card (same query as scrape / listed links). */
+export function buildEbayHubForCard(card: ExtractedCard): EbayGradeHub {
+  const q = buildEbayCardKeywordQuery(card);
   return {
-    raw: hubFor(card),
+    sold: buildEbaySoldSearchUrlForCard(card, q),
+    active: buildEbayActiveSearchUrlForCard(card, q),
+  };
+}
+
+export function buildEbayGradeHubs(card: ExtractedCard): Record<EbayGradeHubKey, EbayGradeHub> {
+  const hubFor = (c: ExtractedCard): EbayGradeHub => {
+    const q = buildEbayCardKeywordQuery(c);
+    return {
+      sold: buildEbaySoldSearchUrlForCard(c, q),
+      active: buildEbayActiveSearchUrlForCard(c, q),
+    };
+  };
+  return {
+    raw: hubFor({ ...card, grader: undefined, grade: undefined }),
     psa10: hubFor({ ...card, grader: "PSA", grade: "10" }),
     psa9: hubFor({ ...card, grader: "PSA", grade: "9" }),
     bgsBlackLabel: hubFor({ ...card, grader: "BGS", grade: "10 Black Label" }),
-    cgcPristine10: hubFor({ ...card, grader: "CGC", grade: "10" }),
+    cgcPristine10: hubFor({ ...card, grader: "CGC", grade: "10 Pristine" }),
   };
 }
 
 export function resolveEvidenceExternalUrl(
   item: MarketEvidence,
   hub: Map<MarketSourceId, HubLaneUrls>,
-  options?: { ebayGradeHub?: EbayGradeHub },
+  options?: { ebayGradeHub?: EbayGradeHub; ebayCardHub?: EbayGradeHub },
 ): string | null {
   const fromUrl = item.url ? inferMarketSourceFromUrl(item.url) : null;
   const fromName = normalizeMarketSource(item.source ?? null);
@@ -185,11 +215,32 @@ function compact(parts: Array<string | null | undefined>): string {
 }
 
 function identity(card: ExtractedCard): string {
-  return compact([card.name, card.printedName, card.language, card.set, card.number, card.printStamps, card.details, card.rarity, card.year]);
+  return compact([franchiseSearchPrefix(card), card.name, card.printedName, card.language, card.set, card.number, card.printStamps, card.details, card.rarity, card.year]);
 }
 
 function gradedIdentity(card: ExtractedCard): string {
-  return compact([card.name, card.printedName, card.language, card.set, card.number, card.printStamps, card.details, card.grader, card.grade]);
+  return buildMarketSearchIdentity(card).platform;
+}
+
+function cardMarketGamePath(card: ExtractedCard): string {
+  switch (inferCardFranchise(card).id) {
+    case "pokemon":
+      return "Pokemon";
+    case "onepiece":
+      return "OnePiece";
+    case "dragonball":
+      return "DragonBallSuper";
+    case "yugioh":
+      return "YuGiOh";
+    case "magic":
+      return "Magic";
+    case "lorcana":
+      return "Lorcana";
+    case "sports":
+      return "Sports-Trading-Cards";
+    default:
+      return "Search";
+  }
 }
 
 export const MARKET_SOURCES: MarketSourceDefinition[] = [
@@ -199,8 +250,8 @@ export const MARKET_SOURCES: MarketSourceDefinition[] = [
     domain: "ebay.com",
     soldUrl: (query) => buildEbaySoldSearchUrl(query),
     activeUrl: (query) => buildEbayActiveSearchUrl(query),
-    soldSearchQuery: (card) => buildEbayPokemonCardKeywordQuery(card),
-    activeSearchQuery: (card) => buildEbayPokemonCardKeywordQuery(card),
+    soldSearchQuery: (card) => buildEbayCardKeywordQuery(card),
+    activeSearchQuery: (card) => buildEbayCardKeywordQuery(card),
   },
   {
     id: "cardladder",
@@ -217,8 +268,8 @@ export const MARKET_SOURCES: MarketSourceDefinition[] = [
     domain: "alt.xyz",
     soldUrl: (query) => `https://app.alt.xyz/browse?q=${encodeURIComponent(query)}`,
     activeUrl: (query) => `https://app.alt.xyz/browse?q=${encodeURIComponent(query)}`,
-    soldSearchQuery: (card) => compact([gradedIdentity(card) || identity(card), "PSA 10", "BGS", "sold"]),
-    activeSearchQuery: (card) => compact([identity(card), "market price"]),
+    soldSearchQuery: (card) => gradedIdentity(card) || identity(card),
+    activeSearchQuery: (card) => gradedIdentity(card) || identity(card),
   },
   {
     id: "goldin",
@@ -226,8 +277,19 @@ export const MARKET_SOURCES: MarketSourceDefinition[] = [
     domain: "goldin.co",
     soldUrl: (query) => `https://goldin.co/search?search=${encodeURIComponent(query)}`,
     activeUrl: (query) => `https://goldin.co/search?search=${encodeURIComponent(query)}`,
-    soldSearchQuery: (card) => compact([gradedIdentity(card) || identity(card), "graded pokemon card"]),
-    activeSearchQuery: (card) => compact([gradedIdentity(card) || identity(card), "graded pokemon"]),
+    soldSearchQuery: (card) => gradedIdentity(card) || identity(card),
+    activeSearchQuery: (card) => gradedIdentity(card) || identity(card),
+  },
+  {
+    id: "fanatics",
+    label: "Fanatics Collect",
+    domain: "fanaticscollect.com",
+    soldUrl: (query) =>
+      `https://www.fanaticscollect.com/search?query=${encodeURIComponent(query)}&sort=price_desc`,
+    activeUrl: (query) =>
+      `https://www.fanaticscollect.com/search?query=${encodeURIComponent(query)}`,
+    soldSearchQuery: (card) => gradedIdentity(card) || identity(card),
+    activeSearchQuery: (card) => gradedIdentity(card) || identity(card),
   },
   {
     id: "pricecharting",
@@ -235,8 +297,8 @@ export const MARKET_SOURCES: MarketSourceDefinition[] = [
     domain: "pricecharting.com",
     soldUrl: (query) => `https://www.pricecharting.com/search-products?q=${encodeURIComponent(query)}&type=prices`,
     activeUrl: (query) => `https://www.pricecharting.com/search-products?q=${encodeURIComponent(query)}&type=prices`,
-    soldSearchQuery: (card) => compact(["pokemon", identity(card), "sold price"]),
-    activeSearchQuery: (card) => compact(["pokemon", identity(card), "price"]),
+    soldSearchQuery: (card) => compact([identity(card), "sold price"]),
+    activeSearchQuery: (card) => compact([identity(card), "price"]),
   },
   {
     id: "cardmarket",
@@ -271,6 +333,43 @@ export function buildMarketSourceLinks(card: ExtractedCard): MarketSourceLink[] 
         { source: "cardladder", label: `${source.label} listed`, lane: "active" as const, url: active },
       ];
     }
+    if (source.id === "ebay") {
+      const soldQuery = source.soldSearchQuery(card);
+      const activeQuery = source.activeSearchQuery(card);
+      return [
+        {
+          source: source.id,
+          label: `${source.label} sold`,
+          lane: "sold",
+          url: buildEbaySoldSearchUrlForCard(card, soldQuery),
+        },
+        {
+          source: source.id,
+          label: `${source.label} listed`,
+          lane: "active",
+          url: buildEbayActiveSearchUrlForCard(card, activeQuery),
+        },
+      ];
+    }
+    if (source.id === "cardmarket") {
+      const gamePath = cardMarketGamePath(card);
+      const soldQuery = source.soldSearchQuery(card);
+      const activeQuery = source.activeSearchQuery(card);
+      return [
+        {
+          source: source.id,
+          label: `${source.label} sold`,
+          lane: "sold",
+          url: `https://www.cardmarket.com/en/${gamePath}/Products/Search?searchString=${encodeURIComponent(soldQuery)}`,
+        },
+        {
+          source: source.id,
+          label: `${source.label} listed`,
+          lane: "active",
+          url: `https://www.cardmarket.com/en/${gamePath}/Products/Search?searchString=${encodeURIComponent(activeQuery)}`,
+        },
+      ];
+    }
     return [
       {
         source: source.id,
@@ -295,6 +394,7 @@ export function inferMarketSourceFromUrl(url: string): MarketSourceId | null {
     if (host.includes("cardladder.")) return "cardladder";
     if (host.includes("alt.xyz") || host.includes("alt.")) return "alt";
     if (host.includes("goldin.")) return "goldin";
+    if (host.includes("fanatics")) return "fanatics";
     if (host.includes("pricecharting.")) return "pricecharting";
     if (host.includes("cardmarket.")) return "cardmarket";
     if (host.includes("tcgplayer.")) return "tcgplayer";
@@ -312,6 +412,7 @@ export function normalizeMarketSource(value: string | null | undefined): MarketS
   if (normalized.includes("card ladder") || normalized.includes("cardladder")) return "cardladder";
   if (normalized === "alt" || /^alt\s/i.test(normalized) || normalized.startsWith("alt.")) return "alt";
   if (normalized.includes("goldin")) return "goldin";
+  if (normalized.includes("fanatics")) return "fanatics";
   if (normalized.includes("pricecharting") || normalized.includes("price charting")) return "pricecharting";
   if (normalized.includes("cardmarket") || normalized.includes("card market")) return "cardmarket";
   if (normalized.includes("tcgplayer") || normalized.includes("tcg player")) return "tcgplayer";

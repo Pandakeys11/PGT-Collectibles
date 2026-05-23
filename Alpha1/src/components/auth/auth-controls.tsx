@@ -3,9 +3,10 @@
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { APP_HOME_PATH } from "@/lib/app-routes";
 
 export function AuthControls({
-  redirectUrl = "/scanner",
+  redirectUrl = APP_HOME_PATH,
 }: {
   redirectUrl?: string;
 }) {

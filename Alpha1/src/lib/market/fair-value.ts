@@ -1,4 +1,5 @@
-import type { MarketEvidence } from "@/lib/scan/schemas";
+import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
+import { analyzeMarketEvidence, type GradeBucket } from "@/lib/market/market-intelligence";
 
 export function median(values: number[]): number | null {
   if (values.length === 0) return null;
@@ -15,12 +16,31 @@ export type FairValueBasis =
   | "active_median"
   | "reference_median"
   | "sticker_anchor"
-  | "tcg_catalog";
+  | "tcg_catalog"
+  | "target_sold_median"
+  | "target_active_median"
+  | "target_reference_median"
+  | "nearest_sold_median";
 
 export function deriveFairValueResult(
   evidence: MarketEvidence[],
-  options?: { stickerUsd?: number | null },
+  options?: {
+    card?: Pick<ExtractedCard, "printStamps" | "details"> | null;
+    gradeCard?: ExtractedCard | null;
+    stickerUsd?: number | null;
+    targetGradeBucket?: GradeBucket | null;
+  },
 ): { fairValueUsd: number | null; fairValueBasis: FairValueBasis | null } {
+  const intelligence = analyzeMarketEvidence(evidence, {
+    card: options?.card ?? null,
+    gradeCard: options?.gradeCard ?? null,
+    stickerUsd: options?.stickerUsd,
+    targetGradeBucket: options?.targetGradeBucket ?? null,
+  });
+  if (intelligence.fmvUsd != null && intelligence.fmvBasis) {
+    return { fairValueUsd: intelligence.fmvUsd, fairValueBasis: intelligence.fmvBasis };
+  }
+
   const pricesFor = (kind: MarketEvidence["kind"]) =>
     evidence
       .filter((item) => item.kind === kind && typeof item.priceUsd === "number" && Number.isFinite(item.priceUsd!))

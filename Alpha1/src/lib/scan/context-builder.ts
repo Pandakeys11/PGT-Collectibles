@@ -1,5 +1,12 @@
 import type { FairValueBasis } from "@/lib/market/fair-value";
+import {
+  hasReadableCertNumber,
+  isCertNotApplicable,
+  normalizeGradedSlabFields,
+} from "@/lib/scan/graded-slab";
 import { classifyCardLane, scrubHallucinatedSlabFieldsForRaw } from "@/lib/scan/lane";
+import { printEditionBlocker, resolvePrintEdition } from "@/lib/scan/print-edition";
+import { franchiseLabel } from "@/lib/scan/franchise";
 import { buildEbaySoldSearchUrl, buildEbayActiveSearchUrl, buildMarketSourceLinks } from "@/lib/market/sources";
 import type {
   CatalogCandidate,
@@ -31,6 +38,10 @@ export function buildScanCardContext(args: {
   specimenId: string;
   card: ExtractedCard;
   registry?: RegistrySnapshot | null;
+  populationSummary?: string | null;
+  certProvider?: string | null;
+  certGradeDate?: string | null;
+  certMarketEvidence?: MarketEvidence[];
   catalogId?: string | null;
   year?: string | null;
   marketEvidence?: MarketEvidence[];
@@ -43,10 +54,13 @@ export function buildScanCardContext(args: {
   catalogCandidates?: CatalogCandidate[];
   identityEvidence?: IdentityEvidence[];
 }): ScanCardContext {
-  const laneResult = classifyCardLane(cardRecordFromExtracted(args.card));
+  const prepped = normalizeGradedSlabFields(args.card);
+  const laneResult = classifyCardLane(cardRecordFromExtracted(prepped));
   const lane = laneResult.lane;
   const normalized =
-    lane === "raw" ? (scrubHallucinatedSlabFieldsForRaw(args.card) as ExtractedCard) : args.card;
+    lane === "raw"
+      ? (scrubHallucinatedSlabFieldsForRaw(prepped) as ExtractedCard)
+      : normalizeGradedSlabFields(prepped, "graded");
   const verificationFields = buildVerificationFields(normalized, args.registry);
   const registryVerificationStatus = deriveVerificationStatus(verificationFields);
   const registryConfidence = deriveConfidence(verificationFields, lane);
@@ -77,9 +91,16 @@ export function buildScanCardContext(args: {
   if (catalogAttempted && catalogIdentityStatus === "failed") {
     blockers.push("No official catalog candidate cleared the identity threshold.");
   }
-  if (lane === "graded" && !String(normalized.cert ?? "").replace(/\D/g, "").match(/\d{6,}/)) {
-    blockers.push("Graded lane without a readable cert number.");
+  if (lane === "graded" && !hasReadableCertNumber(normalized.cert)) {
+    blockers.push(
+      isCertNotApplicable(normalized.cert)
+        ? "Cert not visible in photo (often on back of slab) — enter cert # manually."
+        : "Graded lane without a readable cert number.",
+    );
   }
+  const editionBlocker = printEditionBlocker(normalized, lane);
+  if (editionBlocker) blockers.push(editionBlocker);
+  const resolvedEdition = resolvePrintEdition(normalized);
 
   const query = buildSearchQuery(normalized);
   const marketEvidence = args.marketEvidence ?? [];
@@ -100,7 +121,15 @@ export function buildScanCardContext(args: {
     cardNumber: normalized.number ?? null,
     year: args.year ?? normalized.year ?? null,
     variantLabel:
-      [normalized.language, normalized.printedName, normalized.printStamps, normalized.details, normalized.rarity]
+      [
+        franchiseLabel(normalized),
+        resolvedEdition && resolvedEdition.id !== "unknown" ? resolvedEdition.label : null,
+        normalized.language,
+        normalized.printedName,
+        normalized.printStamps,
+        normalized.details,
+        normalized.rarity,
+      ]
         .filter(Boolean)
         .join(" · ") || null,
     encapsulation: lane === "graded" ? "graded_slab" : "raw",
@@ -116,10 +145,17 @@ export function buildScanCardContext(args: {
     verificationFields,
     marketEvidence,
     marketSourceLinks,
-    populationSummary: args.registry?.isVerified ? "Registry verified — population hydration pending." : null,
+    populationSummary:
+      args.populationSummary ??
+      (args.registry?.isVerified
+        ? "Registry verified — open grader link for full population."
+        : null),
     ebaySoldSearchUrl: ebaySold ?? (query ? ebaySearchUrl(query, true) : null),
     ebayActiveSearchUrl: ebayActive ?? (query ? ebaySearchUrl(query, false) : null),
     registryUrl: args.registry?.registryUrl ?? null,
+    certProvider: args.certProvider ?? null,
+    certGradeDate: args.certGradeDate ?? null,
+    certMarketEvidence: args.certMarketEvidence ?? [],
     extraction: normalized,
     catalogImageUrl: args.catalogImageUrl ?? null,
   };

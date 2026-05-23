@@ -1,4 +1,5 @@
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
+import { resolveCardListFmv } from "@/lib/scan/card-list-fmv";
 import { formatAskingPriceCompact as formatAskingPriceUnified } from "@/lib/scan/specimen-present";
 import type { FairValueBasis } from "@/lib/market/fair-value";
 import {
@@ -23,6 +24,10 @@ const FMV_BASIS_LABEL: Partial<Record<FairValueBasis, string>> = {
   reference_median: "guide ref",
   sticker_anchor: "from sticker",
   tcg_catalog: "TCGPlayer market",
+  target_sold_median: "grade sold",
+  target_active_median: "grade ask",
+  target_reference_median: "grade guide",
+  nearest_sold_median: "nearest grade sold",
 };
 
 /** Full phrase for detail panels (matches Pokédex market panel). */
@@ -32,6 +37,10 @@ const FMV_BASIS_PHRASE: Partial<Record<FairValueBasis, string>> = {
   reference_median: "price guide median",
   sticker_anchor: "sticker price",
   tcg_catalog: "TCGPlayer market price",
+  target_sold_median: "matched grade sold median",
+  target_active_median: "matched grade active median",
+  target_reference_median: "matched grade reference median",
+  nearest_sold_median: "nearest comparable grade sold median",
 };
 
 export function formatFmvBasisLabel(basis: FairValueBasis | null | undefined): string | null {
@@ -83,11 +92,11 @@ export function formatFairMarketValueHero(specimen: ScanSpecimen): {
   amount: string;
   basis: string | null;
 } {
-  const value = specimen.context.fairValueUsd;
-  if (value == null) return { amount: "—", basis: null };
+  const fmv = resolveCardListFmv(specimen);
+  if (fmv.fmvUsd == null) return { amount: "—", basis: null };
   return {
-    amount: formatUsd(value),
-    basis: formatFmvBasisLabel(specimen.context.fairValueBasis),
+    amount: fmv.fmvDisplay,
+    basis: formatFmvBasisLabel(fmv.fmvBasis),
   };
 }
 

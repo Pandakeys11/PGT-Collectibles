@@ -19,8 +19,10 @@ export function loadEnvLocal() {
     ) {
       value = value.slice(1, -1);
     }
-    // Prefer .env.local when it has a value (shell may export empty placeholders)
-    if (value !== "" || process.env[key] == null) {
+    // Non-empty .env.local values always win (avoids stale shell exports like GROQ_API_KEY=PASTE)
+    if (value !== "") {
+      process.env[key] = value;
+    } else if (process.env[key] == null) {
       process.env[key] = value;
     }
   }

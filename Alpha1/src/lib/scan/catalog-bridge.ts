@@ -1,8 +1,12 @@
-/** Catalog → scanner handoff (query params + builders). */
+/** Catalog → Liquid Scan handoff (query params + builders). */
+
+import { LIQUID_SCAN_PATH } from "@/lib/app-routes";
+import type { CatalogFranchiseId } from "@/lib/catalog/catalog-types";
 
 export type CatalogScanPrefill = {
   catalogId: string;
   name: string;
+  franchise?: CatalogFranchiseId;
   set?: string;
   number?: string;
   year?: string;
@@ -24,7 +28,7 @@ const PREFILL_KEYS = [
 
 export function buildScannerPrefillUrl(
   prefill: CatalogScanPrefill,
-  targetPath = "/scanner",
+  targetPath = LIQUID_SCAN_PATH,
 ): string {
   const params = new URLSearchParams();
   params.set("catalogId", prefill.catalogId.trim());
