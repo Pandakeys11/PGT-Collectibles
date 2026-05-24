@@ -153,3 +153,26 @@ export async function ensureScanUploadDataUrl(dataUrl: string): Promise<string> 
   const source = await loadDrawableFromDataUrl(dataUrl);
   return encodeUnderBudget(source, SCAN_UPLOAD_MAX_SIDE, SCAN_UPLOAD_JPEG_QUALITY);
 }
+
+/** Capture a live camera frame with the same compression path as file uploads. */
+export async function captureVideoFrameToDataUrl(video: HTMLVideoElement): Promise<string> {
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  if (w < 2 || h < 2) {
+    throw new Error("Camera is not ready — wait for the preview to load.");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not capture camera frame");
+  ctx.drawImage(video, 0, 0, w, h);
+  const raw = canvas.toDataURL("image/jpeg", SCAN_UPLOAD_JPEG_QUALITY);
+  return ensureScanUploadDataUrl(raw);
+}
+
+export async function dataUrlToJpegFile(dataUrl: string, filename: string): Promise<File> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  return new File([blob], filename, { type: blob.type || "image/jpeg" });
+}

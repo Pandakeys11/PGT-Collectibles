@@ -114,6 +114,8 @@ export function useScannerChat() {
     updateSpecimen,
     flushManualEnrich,
     uploadQueuedCount,
+    laneMode,
+    ingestLiveCameraScan,
   } = session;
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_ASSISTANT]);
   const [scanMode, setScanMode] = useState<ScanMode>("binder");
@@ -1075,5 +1077,7 @@ export function useScannerChat() {
     appendAssistantMessage,
     speedOn,
     setLiquidScanSpeedOn,
+    laneMode,
+    ingestLiveCameraScan,
   };
 }

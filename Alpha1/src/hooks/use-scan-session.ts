@@ -55,6 +55,7 @@ import {
   type ExtractedCard,
   type ScanCardContext,
 } from "@/lib/scan/schemas";
+import type { LiveScanResult } from "@/lib/pokegrade/types";
 import {
   getVisionClientTimeoutMs,
   readImageFileAsDataUrl,
@@ -1390,6 +1391,17 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     [],
   );
 
+  const ingestLiveCameraScan = useCallback((result: LiveScanResult, file: File) => {
+    const slotId = makeId("slot");
+    setSlots((current) => [
+      ...current,
+      { id: slotId, file, previewUrl: result.previewUrl },
+    ]);
+    setSpecimens((current) => [...current, result.specimen]);
+    setSelectedId(result.specimen.id);
+    setError(null);
+  }, []);
+
   return {
     laneMode,
     setLaneMode,
@@ -1423,5 +1435,6 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     clearSession,
     hydrateSavedSession,
     ingestCatalogPrefill,
+    ingestLiveCameraScan,
   };
 }
