@@ -1,4 +1,13 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import {
+  isLegacyScannerRedirectDisabled,
+  LEGACY_SCANNER_GONE_MESSAGE,
+} from "@/lib/legacy-scanner";
+
+function isLegacyScannerRequestPath(pathname: string): boolean {
+  return pathname === "/scanner" || pathname.startsWith("/scanner/");
+}
 
 const isProtectedRoute = createRouteMatcher([
   "/scanner",
@@ -20,6 +29,16 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
+  if (
+    isLegacyScannerRedirectDisabled() &&
+    isLegacyScannerRequestPath(request.nextUrl.pathname)
+  ) {
+    return new NextResponse(LEGACY_SCANNER_GONE_MESSAGE, {
+      status: 410,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+
   if (isProtectedRoute(request)) {
     await auth.protect();
   }

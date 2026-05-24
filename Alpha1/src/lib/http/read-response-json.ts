@@ -8,6 +8,11 @@ export async function readResponseJson<T extends Record<string, unknown>>(
   try {
     return JSON.parse(text) as T;
   } catch {
+    if (response.status === 413) {
+      throw new Error(
+        "Upload too large — the server rejected this photo. Try one image at a time or retake closer to the cards.",
+      );
+    }
     throw new Error(
       response.ok
         ? "Server returned invalid JSON"

@@ -1,4 +1,5 @@
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { ensureScanUploadDataUrl, prepareScanUploadDataUrl } from "@/lib/scan/prepare-upload-image";
 import { parseScanLimitFromResponse } from "@/lib/scan/scan-limit-error";
 import { CARD_EVIDENCE_VISION_RADIUS_MULTIPLIER, extractCardRegionDataUrl } from "@/lib/scan/specimen-crop";
 import type { VisionGridLocation } from "@/lib/scan/spatial";
@@ -26,13 +27,9 @@ export function getVisionConcurrency(): number {
   return DEFAULT_VISION_CONCURRENCY;
 }
 
+/** Compress + orient photos before preview/vision (critical on mobile camera uploads). */
 export function readImageFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error ?? new Error("read failed"));
-    reader.readAsDataURL(file);
-  });
+  return prepareScanUploadDataUrl(file);
 }
 
 function dataUrlToBase64(dataUrl: string): string {
@@ -60,12 +57,13 @@ async function extractVisionForImage(
   },
 ): Promise<unknown[]> {
   const signal = AbortSignal.timeout(options.timeoutMs);
+  const prepared = await ensureScanUploadDataUrl(imageDataUrl);
   const res = await fetch("/api/vision/extract", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      imageBase64s: [dataUrlToBase64(imageDataUrl)],
-      imageMimeTypes: [dataUrlMimeType(imageDataUrl)],
+      imageBase64s: [dataUrlToBase64(prepared)],
+      imageMimeTypes: [dataUrlMimeType(prepared)],
       singleCardCrop: options.singleCardCrop ?? false,
     }),
     signal,
@@ -79,6 +77,12 @@ async function extractVisionForImage(
   if (!res.ok) {
     const limitErr = parseScanLimitFromResponse(res.status, data);
     if (limitErr) throw limitErr;
+    if (res.status === 413) {
+      throw new Error(
+        data.error ||
+          "Photo is too large to upload — try one image at a time or move closer so the file is smaller.",
+      );
+    }
     throw new Error(
       data.error ||
         (res.status === 500 && !data.error
