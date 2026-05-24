@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Loader2, Scan, Upload, Crosshair } from "lucide-react";
+import { Camera, Loader2, Scan, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SCAN_MODE_OPTIONS } from "@/lib/scanner-chat/scan-mode-labels";
 import type { ScanMode, UploadedImage } from "@/lib/scanner-chat/types";
-import type { LiquidCameraMode } from "@/lib/pokegrade/camera-mode";
 import { ImagePreviewStrip } from "./image-preview-strip";
 import { cn } from "@/lib/cn";
 
@@ -25,9 +24,8 @@ export function ScannerComposer({
   hasScanResults,
   speedOn,
   onSpeedOnChange,
-  cameraMode,
-  onCameraModeChange,
   onOpenLiveCamera,
+  supportsLiveCamera,
   className,
 }: {
   prompt: string;
@@ -45,18 +43,18 @@ export function ScannerComposer({
   hasScanResults: boolean;
   speedOn: boolean;
   onSpeedOnChange: (on: boolean) => void;
-  cameraMode: LiquidCameraMode;
-  onCameraModeChange: (mode: LiquidCameraMode) => void;
   onOpenLiveCamera: () => void;
+  supportsLiveCamera?: boolean;
   className?: string;
 }) {
-  const [supportsCamera, setSupportsCamera] = useState(false);
+  const [liveCameraOk, setLiveCameraOk] = useState(supportsLiveCamera ?? false);
   useEffect(() => {
-    setSupportsCamera(
-      typeof navigator !== "undefined" &&
-        Boolean(navigator.mediaDevices?.getUserMedia),
+    setLiveCameraOk(
+      supportsLiveCamera ??
+        (typeof navigator !== "undefined" &&
+          Boolean(navigator.mediaDevices?.getUserMedia)),
     );
-  }, []);
+  }, [supportsLiveCamera]);
   const submitLabel = hasImages
     ? isBusy
       ? "Scanning…"
@@ -67,7 +65,7 @@ export function ScannerComposer({
         ? "Ask"
         : "Send";
   const fileRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
+  const nativeCameraRef = useRef<HTMLInputElement>(null);
 
   return (
     <div
@@ -122,7 +120,7 @@ export function ScannerComposer({
               }}
             />
             <input
-              ref={cameraRef}
+              ref={nativeCameraRef}
               type="file"
               accept="image/*"
               capture="environment"
@@ -143,69 +141,28 @@ export function ScannerComposer({
             >
               <Upload className="h-4 w-4" />
             </button>
-            {supportsCamera ? (
-              <>
-                <div
-                  className="flex h-11 shrink-0 items-center rounded-xl border border-white/8 bg-black/30 p-0.5"
-                  role="group"
-                  aria-label="Camera mode"
-                >
-                  <button
-                    type="button"
-                    title="Take photo — adds to queue like upload"
-                    disabled={isBusy || uploadsLocked}
-                    onClick={() => onCameraModeChange("picture")}
-                    className={cn(
-                      "rounded-lg px-2 py-1.5 text-[10px] font-medium transition touch-manipulation",
-                      cameraMode === "picture"
-                        ? "bg-white/10 text-slate-100"
-                        : "text-slate-500",
-                    )}
-                  >
-                    Photo
-                  </button>
-                  <button
-                    type="button"
-                    title="PokeGrade live scan — visor HUD with auto identity & PSA 10 comps"
-                    disabled={isBusy || uploadsLocked}
-                    onClick={() => onCameraModeChange("live-scan")}
-                    className={cn(
-                      "rounded-lg px-2 py-1.5 text-[10px] font-medium transition touch-manipulation",
-                      cameraMode === "live-scan"
-                        ? "bg-emerald-500/20 text-emerald-200"
-                        : "text-slate-500",
-                    )}
-                  >
-                    Scan
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (cameraMode === "live-scan") onOpenLiveCamera();
-                    else cameraRef.current?.click();
-                  }}
-                  disabled={isBusy || uploadsLocked}
-                  className={cn(
-                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition touch-manipulation disabled:opacity-40",
-                    cameraMode === "live-scan"
-                      ? "text-emerald-300 ring-1 ring-emerald-500/35 hover:bg-emerald-500/10"
-                      : "text-slate-500 hover:bg-white/5 hover:text-slate-200",
-                  )}
-                  aria-label={
-                    cameraMode === "live-scan"
-                      ? "Open live scan camera"
-                      : "Capture photo"
-                  }
-                >
-                  {cameraMode === "live-scan" ? (
-                    <Crosshair className="h-4 w-4" />
-                  ) : (
-                    <Camera className="h-4 w-4" />
-                  )}
-                </button>
-              </>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                if (liveCameraOk) onOpenLiveCamera();
+                else nativeCameraRef.current?.click();
+              }}
+              disabled={isBusy || uploadsLocked}
+              className={cn(
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition touch-manipulation disabled:opacity-40",
+                liveCameraOk
+                  ? "text-emerald-300 ring-1 ring-emerald-500/35 hover:bg-emerald-500/10"
+                  : "text-slate-500 hover:bg-white/5 hover:text-slate-200",
+              )}
+              aria-label={liveCameraOk ? "Open PGT scan camera with HUD" : "Capture photo"}
+              title={
+                liveCameraOk
+                  ? "PGT helmet HUD · live auto-scan"
+                  : "Device camera (HUD needs HTTPS)"
+              }
+            >
+              <Camera className="h-4 w-4" />
+            </button>
             <button
               type="button"
               title={
@@ -270,9 +227,7 @@ export function ScannerComposer({
               : "Speed off · fewer API calls"
             : hasScanResults
               ? "Tap a card or open Sheet for your list"
-              : cameraMode === "live-scan"
-                ? "Live Scan · visor HUD · 1 credit per capture"
-                : "Upload or capture · 1 credit per image"}
+              : "Camera opens PGT HUD · auto-scan · 1 credit per scan"}
         </p>
       </div>
     </div>

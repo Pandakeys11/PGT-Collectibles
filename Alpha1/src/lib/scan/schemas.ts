@@ -178,7 +178,8 @@ export const extractedCardSchema = z.object({
   details: z.string().max(1_500).optional(),
   /** Visible print / edition stamps (1st Edition, Shadowless, Unlimited, Reverse Holo, promo marks, etc.) */
   printStamps: z.string().max(200).optional(),
-  labelTitle: z.string().max(160).optional(),
+  /** Verbatim slab holder label text (top tag); may span multiple lines joined with · */
+  labelTitle: z.string().max(400).optional(),
   extractedPrice: z.number().nullable().optional(),
   stickerNote: z.string().nullable().optional(),
   encapsulation: z.string().optional(),

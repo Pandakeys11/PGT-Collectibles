@@ -28,19 +28,29 @@ const NAME_RULES = `
 const POKEMON_SET_RULES = buildVisionSetIdentificationBlock();
 
 const GRADED_SLAB_LABEL_RULES = `
-- **Graded slabs (PSA/CGC/BGS/SGC/ACE):** The **holder label is authoritative** for identity — read it before guessing from card art.
-  - Copy **name**, **set** (English catalog set name), **number** (full promo code e.g. SM245, SWSH198, SVP045), and **year** from the label text.
-  - PSA labels often show YEAR · SET · CARD# · NAME on separate lines — merge into the JSON fields above.
-  - Do not shorten set to "Promo" alone when the label names the promo set (e.g. "Sun & Moon Promos", "Sword & Shield Promos").
-  - **encapsulation** = graded_slab; **grader**, **grade** from the front label.
-  - **cert** = certification number **only if those digits are legibly visible in this image** (front label or barcode on the face shown). **null** if:
-    - Cert # is on the **back** of the slab (common for CGC, TAG, many BGS/SGC) and not readable here
-    - You would have to guess from card collector number, set code, or year
-  - Never copy card number (e.g. 25/102, SM245), Pokédex digits, or set totals into **cert**.
-  - **labelTitle** = copy the full primary slab label line verbatim (year · set · number · name as printed on the holder).
-  - Include visible qualifiers in **grade** or **details** (GEM MT, Black Label, Pristine, Qualifier, sub-grades).
-  - If cert is not visible, add to **details**: "Cert on back — enter manually".
-  - Card art may be obscured — if label and art disagree, trust the label and note in details.`;
+- **Graded slabs (PSA/CGC/BGS/BVG/SGC/ACE/TAG):** The **top holder label / tag** is authoritative — read it before card art.
+  - **encapsulation** = graded_slab for every professional slab in frame.
+  - **labelTitle** (critical): copy **all visible holder label text** top-to-bottom, joined with " · " (year, brand, set, card #, name, grade line). Up to ~400 characters. This is the primary matching key.
+  - **name**, **set**, **number**, **year** must be parsed from the label tag into their JSON fields (not guessed from artwork).
+  - **number**: full collector code as printed — fractions (4/102), promo codes (SM245, SWSH198, SVP045, OP01-001), not Pokédex # alone.
+  - **set**: full English catalog set name (e.g. "Sun & Moon Promos", "Sword & Shield", "Team Rocket 1st Edition") — never shorten to "Promo" alone when the label names the set.
+  - **grader** + **grade** from the grade badge on the label (large number / GEM MT / PRISTINE / Black Label).
+  - **PSA** red label: lines are often YEAR · GAME/SET · # · NAME; grade in top-right; cert # only if printed on this face (often bottom — 8–10 digits).
+  - **CGC** blue label: YEAR MANUFACTURER SET # NAME; sub-grades (Centering/Corners/Edges/Surface) → **details**; cert often on back → null + note.
+  - **BGS/BVG** gold label: grade top-left; sub-grades in **details**; card line below; cert often on back.
+  - **SGC/ACE/TAG**: read visible tag text; cert only when explicitly printed on front.
+  - **cert** = certification digits **only** when legibly on the label in this photo. **null** if on back or unreadable. Never use card #, year, or set code as cert.
+  - **printStamps** from label when printed (1st Edition, Reverse Holo, Prizm, /99 serial).
+  - **details**: qualifiers (GEM MT, Black Label, Pristine), BGS/CGC sub-grades, "Cert on back — enter manually" when cert not visible.
+  - Sticker/tag ask on slab → **extractedPrice** + **stickerNote**.
+  - If label and art disagree, **trust the label** and note conflict in **details**.`;
+
+const GRADED_SCAN_PREAMBLE = `
+**GRADED CARD SCAN — label tag priority**
+- Target: professionally graded slabs (PSA, CGC, BGS, SGC, ACE, TAG).
+- For each slab, read the **printed tag at the top of the holder** (not the card illustration below).
+- Extract every legible field from that tag into labelTitle and the structured fields.
+- Skip raw loose cards unless no slabs are visible.`;
 
 const PRINT_EDITION_RULES = `
 - **printStamps** (required when visible): Capture **edition, finish, parallel, and language print** — never put these in **set** or **number**.
@@ -71,7 +81,13 @@ ${PRINT_EDITION_RULES}
 - Pokémon raw stamp examples:
 ${POKEMON_PRINT_EDITION_RULES}`;
 
-export function buildVisionPrompt(options: { singleCardCrop: boolean; compact: boolean }): string {
+export function buildVisionPrompt(options: {
+  singleCardCrop: boolean;
+  compact: boolean;
+  /** Graded Card Mode — emphasize slab tag OCR */
+  gradedFocus?: boolean;
+}): string {
+  const gradedBlock = options.gradedFocus ? `${GRADED_SCAN_PREAMBLE}\n` : "";
   const fields = options.compact ? CARD_FIELDS : CARD_FIELDS_WITH_BBOX;
   const detailsRule = options.compact
     ? "- Keep **details** under 40 characters per card."
@@ -81,7 +97,7 @@ export function buildVisionPrompt(options: { singleCardCrop: boolean; compact: b
     : "- bbox is the visible card/slab rectangle on 0-1000: top, left, width, height when edges are visible.";
 
   if (options.singleCardCrop) {
-    return `You are a multi-franchise trading-card vision extractor (TCG + sports). This image is a **tight crop of ONE card or slab**.
+    return `${gradedBlock}You are a multi-franchise trading-card vision extractor (TCG + sports). This image is a **tight crop of ONE card or slab**.
 
 Return JSON only:
 {"cards":[{${fields}}]}
@@ -96,7 +112,7 @@ ${detailsRule}
 ${SHARED_RULES}`;
   }
 
-  return `You are a multi-franchise trading-card vision extractor (TCG + sports). The image may show a binder page, raw cards, graded slabs, or a mixed grid from **different games or sports**.
+  return `${gradedBlock}You are a multi-franchise trading-card vision extractor (TCG + sports). The image may show a binder page, raw cards, graded slabs, or a mixed grid from **different games or sports**.
 
 Return JSON only:
 {"cards":[{${fields}}]}

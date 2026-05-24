@@ -17,6 +17,7 @@ export async function runLiveCardScan(args: {
 
   const extracted = await runVisionExtraction([previewUrl], {
     singleCardCrop: singleCard,
+    gradedFocus: laneMode === "graded",
     concurrency: 1,
   });
 

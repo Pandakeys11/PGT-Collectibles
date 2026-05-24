@@ -4,14 +4,18 @@
 
 All images — **gallery upload**, **Photo** camera capture, and **Live Scan** frames — pass through `prepareScanUploadDataUrl` (resize, EXIF orientation, JPEG compress) before vision. This keeps Android/iOS camera photos under Vercel’s ~4.5MB request limit.
 
-## UI modes
+## Camera (mobile + desktop)
 
-| Mode | Behavior |
-|------|----------|
-| **Photo** | Native camera/file picker → image queue → **Start AI Scan** (batch sheet) |
-| **Scan** | `getUserMedia` live camera → PokeGrade visor HUD → auto-scan every ~3.2s → **Add to sheet** |
+The **camera button** opens the **in-app live camera** (`navigator.mediaDevices.getUserMedia`) with the **PGT helmet HUD** overlaid on the preview. This is **not** the native `<input capture>` UI (that is only a fallback if camera permission is denied).
 
-Preference is stored in `localStorage` (`pgt-liquid-camera-mode`).
+| Control | Behavior |
+|---------|----------|
+| **Auto** | Scans every ~3s while the visor is open |
+| **Scan** | Manual scan now |
+| **Snap** | Save frame to upload queue (no vision until Start AI Scan) |
+| **Add** | Push last HUD result into the scan sheet |
+
+Requires **HTTPS** (or localhost) for `getUserMedia`.
 
 ## Data pipeline (today)
 

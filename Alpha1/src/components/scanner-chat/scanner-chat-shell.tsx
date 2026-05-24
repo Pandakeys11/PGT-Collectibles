@@ -23,25 +23,10 @@ import { ScannerSidebar, type SidebarNavId } from "./scanner-sidebar";
 import { LiquidScanPanelBootstrap } from "./liquid-scan-panel-bootstrap";
 import { UploadDropzoneOverlay } from "./upload-dropzone";
 import { LiquidScanLiveCamera } from "./liquid-scan-live-camera";
-import {
-  readLiquidCameraMode,
-  writeLiquidCameraMode,
-  type LiquidCameraMode,
-} from "@/lib/pokegrade/camera-mode";
 
 export function ScannerChatShell() {
   const chat = useScannerChat();
-  const [cameraMode, setCameraMode] = useState<LiquidCameraMode>("picture");
   const [liveCameraOpen, setLiveCameraOpen] = useState(false);
-
-  useEffect(() => {
-    setCameraMode(readLiquidCameraMode());
-  }, []);
-
-  const handleCameraModeChange = useCallback((mode: LiquidCameraMode) => {
-    writeLiquidCameraMode(mode);
-    setCameraMode(mode);
-  }, []);
   const companion = useCompanion();
   const { quota, isPro } = useScanQuota();
   const feedRef = useRef<HTMLDivElement>(null);
@@ -267,8 +252,6 @@ export function ScannerChatShell() {
             hasScanResults={chat.specimens.length > 0}
             speedOn={chat.speedOn}
             onSpeedOnChange={chat.setLiquidScanSpeedOn}
-            cameraMode={cameraMode}
-            onCameraModeChange={handleCameraModeChange}
             onOpenLiveCamera={() => setLiveCameraOpen(true)}
           />
         </main>
@@ -326,8 +309,8 @@ export function ScannerChatShell() {
         open={liveCameraOpen}
         onClose={() => setLiveCameraOpen(false)}
         laneMode={chat.laneMode}
-        autoScan={cameraMode === "live-scan"}
         busy={chat.isBusy}
+        onCapturePhoto={(file) => chat.addImages([file])}
         onAddToSession={(result, file) => {
           chat.ingestLiveCameraScan(result, file);
           chat.setResultsDrawerOpen(true);

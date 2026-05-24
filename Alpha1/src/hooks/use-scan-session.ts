@@ -637,6 +637,7 @@ export function useScanSession(options?: { speedOn?: boolean }) {
       const extracted = await runVisionExtraction(images, {
         timeoutMs: getVisionClientTimeoutMs(),
         concurrency: speedProfile.visionConcurrency,
+        gradedFocus: laneMode === "graded",
         onProgress: (state) => {
           setProgress(
             `Vision ${state.imagesDone}/${state.imagesTotal} (${state.mode})`,

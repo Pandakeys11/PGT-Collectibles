@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
     imageBase64s?: string[];
     imageMimeTypes?: string[];
     singleCardCrop?: boolean;
+    gradedFocus?: boolean;
   };
   try {
     body = await req.json();
@@ -81,8 +82,9 @@ export async function POST(req: NextRequest) {
   }
 
   const singleCardCrop = body.singleCardCrop === true;
-  const prompt = buildVisionPrompt({ singleCardCrop, compact: false });
-  const compactPrompt = buildVisionPrompt({ singleCardCrop, compact: true });
+  const gradedFocus = body.gradedFocus === true;
+  const prompt = buildVisionPrompt({ singleCardCrop, compact: false, gradedFocus });
+  const compactPrompt = buildVisionPrompt({ singleCardCrop, compact: true, gradedFocus });
   const timeoutMs = getVisionProviderTimeoutMs();
 
   const imageBase64s = Array.isArray(body.imageBase64s)

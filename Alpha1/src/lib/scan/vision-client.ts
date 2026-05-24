@@ -54,6 +54,7 @@ async function extractVisionForImage(
   options: {
     timeoutMs: number;
     singleCardCrop?: boolean;
+    gradedFocus?: boolean;
   },
 ): Promise<unknown[]> {
   const signal = AbortSignal.timeout(options.timeoutMs);
@@ -65,6 +66,7 @@ async function extractVisionForImage(
       imageBase64s: [dataUrlToBase64(prepared)],
       imageMimeTypes: [dataUrlMimeType(prepared)],
       singleCardCrop: options.singleCardCrop ?? false,
+      gradedFocus: options.gradedFocus === true ? true : undefined,
     }),
     signal,
   });
@@ -104,6 +106,8 @@ export async function runVisionExtraction(
     timeoutMs?: number;
     /** Tight crop already isolates one card — use focused prompt and expect one result. */
     singleCardCrop?: boolean;
+    /** Graded Card Mode — slab tag OCR priority (PSA/CGC/BGS). */
+    gradedFocus?: boolean;
     /** Parallel vision requests (default 3). Set 1 for strictly sequential. */
     concurrency?: number;
     onProgress?: (progress: VisionProgress) => void;
@@ -134,6 +138,7 @@ export async function runVisionExtraction(
       const cards = await extractVisionForImage(images[imageIndex], imageIndex, {
         timeoutMs,
         singleCardCrop: options.singleCardCrop,
+        gradedFocus: options.gradedFocus,
       });
       results[imageIndex] = cards;
       imagesDone += 1;
@@ -166,6 +171,7 @@ export async function runVisionOnSingleCardCrop(
   return runVisionExtraction([crop], {
     timeoutMs: options.timeoutMs ?? getVisionClientTimeoutMs(),
     singleCardCrop: true,
+    gradedFocus: options.gradedSlab === true,
     concurrency: 1,
   });
 }

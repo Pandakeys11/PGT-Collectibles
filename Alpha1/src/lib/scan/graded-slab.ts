@@ -1,5 +1,10 @@
 import { classifyCardLane } from "@/lib/scan/lane";
-import { parseStructuredSlabLabel } from "@/lib/scan/slab-label-parse";
+import {
+  combineSlabLabelSources,
+  extractSlabSubgrades,
+  parseStructuredSlabLabel,
+  synthesizeSlabLabelTitle,
+} from "@/lib/scan/slab-label-parse";
 import type { ExtractedCard } from "@/lib/scan/schemas";
 import type { RegistrySnapshot } from "@/lib/scan/verification";
 
@@ -96,6 +101,7 @@ function slabTextBlobs(card: ExtractedCard): string[] {
     cleanText(card.grade),
     cleanText(card.grader),
     cleanText(card.rarity),
+    cleanText(card.printStamps),
     cleanText(card.details),
     cleanText(card.cert),
   ].filter(Boolean);
@@ -177,11 +183,18 @@ export function normalizeGradedSlabFields(
 
   const blobs = slabTextBlobs(card);
   const combinedBlob = blobs.join(" ");
+  const labelBlob = combineSlabLabelSources(
+    card.labelTitle,
+    card.grade,
+    card.grader,
+    card.rarity,
+    card.details,
+  );
 
   let grader = cleanText(card.grader);
   let grade = cleanText(card.grade);
   let details: string | undefined = cleanText(card.details) || undefined;
-  const labelTitle = cleanText(card.labelTitle) || undefined;
+  let labelTitle = cleanText(card.labelTitle) || undefined;
   let name = cleanText(card.name);
   let set = cleanText(card.set);
   let number = cleanText(card.number);
@@ -192,7 +205,7 @@ export function normalizeGradedSlabFields(
     grade = parts[0] ?? grade;
   }
 
-  const fromLabel = parseStructuredSlabLabel(labelTitle);
+  const fromLabel = parseStructuredSlabLabel(labelTitle, labelBlob);
   if (!grader && fromLabel.grader) grader = fromLabel.grader;
   if (!grade && fromLabel.grade) grade = fromLabel.grade;
   if (!year && fromLabel.year) year = fromLabel.year;
@@ -203,6 +216,26 @@ export function normalizeGradedSlabFields(
     (!name || /resolving|unknown|pending/i.test(name) || name.length < 3)
   ) {
     name = fromLabel.name;
+  }
+
+  const subgrades = extractSlabSubgrades(combinedBlob);
+  if (subgrades) {
+    details = appendUniqueDetails(details, subgrades);
+  }
+
+  if (!labelTitle || labelTitle.length < 12) {
+    const synthesized = synthesizeSlabLabelTitle({
+      year,
+      set,
+      number,
+      name,
+      grader,
+      grade,
+      printStamps: card.printStamps,
+    });
+    if (synthesized) labelTitle = synthesized;
+  } else if (labelBlob.length > labelTitle.length + 8) {
+    labelTitle = labelBlob.slice(0, 400);
   }
 
   for (const blob of blobs) {
