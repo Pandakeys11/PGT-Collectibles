@@ -7,12 +7,14 @@ import {
   claimTask,
   hatchCompanion,
   performAction,
+  recordCompanionQuestEvent,
   recordScanUsage,
+  rerollCompanionStarter,
   toCompanionState,
   type CompanionPersisted,
 } from "@/lib/companion/game-engine";
 import { parseClientCompanion, resolveCompanionRow } from "@/lib/companion/resolve-row";
-import type { CompanionActionId, CompanionState } from "@/lib/companion/schemas";
+import type { CompanionActionId, CompanionQuestEvent, CompanionState } from "@/lib/companion/schemas";
 import { countVisionScansThisWeek, saveCompanionRow } from "@/lib/companion/repository";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -166,6 +168,70 @@ export async function syncCompanionFromClient(
 
   const { persistMode } = await resolveCompanionRow(appUser.id, row);
   const payload = await buildState(applyTimeDecay(row), appUser.id, persistMode);
+  return { ok: true, payload };
+}
+
+export async function rerollCompanionStarterForUser(
+  clientRow?: CompanionPersisted | null,
+): Promise<
+  | {
+      ok: true;
+      payload: CompanionApiPayload;
+      pokemon: { id: number; name: string; slug: string };
+    }
+  | { ok: false; error: string; status: number }
+> {
+  const { signedIn, appUser } = await resolveUser();
+  if (!signedIn) return { ok: false, error: "Sign in required", status: 401 };
+  if (!appUser) return { ok: false, error: "Account not synced", status: 503 };
+
+  const { row, persistMode } = await resolveCompanionRow(appUser.id, clientRow ?? null);
+  if (!row) return { ok: false, error: "Hatch a partner first", status: 404 };
+
+  const result = rerollCompanionStarter(row);
+  if (result.error) return { ok: false, error: result.error, status: 400 };
+
+  const next = result.row;
+  if (persistMode === "database" || isSupabaseConfigured()) {
+    const saved = await saveCompanionRow(appUser.id, next);
+    const mode = saved ? "database" : persistMode;
+    const payload = await buildState(next, appUser.id, mode);
+    return {
+      ok: true,
+      payload,
+      pokemon: { id: result.pokemon.id, name: result.pokemon.name, slug: result.pokemon.slug },
+    };
+  }
+
+  const payload = await buildState(next, appUser.id, "local");
+  return {
+    ok: true,
+    payload,
+    pokemon: { id: result.pokemon.id, name: result.pokemon.name, slug: result.pokemon.slug },
+  };
+}
+
+export async function recordCompanionQuestEventForUser(
+  event: CompanionQuestEvent,
+  amount: number,
+  clientRow?: CompanionPersisted | null,
+): Promise<{ ok: true; payload: CompanionApiPayload } | { ok: false; error: string; status: number }> {
+  const { signedIn, appUser } = await resolveUser();
+  if (!signedIn) return { ok: false, error: "Sign in required", status: 401 };
+  if (!appUser) return { ok: false, error: "Account not synced", status: 503 };
+
+  const { row, persistMode } = await resolveCompanionRow(appUser.id, clientRow ?? null);
+  if (!row) return { ok: false, error: "Hatch a partner first", status: 404 };
+
+  const next = recordCompanionQuestEvent(row, event, amount);
+  if (persistMode === "database" || isSupabaseConfigured()) {
+    const saved = await saveCompanionRow(appUser.id, next);
+    const mode = saved ? "database" : persistMode;
+    const payload = await buildState(next, appUser.id, mode);
+    return { ok: true, payload };
+  }
+
+  const payload = await buildState(next, appUser.id, "local");
   return { ok: true, payload };
 }
 

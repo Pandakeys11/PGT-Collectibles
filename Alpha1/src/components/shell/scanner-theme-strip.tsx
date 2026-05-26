@@ -1,24 +1,24 @@
 "use client";
 
-import { ThemeSwatchOrb } from "@/components/shell/theme-swatch";
+import { EnergyThemePickerCard } from "@/components/shell/energy-theme-picker-card";
 import { applyTheme, useActiveTheme } from "@/lib/apply-theme";
 import { themeEnergyLabel } from "@/lib/energy-theme";
 import { THEMES, type ThemeId } from "@/lib/themes";
 import { cn } from "@/lib/cn";
 
+/** Six presets — unique primary energy on each badge (no duplicate Electric, etc.). */
 const FEATURED_THEME_IDS: ThemeId[] = [
-  "obsidian-clean",
   "energy-nexus",
-  "neon-district",
   "emerald-vault",
-  "rainbow-chase",
+  "coral-depth",
   "midnight-mirage",
+  "obsidian-clean",
+  "rainbow-chase",
 ];
 
-/** Compact theme picker for scanner sidebar — swatches only on desktop. */
+/** Compact theme picker — gym trainer badges with theme-colored energy glow. */
 export function ScannerThemeStrip({
   className,
-  /** Desktop sidebar: icons only, no labels or footer copy. */
   compact = false,
 }: {
   className?: string;
@@ -45,37 +45,21 @@ export function ScannerThemeStrip({
           <p className="truncate text-[10px] text-faint">{themeEnergyLabel(themeId)}</p>
         </div>
       ) : null}
-      <div className="grid grid-cols-3 gap-1.5">
-        {featured.map((theme) => {
-          const active = theme.id === themeId;
-          return (
-            <button
-              key={theme.id}
-              type="button"
-              onClick={() => applyTheme(theme.id)}
-              className={cn(
-                "flex flex-col items-center rounded-xl border transition touch-manipulation",
-                compact ? "p-1" : "gap-1 p-1.5",
-                active
-                  ? "border-accent/40 bg-accent/10 ring-1 ring-accent/25"
-                  : "border-white/8 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.06]",
-              )}
-              title={`${theme.label} — ${theme.hint}`}
-              aria-label={`${theme.label}, ${themeEnergyLabel(theme.id)}${active ? ", selected" : ""}`}
-            >
-              <ThemeSwatchOrb themeId={theme.id} className={compact ? "h-7 w-7" : "h-8 w-8"} />
-              {!compact ? (
-                <span className="w-full truncate text-center text-[8px] font-medium text-muted">
-                  {theme.label.split(" ")[0]}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-3 gap-2">
+        {featured.map((theme) => (
+          <EnergyThemePickerCard
+            key={theme.id}
+            themeId={theme.id}
+            label={theme.label}
+            active={theme.id === themeId}
+            compact={compact}
+            onSelect={() => applyTheme(theme.id)}
+          />
+        ))}
       </div>
       {!compact ? (
         <p className="px-1 text-[10px] leading-relaxed text-faint">
-          Themes update desk, catalog, and Liquid Scan.
+          League-style badges — center and corner show each theme&apos;s energy pair.
         </p>
       ) : null}
     </div>

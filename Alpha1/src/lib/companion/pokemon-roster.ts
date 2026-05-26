@@ -121,13 +121,23 @@ export function getCompanionPokemon(id: number): CompanionPokemon | null {
 }
 
 export function pickRandomCompanionPokemon(): CompanionPokemon {
-  const total = COMPANION_ROSTER.reduce((sum, p) => sum + TIER_WEIGHT[p.tier], 0);
+  return pickRandomCompanionPokemonExcluding();
+}
+
+/** Roll a new partner, optionally avoiding the current species. */
+export function pickRandomCompanionPokemonExcluding(excludeId?: number): CompanionPokemon {
+  const pool =
+    excludeId != null
+      ? COMPANION_ROSTER.filter((p) => p.id !== excludeId)
+      : COMPANION_ROSTER;
+  const roster = pool.length > 0 ? pool : COMPANION_ROSTER;
+  const total = roster.reduce((sum, p) => sum + TIER_WEIGHT[p.tier], 0);
   let roll = Math.random() * total;
-  for (const pokemon of COMPANION_ROSTER) {
+  for (const pokemon of roster) {
     roll -= TIER_WEIGHT[pokemon.tier];
     if (roll <= 0) return pokemon;
   }
-  return COMPANION_ROSTER[0]!;
+  return roster[0]!;
 }
 
 /** Fisher–Yates shuffle for pokeball grid positions (indices 0–8). */

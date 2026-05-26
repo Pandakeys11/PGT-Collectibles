@@ -41,7 +41,16 @@ export const companionStateSchema = z.object({
   }),
   lastTickAt: z.string(),
   storage: z.enum(["database", "local"]),
+  starterRerollsUsed: z.number(),
+  starterRerollsRemaining: z.number(),
 });
+
+export const companionQuestEventSchema = z.enum([
+  "scan_session",
+  "market_intelligence",
+  "catalog_confirm",
+  "cards_scanned",
+]);
 
 export type CompanionActionId = z.infer<typeof companionActionIdSchema>;
 export type CompanionState = z.infer<typeof companionStateSchema>;
@@ -60,3 +69,15 @@ export const claimTaskBodySchema = z.object({
   taskId: z.string().min(1).max(64),
   companion: z.record(z.string(), z.unknown()).optional(),
 });
+
+export const rerollStarterBodySchema = z.object({
+  companion: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const questEventBodySchema = z.object({
+  event: companionQuestEventSchema,
+  amount: z.number().int().min(1).max(50).optional(),
+  companion: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type CompanionQuestEvent = z.infer<typeof companionQuestEventSchema>;

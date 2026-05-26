@@ -37,7 +37,7 @@ function TourImageFrame({
         src={src}
         alt={alt}
         fill
-        sizes="(max-width: 28rem) 100vw, 28rem"
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 560px"
         className={cn("object-cover", imageClassName)}
       />
       {badge ? (
@@ -76,21 +76,21 @@ export function TourUploadPreview() {
         src={ONBOARDING_BINDER_IMAGES.binderPage.src}
         alt={ONBOARDING_BINDER_IMAGES.binderPage.alt}
         badge="Sample capture"
-        className="h-36 w-full"
+        className="h-36 w-full md:h-[min(42vh,14rem)]"
         imageClassName="object-[center_42%]"
       />
       <div className="grid grid-cols-2 gap-2">
         <TourImageFrame
           src={ONBOARDING_BINDER_IMAGES.binderPage.src}
           alt=""
-          className="h-16"
+          className="h-16 md:h-20"
           imageClassName="object-[20%_30%] scale-125"
         />
         <TourImageFrame
           src={ONBOARDING_BINDER_IMAGES.gradedSlabs.src}
           alt={ONBOARDING_BINDER_IMAGES.gradedSlabs.alt}
           badge="Slabs"
-          className="h-16"
+          className="h-16 md:h-20"
         />
       </div>
     </div>
@@ -112,7 +112,7 @@ export function TourDetectPreview() {
           ${ONBOARDING_DEMO_SUMMARY.estimatedTotal.toLocaleString()} est.
         </p>
       </div>
-      <div className="max-h-[220px] space-y-2 overflow-hidden">
+      <div className="max-h-[220px] space-y-2 overflow-hidden md:max-h-[min(32vh,280px)]">
         {ONBOARDING_DEMO_CARDS.map((card, index) => (
           <div key={card.id} className="pointer-events-none scale-[0.98] origin-top">
             <CardMatchResult card={card} index={index} stackPricing />

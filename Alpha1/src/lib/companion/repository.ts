@@ -25,6 +25,7 @@ type DbRow = {
   lifetime_stats: CompanionPersisted["lifetime"];
   usage_scans_this_week: number;
   usage_week_key: string;
+  starter_rerolls_used: number;
 };
 
 function rowToPersisted(row: DbRow): CompanionPersisted {
@@ -47,6 +48,7 @@ function rowToPersisted(row: DbRow): CompanionPersisted {
     lifetime: row.lifetime_stats,
     usageScansThisWeek: row.usage_scans_this_week,
     usageWeekKey: row.usage_week_key,
+    starterRerollsUsed: row.starter_rerolls_used,
   })!;
 }
 
@@ -81,6 +83,7 @@ function persistedToDb(userId: string, row: CompanionPersisted): Omit<DbRow, "us
     lifetime_stats: row.lifetime,
     usage_scans_this_week: row.usageScansThisWeek,
     usage_week_key: row.usageWeekKey,
+    starter_rerolls_used: row.starterRerollsUsed,
   };
 }
 
@@ -90,7 +93,7 @@ export async function getCompanionRow(userId: string): Promise<CompanionPersiste
   const { data, error } = await supabase
     .from("user_companions")
     .select(
-      "user_id, pokemon_id, pokemon_name, pokemon_slug, pokemon_tier, pokemon_era, hatched_at, level, xp, hunger, energy, mood, last_tick_at, action_cooldowns, task_progress, task_claimed, lifetime_stats, usage_scans_this_week, usage_week_key",
+      "user_id, pokemon_id, pokemon_name, pokemon_slug, pokemon_tier, pokemon_era, hatched_at, level, xp, hunger, energy, mood, last_tick_at, action_cooldowns, task_progress, task_claimed, lifetime_stats, usage_scans_this_week, usage_week_key, starter_rerolls_used",
     )
     .eq("user_id", userId)
     .maybeSingle();

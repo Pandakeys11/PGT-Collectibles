@@ -4,8 +4,11 @@
  * Vercel's ~4.5MB serverless request body limit when sent as base64 JSON.
  */
 
-/** Longest edge sent to vision — enough detail for multi-card binder reads. */
+/** Longest edge for standard uploads. */
 export const SCAN_UPLOAD_MAX_SIDE = 2048;
+
+/** Binder / grid screenshots — more pixels per card when payload budget allows. */
+export const SCAN_UPLOAD_BINDER_MAX_SIDE = 3072;
 
 export const SCAN_UPLOAD_JPEG_QUALITY = 0.85;
 
@@ -135,11 +138,23 @@ function encodeUnderBudget(
   return fallback;
 }
 
+function pickUploadMaxSide(source: DrawableSource, binderGrid?: boolean): number {
+  if (!binderGrid) return SCAN_UPLOAD_MAX_SIDE;
+  const longEdge = Math.max(source.width, source.height);
+  if (longEdge >= 2400) return SCAN_UPLOAD_BINDER_MAX_SIDE;
+  if (longEdge >= 1600) return 2560;
+  return SCAN_UPLOAD_MAX_SIDE;
+}
+
 /** Resize, correct orientation, and compress a file for scan preview + vision upload. */
-export async function prepareScanUploadDataUrl(file: File): Promise<string> {
+export async function prepareScanUploadDataUrl(
+  file: File,
+  options?: { binderGrid?: boolean },
+): Promise<string> {
   const source = await loadDrawableFromFile(file);
   try {
-    return encodeUnderBudget(source, SCAN_UPLOAD_MAX_SIDE, SCAN_UPLOAD_JPEG_QUALITY);
+    const maxSide = pickUploadMaxSide(source, options?.binderGrid);
+    return encodeUnderBudget(source, maxSide, SCAN_UPLOAD_JPEG_QUALITY);
   } finally {
     source.dispose?.();
   }

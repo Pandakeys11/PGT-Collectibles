@@ -35,9 +35,9 @@ export function getLiquidScanSpeedProfile(speedOn: boolean): LiquidScanSpeedProf
   if (speedOn) {
     return {
       visionConcurrency: 3,
-      catalogConcurrency: 6,
-      marketConcurrency: 4,
-      precisionConcurrency: 2,
+      catalogConcurrency: 8,
+      marketConcurrency: 6,
+      precisionConcurrency: 3,
       skipRegistryOnBulkEnrich: false,
       precisionCropEnabled: true,
       precisionCropMax: 6,
@@ -46,13 +46,25 @@ export function getLiquidScanSpeedProfile(speedOn: boolean): LiquidScanSpeedProf
   }
   return {
     visionConcurrency: 2,
-    catalogConcurrency: 3,
-    marketConcurrency: 2,
-    precisionConcurrency: 1,
+    catalogConcurrency: 5,
+    marketConcurrency: 4,
+    precisionConcurrency: 2,
     skipRegistryOnBulkEnrich: true,
     precisionCropEnabled: true,
     precisionCropMax: 5,
     autoSessionReport: false,
+  };
+}
+
+/** Raise enrich parallelism for dense binder extractions (12+ rows). */
+export function enrichConcurrencyForCardCount(
+  cardCount: number,
+  profile: LiquidScanSpeedProfile,
+): { catalog: number; market: number } {
+  const boost = cardCount >= 18 ? 3 : cardCount >= 12 ? 2 : cardCount >= 8 ? 1 : 0;
+  return {
+    catalog: Math.min(Math.max(2, profile.catalogConcurrency + boost), Math.min(cardCount, 10)),
+    market: Math.min(Math.max(2, profile.marketConcurrency + boost), Math.min(cardCount, 8)),
   };
 }
 
@@ -62,8 +74,8 @@ export function precisionCropMaxForCardCount(
   profile: LiquidScanSpeedProfile,
 ): number {
   const base = profile.precisionCropMax;
-  if (cardCount >= 20) return Math.max(base, 8);
-  if (cardCount >= 12) return Math.max(base, 6);
+  if (cardCount >= 20) return Math.max(base, 10);
+  if (cardCount >= 12) return Math.max(base, 7);
   return base;
 }
 

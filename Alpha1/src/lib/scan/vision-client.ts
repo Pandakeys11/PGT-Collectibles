@@ -1,4 +1,11 @@
 import { readResponseJson } from "@/lib/http/read-response-json";
+import {
+  dedupeBinderGridVisionCards,
+  mapTileLocationToParent,
+  planBinderGridTiles,
+  readImageNaturalSize,
+  renderBinderGridTileDataUrl,
+} from "@/lib/scan/binder-grid-vision";
 import { ensureScanUploadDataUrl, prepareScanUploadDataUrl } from "@/lib/scan/prepare-upload-image";
 import { parseScanLimitFromResponse } from "@/lib/scan/scan-limit-error";
 import { CARD_EVIDENCE_VISION_RADIUS_MULTIPLIER, extractCardRegionDataUrl } from "@/lib/scan/specimen-crop";
@@ -28,8 +35,11 @@ export function getVisionConcurrency(): number {
 }
 
 /** Compress + orient photos before preview/vision (critical on mobile camera uploads). */
-export function readImageFileAsDataUrl(file: File): Promise<string> {
-  return prepareScanUploadDataUrl(file);
+export function readImageFileAsDataUrl(
+  file: File,
+  options?: { binderGrid?: boolean },
+): Promise<string> {
+  return prepareScanUploadDataUrl(file, options);
 }
 
 function dataUrlToBase64(dataUrl: string): string {
@@ -55,6 +65,7 @@ async function extractVisionForImage(
     timeoutMs: number;
     singleCardCrop?: boolean;
     gradedFocus?: boolean;
+    binderGrid?: boolean;
   },
 ): Promise<unknown[]> {
   const signal = AbortSignal.timeout(options.timeoutMs);
@@ -67,6 +78,7 @@ async function extractVisionForImage(
       imageMimeTypes: [dataUrlMimeType(prepared)],
       singleCardCrop: options.singleCardCrop ?? false,
       gradedFocus: options.gradedFocus === true ? true : undefined,
+      binderGrid: options.binderGrid === true ? true : undefined,
     }),
     signal,
   });
@@ -100,6 +112,113 @@ async function extractVisionForImage(
   }));
 }
 
+function remapTileCardToParent(
+  raw: unknown,
+  tile: import("@/lib/scan/binder-grid-vision").BinderGridTile,
+  imageIndex: number,
+): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const card = { ...(raw as Record<string, unknown>) };
+  const loc = card.location;
+  if (Array.isArray(loc) && loc.length >= 2) {
+    const y = Number(loc[0]);
+    const x = Number(loc[1]);
+    if (Number.isFinite(y) && Number.isFinite(x)) {
+      card.location = mapTileLocationToParent([y, x], tile);
+    }
+  }
+  const bbox = card.bbox;
+  if (bbox && typeof bbox === "object") {
+    const box = bbox as Record<string, unknown>;
+    const top = Number(box.top);
+    const left = Number(box.left);
+    const bw = Number(box.width);
+    const bh = Number(box.height);
+    if ([top, left, bw, bh].every(Number.isFinite)) {
+      card.location = mapTileLocationToParent([top + bh / 2, left + bw / 2], tile);
+    }
+  }
+  return {
+    ...card,
+    sourceImageIndex: imageIndex,
+    visionBatchMerged: false,
+  };
+}
+
+/** Tiled vision for dense binder screenshots — one scan credit, server runs per-tile OCR. */
+async function extractVisionForBinderGridImage(
+  imageDataUrl: string,
+  imageIndex: number,
+  options: {
+    timeoutMs: number;
+    gradedFocus?: boolean;
+  },
+): Promise<unknown[]> {
+  const prepared = await ensureScanUploadDataUrl(imageDataUrl);
+  const { width, height } = await readImageNaturalSize(prepared);
+  const plan = planBinderGridTiles(width, height);
+  const rendered: Array<{
+    tile: import("@/lib/scan/binder-grid-vision").BinderGridTile;
+    dataUrl: string;
+  }> = [];
+
+  for (const tile of plan.tiles) {
+    const tileDataUrl = await renderBinderGridTileDataUrl(prepared, tile, 2048);
+    if (tileDataUrl) rendered.push({ tile, dataUrl: tileDataUrl });
+  }
+
+  if (rendered.length === 0) {
+    return extractVisionForImage(prepared, imageIndex, {
+      ...options,
+      binderGrid: true,
+      singleCardCrop: false,
+    });
+  }
+
+  const signal = AbortSignal.timeout(options.timeoutMs);
+  const preparedTiles = await Promise.all(
+    rendered.map((entry) => ensureScanUploadDataUrl(entry.dataUrl)),
+  );
+  const res = await fetch("/api/vision/extract", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      imageBase64s: preparedTiles.map(dataUrlToBase64),
+      imageMimeTypes: preparedTiles.map(dataUrlMimeType),
+      binderGrid: true,
+      scanCreditCount: 1,
+    }),
+    signal,
+  });
+  const data = await readResponseJson<{ cards?: unknown[]; error?: string }>(res);
+  if (!res.ok) {
+    throw new Error(data.error ?? `Vision scan failed (${res.status})`);
+  }
+  if (!Array.isArray(data.cards) || data.cards.length === 0) {
+    return extractVisionForImage(prepared, imageIndex, {
+      ...options,
+      binderGrid: true,
+      singleCardCrop: false,
+    });
+  }
+
+  const merged: Record<string, unknown>[] = [];
+  for (const raw of data.cards) {
+    const tileIndex =
+      raw && typeof raw === "object"
+        ? Number((raw as Record<string, unknown>).sourceTileIndex)
+        : NaN;
+    const tile =
+      Number.isFinite(tileIndex) && tileIndex >= 0 && tileIndex < rendered.length
+        ? rendered[tileIndex]!.tile
+        : rendered[0]!.tile;
+    const mapped = remapTileCardToParent(raw, tile, imageIndex);
+    if (mapped) merged.push(mapped);
+  }
+
+  return dedupeBinderGridVisionCards(merged, width / height);
+}
+
 export async function runVisionExtraction(
   images: string[],
   options: {
@@ -108,6 +227,8 @@ export async function runVisionExtraction(
     singleCardCrop?: boolean;
     /** Graded Card Mode — slab tag OCR priority (PSA/CGC/BGS). */
     gradedFocus?: boolean;
+    /** Multi-card binder / grid screenshot — tiled vision + binder prompts. */
+    binderGrid?: boolean;
     /** Parallel vision requests (default 3). Set 1 for strictly sequential. */
     concurrency?: number;
     onProgress?: (progress: VisionProgress) => void;
@@ -135,11 +256,21 @@ export async function runVisionExtraction(
       nextIndex += 1;
       if (imageIndex >= images.length) break;
 
-      const cards = await extractVisionForImage(images[imageIndex], imageIndex, {
-        timeoutMs,
-        singleCardCrop: options.singleCardCrop,
-        gradedFocus: options.gradedFocus,
-      });
+      const useBinderTiles =
+        options.binderGrid === true &&
+        !options.singleCardCrop &&
+        images.length === 1;
+      const cards = useBinderTiles
+        ? await extractVisionForBinderGridImage(images[imageIndex], imageIndex, {
+            timeoutMs,
+            gradedFocus: options.gradedFocus,
+          })
+        : await extractVisionForImage(images[imageIndex], imageIndex, {
+            timeoutMs,
+            singleCardCrop: options.singleCardCrop,
+            gradedFocus: options.gradedFocus,
+            binderGrid: options.binderGrid,
+          });
       results[imageIndex] = cards;
       imagesDone += 1;
       options.onProgress?.({ imagesDone, imagesTotal: images.length, mode });

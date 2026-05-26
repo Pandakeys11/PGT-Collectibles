@@ -1,5 +1,13 @@
 import type { CompanionActionId, CompanionState } from "@/lib/companion/schemas";
-import { getCompanionPokemon, pickRandomCompanionPokemon, type CompanionPokemon } from "@/lib/companion/pokemon-roster";
+import {
+  getCompanionPokemon,
+  pickRandomCompanionPokemon,
+  pickRandomCompanionPokemonExcluding,
+  type CompanionPokemon,
+} from "@/lib/companion/pokemon-roster";
+import type { CompanionQuestEvent } from "@/lib/companion/schemas";
+
+export const MAX_STARTER_REROLLS = 3;
 
 export type CompanionPersisted = {
   pokemonId: number;
@@ -27,6 +35,7 @@ export type CompanionPersisted = {
   };
   usageScansThisWeek: number;
   usageWeekKey: string;
+  starterRerollsUsed: number;
 };
 
 export const ACTION_META: Record<
@@ -74,12 +83,24 @@ export type TaskDef = {
 
 export const TASK_DEFINITIONS: TaskDef[] = [
   { id: "daily_login", label: "Check in on your partner", window: "daily", goal: 1, rewardXp: 12 },
+  { id: "daily_scan_session", label: "Run a Liquid Scan session", window: "daily", goal: 1, rewardXp: 18 },
+  { id: "daily_market_intel", label: "Review market intelligence", window: "daily", goal: 1, rewardXp: 16 },
+  { id: "daily_catalog_lock", label: "Confirm a catalog match", window: "daily", goal: 1, rewardXp: 20 },
+  { id: "daily_scan_three", label: "Scan 3 cards today", window: "daily", goal: 3, rewardXp: 28 },
   { id: "daily_feed", label: "Feed once", window: "daily", goal: 1, rewardXp: 15 },
   { id: "daily_care", label: "Any care action", window: "daily", goal: 2, rewardXp: 20 },
   { id: "weekly_train", label: "Train 3 times", window: "weekly", goal: 3, rewardXp: 55 },
   { id: "weekly_battle", label: "Battle twice", window: "weekly", goal: 2, rewardXp: 65 },
+  { id: "weekly_scan_fifteen", label: "Scan 15 cards this week", window: "usage", goal: 15, rewardXp: 95 },
   { id: "usage_scans", label: "Complete 5 card scans", window: "usage", goal: 5, rewardXp: 80 },
 ];
+
+export const QUEST_EVENT_TO_TASK: Record<CompanionQuestEvent, string> = {
+  scan_session: "daily_scan_session",
+  market_intelligence: "daily_market_intel",
+  catalog_confirm: "daily_catalog_lock",
+  cards_scanned: "daily_scan_three",
+};
 
 const HUNGER_DECAY_PER_HOUR = 3.5;
 const ENERGY_DECAY_PER_HOUR = 2;
@@ -143,7 +164,73 @@ export function createHatchedCompanion(pokemon: CompanionPokemon): CompanionPers
     lifetime: { feeds: 0, plays: 0, trains: 0, battles: 0, rests: 0, tasksClaimed: 0 },
     usageScansThisWeek: 0,
     usageWeekKey: wKey,
+    starterRerollsUsed: 0,
   };
+}
+
+function bumpTaskProgress(
+  row: CompanionPersisted,
+  taskId: string,
+  amount: number,
+  now = new Date(),
+): CompanionPersisted {
+  const task = TASK_DEFINITIONS.find((t) => t.id === taskId);
+  if (!task || amount <= 0) return row;
+  const progressKey = taskProgressKey(task.id, task.window, now, row.usageWeekKey);
+  const current =
+    task.id === "usage_scans"
+      ? row.usageScansThisWeek
+      : (row.taskProgress[progressKey] ?? 0);
+  return {
+    ...row,
+    taskProgress: {
+      ...row.taskProgress,
+      [progressKey]: Math.min(task.goal, current + amount),
+    },
+  };
+}
+
+export function recordCompanionQuestEvent(
+  row: CompanionPersisted,
+  event: CompanionQuestEvent,
+  amount = 1,
+  now = new Date(),
+): CompanionPersisted {
+  const taskId = QUEST_EVENT_TO_TASK[event];
+  let next = bumpTaskProgress(row, taskId, amount, now);
+  if (event === "cards_scanned") {
+    next = recordScanUsage(next, amount, now);
+  }
+  return next;
+}
+
+export function rerollCompanionStarter(
+  row: CompanionPersisted,
+  now = new Date(),
+): { row: CompanionPersisted; pokemon: CompanionPokemon; error?: string } {
+  if (row.starterRerollsUsed >= MAX_STARTER_REROLLS) {
+    const current = getCompanionPokemon(row.pokemonId);
+    return {
+      row,
+      error: "No starter rerolls remaining",
+      pokemon: current ?? pickRandomCompanionPokemon(),
+    };
+  }
+
+  const pokemon = pickRandomCompanionPokemonExcluding(row.pokemonId);
+  const next: CompanionPersisted = {
+    ...row,
+    pokemonId: pokemon.id,
+    pokemonName: pokemon.name,
+    pokemonSlug: pokemon.slug,
+    pokemonTier: pokemon.tier,
+    pokemonEra: pokemon.era,
+    starterRerollsUsed: row.starterRerollsUsed + 1,
+    mood: clampStat(row.mood + 6),
+    lastTickAt: now.toISOString(),
+  };
+
+  return { row: next, pokemon };
 }
 
 export function applyTimeDecay(row: CompanionPersisted, now = new Date()): CompanionPersisted {
@@ -299,7 +386,7 @@ export function claimTask(
   const progressKey = taskProgressKey(task.id, task.window, now, row.usageWeekKey);
   const claimKey = `${task.id}_claimed`;
   const progress =
-    task.id === "usage_scans"
+    task.id === "usage_scans" || task.id === "weekly_scan_fifteen"
       ? row.usageScansThisWeek
       : (row.taskProgress[progressKey] ?? 0);
 
@@ -348,6 +435,8 @@ export function toCompanionState(
       lifetime: { feeds: 0, plays: 0, trains: 0, battles: 0, rests: 0, tasksClaimed: 0 },
       lastTickAt: now.toISOString(),
       storage,
+      starterRerollsUsed: 0,
+      starterRerollsRemaining: MAX_STARTER_REROLLS,
     };
   }
 
@@ -364,7 +453,9 @@ export function toCompanionState(
     const progressKey = taskProgressKey(task.id, task.window, now, ticked.usageWeekKey);
     const claimKey = `${task.id}_claimed`;
     const progress =
-      task.id === "usage_scans" ? ticked.usageScansThisWeek : (ticked.taskProgress[progressKey] ?? 0);
+      task.id === "usage_scans" || task.id === "weekly_scan_fifteen"
+        ? ticked.usageScansThisWeek
+        : (ticked.taskProgress[progressKey] ?? 0);
     const complete = progress >= task.goal;
     const claimed = ticked.taskClaimed[claimKey] === windowKey;
     const resetsAt =
@@ -413,6 +504,8 @@ export function toCompanionState(
     lifetime: ticked.lifetime,
     lastTickAt: ticked.lastTickAt,
     storage,
+    starterRerollsUsed: ticked.starterRerollsUsed,
+    starterRerollsRemaining: Math.max(0, MAX_STARTER_REROLLS - ticked.starterRerollsUsed),
   };
 }
 
@@ -454,5 +547,9 @@ export function parsePersistedRow(raw: unknown): CompanionPersisted | null {
     },
     usageScansThisWeek: Number(r.usageScansThisWeek ?? r.usage_scans_this_week ?? 0),
     usageWeekKey: String(r.usageWeekKey ?? r.usage_week_key ?? weekKey()),
+    starterRerollsUsed: Math.min(
+      MAX_STARTER_REROLLS,
+      Math.max(0, Number(r.starterRerollsUsed ?? r.starter_rerolls_used ?? 0)),
+    ),
   };
 }

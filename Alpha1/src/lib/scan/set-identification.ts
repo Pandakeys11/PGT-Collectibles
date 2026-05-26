@@ -435,6 +435,9 @@ export function applySetFromCollectorFraction(
 
 export function captureConsensusThreshold(groupSize: number): number {
   if (groupSize <= 0) return Number.POSITIVE_INFINITY;
+  if (groupSize >= 16) {
+    return Math.ceil(groupSize * 0.75);
+  }
   return Math.min(12, Math.max(6, Math.ceil(groupSize * (2 / 3))));
 }
 

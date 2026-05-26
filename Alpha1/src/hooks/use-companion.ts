@@ -9,7 +9,7 @@ import {
   getLocalCompanion,
   pushLocalCompanionToServer,
 } from "@/lib/companion/client-sync";
-import type { CompanionActionId, CompanionState } from "@/lib/companion/schemas";
+import type { CompanionActionId, CompanionQuestEvent, CompanionState } from "@/lib/companion/schemas";
 import { readResponseJson } from "@/lib/http/read-response-json";
 
 type ApiPayload = {
@@ -89,6 +89,14 @@ export function useCompanion() {
   useEffect(() => {
     void refresh();
   }, [refresh, isSignedIn]);
+
+  useEffect(() => {
+    const onQuest = () => {
+      void refresh();
+    };
+    window.addEventListener("companion-quest-updated", onQuest);
+    return () => window.removeEventListener("companion-quest-updated", onQuest);
+  }, [refresh]);
 
   const hatch = useCallback(async () => {
     if (!isSignedIn || !userId) {
@@ -179,6 +187,78 @@ export function useCompanion() {
     [applyPayload, getSnapshot, isSignedIn, userId],
   );
 
+  const rerollStarter = useCallback(async () => {
+    if (!isSignedIn || !userId) {
+      setError("Sign in required");
+      return null;
+    }
+    const snapshot = getSnapshot();
+    if (!snapshot) {
+      setError("Hatch a partner first");
+      return null;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/companion/reroll-starter", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companion: snapshot }),
+      });
+      const data = await readResponseJson<
+        ApiPayload & {
+          error?: string;
+          reveal?: { id: number; name: string; slug: string };
+          companion?: CompanionPersisted;
+        }
+      >(res);
+      if (!res.ok) {
+        setError(data.error ?? `Reroll failed (${res.status})`);
+        return null;
+      }
+      applyPayload(data);
+      const row = data.companion ?? getLocalCompanion(userId);
+      if (row) await pushLocalCompanionToServer(userId, row);
+      if (!data.state?.pokemonId || !data.state.pokemonName || !data.state.pokemonSlug) return null;
+      return {
+        id: data.state.pokemonId,
+        name: data.state.pokemonName,
+        slug: data.state.pokemonSlug,
+        era: data.state.pokemonEra ?? "",
+        tier: data.state.pokemonTier ?? "",
+      };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }, [applyPayload, getSnapshot, isSignedIn, userId]);
+
+  const trackQuest = useCallback(
+    async (event: CompanionQuestEvent, amount = 1) => {
+      if (!isSignedIn || !userId) return;
+      const snapshot = getSnapshot();
+      if (!snapshot) return;
+      try {
+        const res = await fetch("/api/companion/quest-event", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event, amount, companion: snapshot }),
+        });
+        const data = await readResponseJson<ApiPayload & { error?: string }>(res);
+        if (res.ok && data.state) {
+          applyPayload(data);
+        }
+      } catch {
+        // Quest tracking is best-effort.
+      }
+    },
+    [applyPayload, getSnapshot, isSignedIn, userId],
+  );
+
   const claimTask = useCallback(
     async (taskId: string) => {
       if (!isSignedIn || !userId) {
@@ -227,8 +307,10 @@ export function useCompanion() {
     databaseConfigured,
     refresh,
     hatch,
+    rerollStarter,
     runAction,
     claimTask,
+    trackQuest,
     setError,
   };
 }

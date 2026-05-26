@@ -34,7 +34,7 @@ const STEPS: Record<StepId, StepDetails> = {
     tips: [
       "Lay binder flat for uniform lighting.",
       "Avoid direct camera glares and reflections.",
-      "Support for up to 12 cards per page scan.",
+      "Dense binder grids and screenshots — tiled vision extracts every visible card.",
     ],
   },
   extract: {

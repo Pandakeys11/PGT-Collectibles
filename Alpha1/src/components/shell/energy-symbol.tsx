@@ -212,11 +212,14 @@ export function EnergySymbol({
   className,
   title,
   size = "md",
+  /** Flat enamel look for gym badges — no neon glow. */
+  appearance = "default",
 }: {
   energy: EnergyType;
   className?: string;
   title?: string;
   size?: EnergySymbolSize;
+  appearance?: "default" | "badge";
 }) {
   const uid = useId().replace(/:/g, "");
   const gradId = `${uid}-${energy}-body`;
@@ -225,12 +228,15 @@ export function EnergySymbol({
   const isDragon = energy === "dragon";
   const { ink, highlight } = glyphInk(energy);
 
-  const glowStyle: CSSProperties = {
-    filter: [
-      `drop-shadow(0 1px 0 rgb(0 0 0 / 0.45))`,
-      `drop-shadow(0 0 8px rgb(var(--energy-${energy}-glow) / 0.75))`,
-    ].join(" "),
-  };
+  const glowStyle: CSSProperties =
+    appearance === "badge"
+      ? { filter: "drop-shadow(0 1px 1px rgb(0 0 0 / 0.4))" }
+      : {
+          filter: [
+            `drop-shadow(0 1px 0 rgb(0 0 0 / 0.45))`,
+            `drop-shadow(0 0 8px rgb(var(--energy-${energy}-glow) / 0.75))`,
+          ].join(" "),
+        };
 
   return (
     <svg

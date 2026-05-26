@@ -11,6 +11,7 @@ import { buildVisionPrompt } from "@/lib/ai/vision-prompts";
 import {
   formatVisionProviderError,
   listEnabledVisionProviders,
+  listEnabledVisionProvidersForBinderGrid,
   noteProviderFailure,
   runVisionProviderOnce,
 } from "@/lib/ai/vision-providers";
@@ -74,6 +75,9 @@ export async function POST(req: NextRequest) {
     imageMimeTypes?: string[];
     singleCardCrop?: boolean;
     gradedFocus?: boolean;
+    binderGrid?: boolean;
+    /** Bill one scan when sending multiple tile images for a single binder page. */
+    scanCreditCount?: number;
   };
   try {
     body = await req.json();
@@ -83,10 +87,28 @@ export async function POST(req: NextRequest) {
 
   const singleCardCrop = body.singleCardCrop === true;
   const gradedFocus = body.gradedFocus === true;
-  const prompt = buildVisionPrompt({ singleCardCrop, compact: false, gradedFocus });
-  const compactPrompt = buildVisionPrompt({ singleCardCrop, compact: true, gradedFocus });
-  const timeoutMs = getVisionProviderTimeoutMs();
-
+  const binderGrid = body.binderGrid === true && !singleCardCrop;
+  const prompt = buildVisionPrompt({
+    singleCardCrop,
+    compact: false,
+    gradedFocus,
+    binderGrid,
+  });
+  const compactPrompt = buildVisionPrompt({
+    singleCardCrop,
+    compact: true,
+    gradedFocus,
+    binderGrid,
+  });
+  const compactDensePrompt = binderGrid
+    ? buildVisionPrompt({
+        singleCardCrop,
+        compact: true,
+        compactDense: true,
+        gradedFocus,
+        binderGrid,
+      })
+    : undefined;
   const imageBase64s = Array.isArray(body.imageBase64s)
     ? body.imageBase64s.filter((v) => typeof v === "string" && v.length > 0)
     : [];
@@ -101,6 +123,14 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+  const scanCreditCount =
+    typeof body.scanCreditCount === "number" && Number.isFinite(body.scanCreditCount)
+      ? Math.max(1, Math.min(Math.floor(body.scanCreditCount), imageBase64s.length))
+      : imageBase64s.length;
+  const timeoutMs =
+    binderGrid && imageBase64s.length > 4
+      ? Math.max(getVisionProviderTimeoutMs(), 180_000)
+      : getVisionProviderTimeoutMs();
   if (imageBase64s.length > MAX_IMAGES_PER_REQUEST) {
     return NextResponse.json(
       { error: `At most ${MAX_IMAGES_PER_REQUEST} images per scan request` },
@@ -146,11 +176,13 @@ export async function POST(req: NextRequest) {
     try {
       const creditResult = await consumeScanCredits({
         userId: appUser.id,
-        credits: imageBase64s.length,
+        credits: scanCreditCount,
         route: "/api/vision/extract",
         metadata: {
           imageCount: imageBase64s.length,
+          scanCreditCount,
           singleCardCrop,
+          binderGrid,
         },
       });
 
@@ -177,7 +209,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const enabled = listEnabledVisionProviders();
+  const enabled = binderGrid
+    ? listEnabledVisionProvidersForBinderGrid()
+    : listEnabledVisionProviders();
   if (enabled.length === 0) {
     return NextResponse.json(
       {
@@ -197,14 +231,57 @@ export async function POST(req: NextRequest) {
   for (const providerId of enabled) {
     try {
       const result = await withTimeout(
-        runVisionProviderOnce(
-          providerId,
-          prompt,
-          compactPrompt,
-          imageBase64s,
-          imageMimeTypes,
-          { allowCompactRetry: true },
-        ),
+        binderGrid && imageBase64s.length > 1
+          ? (async () => {
+              const tileResults = await Promise.all(
+                imageBase64s.map((b64, tileIndex) =>
+                  runVisionProviderOnce(
+                    providerId,
+                    prompt,
+                    compactPrompt,
+                    [b64],
+                    [imageMimeTypes[tileIndex] ?? "image/jpeg"],
+                    {
+                      allowCompactRetry: true,
+                      compactDensePrompt,
+                    },
+                  ).then((tileResult) => ({ tileIndex, tileResult })),
+                ),
+              );
+              const merged: unknown[] = [];
+              let salvaged = false;
+              let compactRetry = false;
+              let finishReason: string | null = null;
+              for (const { tileIndex, tileResult } of tileResults) {
+                salvaged = salvaged || tileResult.salvaged;
+                compactRetry = compactRetry || Boolean(tileResult.compactRetry);
+                finishReason = tileResult.finishReason ?? finishReason;
+                for (const card of tileResult.cards) {
+                  merged.push({
+                    ...(card as object),
+                    sourceTileIndex: tileIndex,
+                  });
+                }
+              }
+              return {
+                cards: merged,
+                provider: providerId,
+                salvaged,
+                compactRetry,
+                finishReason,
+              };
+            })()
+          : runVisionProviderOnce(
+              providerId,
+              prompt,
+              compactPrompt,
+              imageBase64s,
+              imageMimeTypes,
+              {
+                allowCompactRetry: true,
+                compactDensePrompt,
+              },
+            ),
         timeoutMs,
         providerId,
       );

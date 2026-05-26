@@ -29,14 +29,30 @@ function makeId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+export type BuildSpecimensOptions = {
+  /** Width ÷ height per capture index — improves 4×5 / 5×4 grid crops. */
+  captureAspects?: ReadonlyMap<number, number>;
+};
+
 /** Turn stabilized vision rows into sheet specimens (per-capture consensus + grid crops). */
 export function buildSpecimensFromVisionCards(
   rawCards: unknown[],
   laneMode: ScanLaneMode,
   slots: ReadonlyArray<{ previewUrl: string }>,
+  options?: BuildSpecimensOptions,
 ): BuiltScanSpecimen[] {
+  const aspectMap = options?.captureAspects ?? new Map<number, number>();
   const { cards } = stabilizeOmniVisionCards(
     rawCards.map((row) => (row && typeof row === "object" ? row : {})),
+    {
+      captureAspectRatio: (raw) => {
+        const idx =
+          typeof (raw as { sourceImageIndex?: number }).sourceImageIndex === "number"
+            ? (raw as { sourceImageIndex: number }).sourceImageIndex
+            : 0;
+        return aspectMap.get(idx);
+      },
+    },
   );
 
   type PassRow = {
@@ -86,8 +102,12 @@ export function buildSpecimensFromVisionCards(
     posByCapture.set(sourceIndex, positionInGroup + 1);
 
     const detectedLocation = normalizeVisionGridLocation(card.location);
+    const captureAspect = aspectMap.get(sourceIndex);
     const evidenceCropLocation: VisionGridLocation | null =
-      detectedLocation ?? (groupSize > 1 ? inferGridLocation(positionInGroup, groupSize) : inferGridLocation(0, 1));
+      detectedLocation ??
+      (groupSize > 1
+        ? inferGridLocation(positionInGroup, groupSize, captureAspect)
+        : inferGridLocation(0, 1, captureAspect));
 
     const id = makeId("specimen");
     nextSpecimens.push({

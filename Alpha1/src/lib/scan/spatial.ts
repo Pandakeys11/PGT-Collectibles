@@ -7,12 +7,22 @@ export type OmniVisionSpatialCard = {
   location?: unknown;
 };
 
-export function inferSpecimenGridColumns(groupSize: number): number {
+export function inferSpecimenGridColumns(
+  groupSize: number,
+  aspectRatio?: number,
+): number {
   if (groupSize <= 1) return 1;
   if (groupSize <= 4) return 2;
-  if (groupSize <= 9) return 3;
-  if (groupSize <= 12) return 4;
-  if (groupSize <= 20) return 5;
+  if (groupSize <= 6) return aspectRatio != null && aspectRatio > 1.2 ? 3 : 2;
+  if (aspectRatio != null && aspectRatio >= 1.15) {
+    if (groupSize >= 18) return 5;
+    if (groupSize >= 10) return 4;
+    return 3;
+  }
+  // Portrait phone shots of table grids.
+  if (groupSize <= 12) return 3;
+  if (groupSize <= 16) return 4;
+  if (groupSize <= 25) return 5;
   if (groupSize <= 30) return 6;
   return Math.min(8, Math.ceil(Math.sqrt(groupSize)));
 }
@@ -51,9 +61,13 @@ function normalizeVisionBboxCenter(bbox: unknown): VisionGridLocation | undefine
  * each **row** left→right, then the next row down (matches typical binder photos and how
  * vision models naturally list cards). Use with the same ordering in the vision prompt.
  */
-export function inferGridLocation(indexInGroup: number, groupSize: number): VisionGridLocation {
+export function inferGridLocation(
+  indexInGroup: number,
+  groupSize: number,
+  aspectRatio?: number,
+): VisionGridLocation {
   if (groupSize <= 0) return [500, 500] as const;
-  const cols = inferSpecimenGridColumns(groupSize);
+  const cols = inferSpecimenGridColumns(groupSize, aspectRatio);
   const rows = Math.max(1, Math.ceil(groupSize / cols));
   const row = Math.floor(indexInGroup / cols);
   const col = indexInGroup % cols;
@@ -116,7 +130,10 @@ export function pickPrimaryVisionCardFromCrop<T extends { location?: unknown }>(
   return best;
 }
 
-export function stabilizeOmniVisionCards<T extends OmniVisionSpatialCard>(cards: T[]): {
+export function stabilizeOmniVisionCards<T extends OmniVisionSpatialCard>(
+  cards: T[],
+  options?: { captureAspectRatio?: (card: T) => number | undefined },
+): {
   cards: T[];
   warnings: string[];
 } {
@@ -147,7 +164,8 @@ export function stabilizeOmniVisionCards<T extends OmniVisionSpatialCard>(cards:
 
     let location = normalizeVisionGridLocation(card.location) ?? normalizeVisionBboxCenter((card as Record<string, unknown>).bbox);
     if (!location && groupSize > 1) {
-      location = inferGridLocation(positionInGroup, groupSize);
+      const aspect = options?.captureAspectRatio?.(card);
+      location = inferGridLocation(positionInGroup, groupSize, aspect);
     }
     return location ? ({ ...card, location } as T) : card;
   });

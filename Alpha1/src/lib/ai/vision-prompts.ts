@@ -81,20 +81,40 @@ ${PRINT_EDITION_RULES}
 - Pokémon raw stamp examples:
 ${POKEMON_PRINT_EDITION_RULES}`;
 
+const BINDER_GRID_RULES = `
+- **Dense binder / grid / table flat-lay:** Include **every** visible trading card — do not stop early (often 12–20+ cards).
+- List cards **row-major** (left→right, top→bottom). Match the real layout (common: **4 rows × 5 columns**, **3×4**, **5×4** table shots).
+- **Duplicate copies** of the same Pokémon in different positions are **separate entries** (e.g. two Jolteon in different slots).
+- **location** [y,x] is required per card (center of the card face on 0–1000). Include **bbox** when edges are visible.
+- For 8+ cards: keep **details** under 50 characters; omit stickerNote unless a price sticker is visible.
+- Read **set** + **number** from **that card's face** (set symbol + collector number) — never copy from a neighbor.
+- **Japanese** cards: set **language** to Japanese; **printedName** = visible title; **name** = English catalog name when known.
+- Mixed Wizards/Neo sets on one photo are normal — each card keeps its own set name and fraction (e.g. 62/62 Fossil vs 64/64 Jungle).`;
+
 export function buildVisionPrompt(options: {
   singleCardCrop: boolean;
   compact: boolean;
   /** Graded Card Mode — emphasize slab tag OCR */
   gradedFocus?: boolean;
+  /** Large multi-card binder / screenshot grid */
+  binderGrid?: boolean;
+  /** Compact but keep bbox for evidence crops on dense pages */
+  compactDense?: boolean;
 }): string {
   const gradedBlock = options.gradedFocus ? `${GRADED_SCAN_PREAMBLE}\n` : "";
-  const fields = options.compact ? CARD_FIELDS : CARD_FIELDS_WITH_BBOX;
-  const detailsRule = options.compact
-    ? "- Keep **details** under 40 characters per card."
-    : "- Keep **details** under 120 characters per card so the full JSON fits in one response.";
-  const bboxRule = options.compact
-    ? "- Omit bbox; location [y,x] on 0-1000 is enough."
-    : "- bbox is the visible card/slab rectangle on 0-1000: top, left, width, height when edges are visible.";
+  const useDenseFields = options.compactDense;
+  const fields =
+    options.compact && !useDenseFields ? CARD_FIELDS : CARD_FIELDS_WITH_BBOX;
+  const detailsRule = options.compactDense
+    ? "- Keep **details** under 50 characters per card."
+    : options.compact
+      ? "- Keep **details** under 40 characters per card."
+      : "- Keep **details** under 120 characters per card so the full JSON fits in one response.";
+  const bboxRule =
+    options.compact && !useDenseFields
+      ? "- Omit bbox; location [y,x] on 0-1000 is enough."
+      : "- bbox is the visible card/slab rectangle on 0-1000: top, left, width, height when edges are visible.";
+  const binderBlock = options.binderGrid ? BINDER_GRID_RULES : "";
 
   if (options.singleCardCrop) {
     return `${gradedBlock}You are a multi-franchise trading-card vision extractor (TCG + sports). This image is a **tight crop of ONE card or slab**.
@@ -125,5 +145,6 @@ Rules:
 - location: card center on 0-1000 (y down, x right).
 ${bboxRule}
 ${detailsRule}
+${binderBlock}
 ${SHARED_RULES}`;
 }

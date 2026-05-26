@@ -36,6 +36,7 @@ export function companionFromApiPayload(
     energy: data.state.energy,
     mood: data.state.mood,
     lastTickAt: data.state.lastTickAt,
+    starterRerollsUsed: data.state.starterRerollsUsed,
   });
   if (row) saveCompanionLocal(userId, row);
 }

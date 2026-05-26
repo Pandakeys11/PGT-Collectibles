@@ -15,6 +15,7 @@ import {
   getXaiVisionModel,
   getVisionMaxOutputTokensForProvider,
   getVisionProviderOrder,
+  getVisionProviderOrderForBinderGrid,
   getVisionSkipProviders,
 } from "@/lib/ai/env";
 import {
@@ -326,9 +327,9 @@ export function isVisionProviderConfigured(id: VisionProviderId): boolean {
   }
 }
 
-export function listEnabledVisionProviders(): VisionProviderId[] {
+function filterEnabledProviders(order: string[]): VisionProviderId[] {
   const skip = new Set(getVisionSkipProviders());
-  return getVisionProviderOrder().filter(
+  return order.filter(
     (id): id is VisionProviderId =>
       (id === "groq" ||
         id === "gemini" ||
@@ -339,6 +340,14 @@ export function listEnabledVisionProviders(): VisionProviderId[] {
       !skip.has(id) &&
       !isProviderInCooldown(id),
   );
+}
+
+export function listEnabledVisionProviders(): VisionProviderId[] {
+  return filterEnabledProviders(getVisionProviderOrder());
+}
+
+export function listEnabledVisionProvidersForBinderGrid(): VisionProviderId[] {
+  return filterEnabledProviders(getVisionProviderOrderForBinderGrid());
 }
 
 export function formatVisionProviderError(
@@ -369,14 +378,16 @@ export async function runVisionProviderOnce(
   compactPrompt: string,
   imageBase64s: string[],
   imageMimeTypes: string[],
-  options: { allowCompactRetry?: boolean } = {},
+  options: { allowCompactRetry?: boolean; compactDensePrompt?: string } = {},
 ): Promise<VisionRunResult> {
   const maxTokens = getVisionMaxOutputTokensForProvider(id);
   const allowCompact = options.allowCompactRetry !== false;
+  const densePrompt = options.compactDensePrompt;
 
   const runPass = async (
     textPrompt: string,
     compact: boolean,
+    dense = false,
   ): Promise<VisionRunResult> => {
     const { text, finishReason } = await invokeProvider(
       id,
@@ -392,9 +403,12 @@ export async function runVisionProviderOnce(
 
     const truncated = finishReason === "length" || result.salvaged;
     if (truncated && allowCompact && !compact) {
+      if (densePrompt) {
+        const denseResult = await runPass(densePrompt, true, true);
+        if (denseResult.cards.length >= result.cards.length) return denseResult;
+      }
       const compactResult = await runPass(compactPrompt, true);
-      if (compactResult.cards.length >= result.cards.length)
-        return compactResult;
+      if (compactResult.cards.length >= result.cards.length) return compactResult;
     }
     return result;
   };
@@ -403,6 +417,13 @@ export async function runVisionProviderOnce(
     return await runPass(prompt, false);
   } catch (err) {
     if (!allowCompact || !isJsonParseFailure(err)) throw err;
+    if (densePrompt) {
+      try {
+        return await runPass(densePrompt, true, true);
+      } catch {
+        // fall through to plain compact
+      }
+    }
     return runPass(compactPrompt, true);
   }
 }

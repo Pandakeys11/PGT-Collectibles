@@ -1,6 +1,9 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { trackCompanionQuest } from "@/lib/companion/quest-tracker";
+import { readImageNaturalSize } from "@/lib/scan/binder-grid-vision";
 import {
   hasMinimumIdentityForCatalog,
   hasUserCatalogOverride,
@@ -44,7 +47,11 @@ import {
   normalizeGradedSlabFields,
 } from "@/lib/scan/graded-slab";
 import { normalizeVisionCard } from "@/lib/scan/normalize-extracted-card";
-import { getLiquidScanSpeedProfile } from "@/lib/scan/liquid-scan-speed";
+import {
+  enrichConcurrencyForCardCount,
+  getLiquidScanSpeedProfile,
+  precisionCropMaxForCardCount,
+} from "@/lib/scan/liquid-scan-speed";
 import {
   mergePrecisionCard,
   precisionCropImproves,
@@ -163,6 +170,7 @@ function buildContextForUserCatalogSelection(
 }
 
 export function useScanSession(options?: { speedOn?: boolean }) {
+  const { userId } = useAuth();
   const speedOnRef = useRef(options?.speedOn ?? false);
   speedOnRef.current = options?.speedOn ?? false;
   const [laneMode, setLaneMode] = useState<ScanLaneMode>("all");
@@ -306,11 +314,12 @@ export function useScanSession(options?: { speedOn?: boolean }) {
   const ingestImageFiles = useCallback(async (files: File[]) => {
     const list = files.filter((file) => file.type.startsWith("image/"));
     if (list.length === 0) return;
+    const binderGridPrep = list.length === 1;
     const next = await Promise.all(
       list.map(async (file) => ({
         id: makeId("slot"),
         file,
-        previewUrl: await readImageFileAsDataUrl(file),
+        previewUrl: await readImageFileAsDataUrl(file, { binderGrid: binderGridPrep }),
       })),
     );
     setSlots((current) => [...current, ...next]);
@@ -404,27 +413,25 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     const total = items.length;
     const catalogById = new Map<string, ScanSpecimen>();
     const profile = getLiquidScanSpeedProfile(speedOnRef.current);
-    const catalogConcurrency = profile.catalogConcurrency;
-    const marketConcurrency = profile.marketConcurrency;
+    const { catalog: catalogConcurrency, market: marketConcurrency } =
+      enrichConcurrencyForCardCount(total, profile);
     const skipRegistryOnBulk = profile.skipRegistryOnBulkEnrich;
-
     const enrichConcurrency = Math.max(catalogConcurrency, marketConcurrency);
 
     try {
       let enrichDone = 0;
-      setProgress(`Enriching 0/${total}…`);
+      setProgress(`Matching catalog 0/${total}…`);
       for (let offset = 0; offset < items.length; offset += enrichConcurrency) {
         const chunk = items.slice(offset, offset + enrichConcurrency);
         await Promise.all(
           chunk.map(async (specimen) => {
-            let base: ScanSpecimen = specimen;
             try {
               const catalogResult = await enrichExtractedCard({
                 specimenId: specimen.id,
                 card: specimen.card,
                 phase: "catalog",
               });
-              base = {
+              const base = {
                 ...specimen,
                 card: catalogResult.card,
                 context: catalogResult.context,
@@ -433,6 +440,24 @@ export function useScanSession(options?: { speedOn?: boolean }) {
               setSpecimens((current) =>
                 current.map((entry) => (entry.id === specimen.id ? base : entry)),
               );
+            } catch {
+              catalogById.set(specimen.id, specimen);
+            } finally {
+              enrichDone += 1;
+              setProgress(`Matching catalog ${enrichDone}/${total}…`);
+            }
+          }),
+        );
+      }
+
+      enrichDone = 0;
+      setProgress(`Loading market 0/${total}…`);
+      for (let offset = 0; offset < items.length; offset += enrichConcurrency) {
+        const chunk = items.slice(offset, offset + enrichConcurrency);
+        await Promise.all(
+          chunk.map(async (specimen) => {
+            const base = catalogById.get(specimen.id) ?? specimen;
+            try {
               const catalogCtx = pickCatalogContext(base.context);
               const marketResult = await enrichExtractedCard({
                 specimenId: base.id,
@@ -461,10 +486,10 @@ export function useScanSession(options?: { speedOn?: boolean }) {
                 ),
               );
             } catch {
-              catalogById.set(specimen.id, base);
+              // Keep catalog-only row.
             } finally {
               enrichDone += 1;
-              setProgress(`Enriching ${enrichDone}/${total}…`);
+              setProgress(`Loading market ${enrichDone}/${total}…`);
             }
           }),
         );
@@ -472,8 +497,12 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     } finally {
       setEnriching(false);
       setProgress(null);
+      if (userId && total > 0) {
+        void trackCompanionQuest(userId, "scan_session", 1);
+        void trackCompanionQuest(userId, "cards_scanned", total);
+      }
     }
-  }, [cancelPendingEnrich]);
+  }, [cancelPendingEnrich, userId]);
 
   const reEnrichAfterPrecision = useCallback(async (id: string, card: ExtractedCard) => {
     if (!hasMinimumIdentityForCatalog(card)) return;
@@ -631,16 +660,35 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     setScanLimit(null);
     setSpecimens([]);
     setSelectedId(null);
-    setProgress("Running vision extraction...");
+    const binderGridScan = slots.length === 1 && laneMode !== "graded";
+    setProgress(
+      binderGridScan
+        ? "Running tiled vision on binder grid…"
+        : "Running vision extraction…",
+    );
     try {
       const images = slots.map((slot) => slot.previewUrl);
+      const captureAspects = new Map<number, number>();
+      await Promise.all(
+        images.map(async (url, index) => {
+          if (!url) return;
+          try {
+            const { width, height } = await readImageNaturalSize(url);
+            captureAspects.set(index, width / Math.max(1, height));
+          } catch {
+            // Aspect fallback uses card-count heuristics only.
+          }
+        }),
+      );
       const specimensByImage = new Map<number, ScanSpecimen[]>();
       let visionCardCount = 0;
 
       const speedProfile = getLiquidScanSpeedProfile(speedOnRef.current);
+      const binderGrid = binderGridScan;
       const extracted = await runVisionExtraction(images, {
         timeoutMs: getVisionClientTimeoutMs(),
         concurrency: speedProfile.visionConcurrency,
+        binderGrid,
         gradedFocus: laneMode === "graded",
         onProgress: (state) => {
           setProgress(
@@ -649,7 +697,9 @@ export function useScanSession(options?: { speedOn?: boolean }) {
         },
         onImageComplete: (cards, imageIndex) => {
           visionCardCount += cards.length;
-          const batch = buildSpecimensFromVisionCards(cards, laneMode, slots);
+          const batch = buildSpecimensFromVisionCards(cards, laneMode, slots, {
+            captureAspects,
+          });
           if (batch.length === 0) return;
           specimensByImage.set(imageIndex, batch);
           const ordered = Array.from(specimensByImage.keys())
@@ -666,11 +716,9 @@ export function useScanSession(options?: { speedOn?: boolean }) {
       const stabilizedCount = extracted.filter(
         (row) => row && typeof row === "object",
       ).length;
-      let nextSpecimens = buildSpecimensFromVisionCards(
-        extracted,
-        laneMode,
-        slots,
-      );
+      let nextSpecimens = buildSpecimensFromVisionCards(extracted, laneMode, slots, {
+        captureAspects,
+      });
       const { specimens: resolved, laneNotice } =
         resolveSpecimensWithLaneFallback(
           nextSpecimens,
@@ -701,11 +749,15 @@ export function useScanSession(options?: { speedOn?: boolean }) {
       setScanning(false);
       setProgress("Extraction complete — matching catalog…");
       await enrichSpecimens(nextSpecimens);
+      const precisionMax = precisionCropMaxForCardCount(
+        nextSpecimens.length,
+        speedProfile,
+      );
       const precisionCandidates = selectPrecisionCropCandidates(
         specimensRef.current.length > 0 ? specimensRef.current : nextSpecimens,
         {
           enabled: speedProfile.precisionCropEnabled,
-          max: speedProfile.precisionCropMax,
+          max: precisionMax,
         },
       );
       if (precisionCandidates.length > 0) {
@@ -1272,8 +1324,11 @@ export function useScanSession(options?: { speedOn?: boolean }) {
       );
 
       void refreshMarketForCatalogOverride(id, confirmedCard, candidate.catalogId, catalogImageUrl);
+      if (userId) {
+        void trackCompanionQuest(userId, "catalog_confirm", 1);
+      }
     },
-    [refreshMarketForCatalogOverride],
+    [refreshMarketForCatalogOverride, userId],
   );
 
   const rejectCatalogCandidate = useCallback((id: string, catalogId: string) => {

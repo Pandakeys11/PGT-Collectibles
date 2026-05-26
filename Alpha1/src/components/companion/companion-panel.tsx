@@ -11,9 +11,12 @@ import {
   Heart,
   Loader2,
   Moon,
+  RefreshCw,
   Sparkles,
   Swords,
 } from "lucide-react";
+import { CompanionQuestBoard } from "@/components/companion/companion-quest-board";
+import { MAX_STARTER_REROLLS } from "@/lib/companion/game-engine";
 import { CompanionStatBar } from "@/components/companion/companion-stat-bar";
 import { PokeballGrid } from "@/components/companion/pokeball-grid";
 import { PokemonSprite } from "@/components/companion/pokemon-sprite";
@@ -57,6 +60,7 @@ export function CompanionPanel({
   error,
   isSignedIn,
   hatch,
+  rerollStarter,
   runAction,
   claimTask,
   setError,
@@ -72,6 +76,8 @@ export function CompanionPanel({
     tier: string;
   } | null>(null);
   const [hatching, setHatching] = useState(false);
+  const [pickingAgain, setPickingAgain] = useState(false);
+  const [showRerollGrid, setShowRerollGrid] = useState(false);
 
   const showBody = isMobile || expanded;
 
@@ -80,6 +86,25 @@ export function CompanionPanel({
     setError(null);
     const result = await hatch();
     setHatching(false);
+    if (result) {
+      setReveal({
+        name: result.name,
+        id: result.id,
+        slug: result.slug,
+        era: result.era,
+        tier: result.tier,
+      });
+    }
+  };
+
+  const rerollsRemaining = state?.starterRerollsRemaining ?? 0;
+
+  const handlePickAgain = async () => {
+    setPickingAgain(true);
+    setError(null);
+    const result = await rerollStarter();
+    setPickingAgain(false);
+    setShowRerollGrid(false);
     if (result) {
       setReveal({
         name: result.name,
@@ -107,6 +132,7 @@ export function CompanionPanel({
         energy: state.energy,
         mood: state.mood,
         lastTickAt: state.lastTickAt,
+        starterRerollsUsed: state.starterRerollsUsed,
       });
       if (row) saveCompanionLocal(userId, row);
     }
@@ -202,6 +228,55 @@ export function CompanionPanel({
             <Heart className={cn("shrink-0 text-energy-fairy-2", isMobile ? "h-6 w-6" : "h-4 w-4")} />
           </div>
 
+          {rerollsRemaining > 0 ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className={cn("font-semibold text-slate-200", isMobile ? "text-sm" : "text-[11px]")}>
+                    Starter pick
+                  </p>
+                  <p className={cn("text-slate-500", isMobile ? "text-xs" : "text-[10px]")}>
+                    {rerollsRemaining} of {MAX_STARTER_REROLLS} rerolls left — choose a new partner
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy || pickingAgain}
+                  onClick={() => setShowRerollGrid((v) => !v)}
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1 rounded-md border border-white/12 bg-white/[0.04] font-semibold text-slate-200 transition hover:bg-white/[0.08] disabled:opacity-40 touch-manipulation",
+                    isMobile ? "px-3 py-2 text-xs" : "px-2 py-1.5 text-[10px]",
+                  )}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", pickingAgain && "animate-spin")} />
+                  Pick again
+                </button>
+              </div>
+              {showRerollGrid ? (
+                <div className="mt-3 space-y-2">
+                  <p className={cn("text-slate-500", isMobile ? "text-xs" : "text-[10px]")}>
+                    Tap a Poké Ball to roll a new starter. Stats and level stay the same.
+                  </p>
+                  <PokeballGrid
+                    disabled={busy || pickingAgain}
+                    size={isMobile ? "large" : "default"}
+                    onPick={() => void handlePickAgain()}
+                  />
+                  {pickingAgain ? (
+                    <p className="flex items-center justify-center gap-2 text-sm text-slate-400">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Rolling new partner…
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className={cn("text-center text-slate-600", isMobile ? "text-xs" : "text-[10px]")}>
+              Starter locked — all {MAX_STARTER_REROLLS} rerolls used
+            </p>
+          )}
+
           <div className={cn("space-y-2", isMobile && "space-y-3")}>
             <CompanionStatBar label="Hunger" value={state.hunger} tone="hunger" />
             <CompanionStatBar label="Energy" value={state.energy} tone="energy" />
@@ -232,44 +307,13 @@ export function CompanionPanel({
             })}
           </div>
 
-          <div className={cn("space-y-2", isMobile ? "max-h-none" : "max-h-32 overflow-y-auto pr-0.5")}>
-            <p className={cn("font-semibold uppercase text-slate-500", isMobile ? "text-xs" : "text-[9px]")}>
-              Tasks
-            </p>
-            {state.tasks.map((task) => (
-              <div
-                key={task.id}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg border border-white/[0.07] bg-[#05080c]",
-                  isMobile ? "px-3 py-3" : "px-2 py-1.5",
-                )}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className={cn("text-slate-300", isMobile ? "text-sm" : "truncate text-[10px]")}>
-                    {task.label}
-                  </p>
-                  <p className={cn("font-mono text-slate-600", isMobile ? "text-xs" : "text-[9px]")}>
-                    {task.progress}/{task.goal} · +{task.rewardXp} XP
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={busy || !task.complete || task.claimed}
-                  onClick={() => void claimTask(task.id)}
-                  className={cn(
-                    "shrink-0 touch-manipulation rounded-md px-3 py-2 font-bold uppercase transition active:scale-[0.98]",
-                    isMobile ? "text-xs" : "px-2 py-1 text-[9px]",
-                    task.claimed
-                      ? "border border-white/10 text-slate-600"
-                      : task.complete
-                        ? "border border-emerald-300/40 bg-emerald-400/15 text-emerald-200"
-                        : "border border-white/10 text-slate-500",
-                  )}
-                >
-                  {task.claimed ? "Done" : task.complete ? "Claim" : task.window}
-                </button>
-              </div>
-            ))}
+          <div className={cn(isMobile ? "max-h-none" : "max-h-64 overflow-y-auto pr-0.5 scanner-chat-scrollbar")}>
+            <CompanionQuestBoard
+              tasks={state.tasks}
+              busy={busy}
+              isMobile={isMobile}
+              onClaim={(taskId) => void claimTask(taskId)}
+            />
           </div>
         </>
       )}

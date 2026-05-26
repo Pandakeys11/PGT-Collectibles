@@ -107,6 +107,23 @@ export function getVisionProviderOrder(): string[] {
   return ids.length > 0 ? ids : [...DEFAULT_VISION_PROVIDER_ORDER];
 }
 
+/** Binder grids need higher output token ceilings — prefer non-Groq providers first when available. */
+export function getVisionProviderOrderForBinderGrid(): string[] {
+  if (isGroqPrimaryOnly() && getGroqApiKey()) return ["groq"];
+  const preferred = ["openrouter", "gemini", "openai", "xai", "groq"];
+  const configured = preferred.filter((id) => {
+    if (id === "groq") return Boolean(getGroqApiKey());
+    if (id === "gemini") return Boolean(getGeminiApiKey());
+    if (id === "openrouter") return Boolean(getOpenRouterApiKey());
+    if (id === "openai") return Boolean(getOpenAIApiKey());
+    if (id === "xai") return Boolean(getXaiApiKey());
+    return false;
+  });
+  const skip = new Set(getVisionSkipProviders());
+  const ordered = configured.filter((id) => !skip.has(id));
+  return ordered.length > 0 ? ordered : getVisionProviderOrder();
+}
+
 function parseCommaList(raw: string | undefined): string[] {
   if (!raw?.trim()) return [];
   return raw

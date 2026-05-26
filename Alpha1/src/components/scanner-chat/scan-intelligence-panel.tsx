@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { trackCompanionQuest } from "@/lib/companion/quest-tracker";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bookmark,
@@ -80,8 +82,10 @@ export function ScanIntelligencePanel({
   layoutMode?: "sidebar" | "drawer";
   className?: string;
 }) {
+  const { userId } = useAuth();
   const isDrawer = layoutMode === "drawer";
   const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
+  const marketIntelTrackedRef = useRef<string | null>(null);
 
   useEffect(() => {
     setExcludedKeys(new Set());
@@ -109,6 +113,18 @@ export function ScanIntelligencePanel({
     () => Boolean(selectedSpecimen?.context.marketEvidence?.length),
     [selectedSpecimen],
   );
+
+  useEffect(() => {
+    marketIntelTrackedRef.current = null;
+  }, [selectedSpecimenId]);
+
+  useEffect(() => {
+    if (!userId || !marketReady || !selectedSpecimenId) return;
+    const key = `${selectedSpecimenId}:market`;
+    if (marketIntelTrackedRef.current === key) return;
+    marketIntelTrackedRef.current = key;
+    void trackCompanionQuest(userId, "market_intelligence", 1);
+  }, [userId, marketReady, selectedSpecimenId]);
 
   return (
     <aside
