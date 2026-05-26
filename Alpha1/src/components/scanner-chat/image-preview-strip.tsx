@@ -11,6 +11,7 @@ function PreviewStripItem({
   img,
   index,
   scanning,
+  compact,
   gallery,
   galleryIndex,
   onOpenGallery,
@@ -19,6 +20,7 @@ function PreviewStripItem({
   img: UploadedImage;
   index: number;
   scanning?: boolean;
+  compact?: boolean;
   gallery: ReturnType<typeof useUploadImageLightbox>["gallery"];
   galleryIndex: number;
   onOpenGallery: (index: number) => void;
@@ -41,7 +43,8 @@ function PreviewStripItem({
           galleryIndex={galleryIndex}
           onOpenGallery={onOpenGallery}
           className={cn(
-            "sc-glow-border h-16 w-16 sm:h-20 sm:w-20",
+            "sc-glow-border",
+            compact ? "h-14 w-14" : "h-16 w-16 sm:h-20 sm:w-20",
             scanning && "sc-laser-scan shadow-[0_0_12px_rgba(34,211,238,0.2)]",
           )}
         >
@@ -80,12 +83,14 @@ export function ImagePreviewStrip({
   onRemove,
   onReorder,
   scanning,
+  compact = false,
   className,
 }: {
   images: UploadedImage[];
   onRemove: (id: string) => void;
   onReorder: (from: number, to: number) => void;
   scanning?: boolean;
+  compact?: boolean;
   className?: string;
 }) {
   const lightbox = useUploadImageLightbox(images);
@@ -113,6 +118,7 @@ export function ImagePreviewStrip({
             img={img}
             index={index}
             scanning={scanning}
+            compact={compact}
             gallery={lightbox.gallery}
             galleryIndex={index}
             onOpenGallery={lightbox.openAt}

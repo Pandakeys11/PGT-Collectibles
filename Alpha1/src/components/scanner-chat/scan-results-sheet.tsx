@@ -147,7 +147,12 @@ export function ScanResultsSheet({
   if (specimens.length === 0) return null;
 
   return (
-    <div className={cn("sc-scan-sheet sc-glow-border overflow-hidden rounded-xl sc-glass-raised", className)}>
+    <div
+      className={cn(
+        "sc-scan-sheet sc-glow-border w-full min-w-0 max-w-full overflow-hidden rounded-xl sc-glass-raised",
+        className,
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 bg-white/[0.02] px-3 py-2">
         <div className="flex items-center gap-2">
           <Table2 className="h-3.5 w-3.5 text-emerald-400/90" aria-hidden />

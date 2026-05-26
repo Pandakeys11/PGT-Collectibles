@@ -11,7 +11,7 @@ import {
   buildScanSummaryFromSpecimens,
   specimenToCardMatch,
 } from "@/lib/scanner-chat/specimen-present";
-import { CardMatchResult } from "./card-match-result";
+import { ExtractedCardsCarousel } from "./extracted-cards-carousel";
 import { LiquidAskResponsePanel } from "./liquid-ask-response";
 import { LiquidChatOutputPanel } from "./liquid-chat-output";
 import { LiquidAskMarkdown } from "./liquid-ask-markdown";
@@ -22,6 +22,7 @@ import {
   type ScanResultsView,
 } from "./scan-results-view-toggle";
 import type { CardInteractionHandlers } from "./chat-message";
+import { cn } from "@/lib/cn";
 
 const MOBILE_RESULTS_MQ = "(max-width: 1023px)";
 
@@ -59,7 +60,7 @@ export function AIStreamingScanMessage({
     getMobileResultsSnapshot,
     getMobileResultsServerSnapshot,
   );
-  const [resultsView, setResultsView] = useState<ScanResultsView>("sheet");
+  const [resultsView, setResultsView] = useState<ScanResultsView>("cards");
 
   const isLiveScan = Boolean(message.streaming && !message.scanReport);
 
@@ -86,18 +87,25 @@ export function AIStreamingScanMessage({
   const showAskSpinner = !message.scanReport && !showResults && !message.output;
   const showDoneNarrative =
     !message.scanReport && !showAskSpinner && message.text.trim().length > 0 && !isLiveScan;
+  const wideEmbed =
+    message.output?.kind === "catalog" || message.output?.kind === "companion";
 
   return (
     <motion.article
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="flex gap-3"
+      className="flex w-full min-w-0 gap-3 max-lg:gap-0"
     >
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/25 to-sky-500/20 ring-1 ring-emerald-400/20 sm:h-8 sm:w-8 sm:rounded-xl">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/25 to-sky-500/20 ring-1 ring-emerald-400/20 max-lg:hidden sm:h-8 sm:w-8 sm:rounded-xl">
         <Sparkles className="h-3.5 w-3.5 text-emerald-300 sm:h-4 sm:w-4" />
       </div>
-      <div className="min-w-0 flex-1 space-y-2.5 sm:space-y-3">
+      <div
+        className={cn(
+          "min-w-0 flex-1 space-y-2.5 sm:space-y-3 max-lg:w-full",
+          wideEmbed && "sc-assistant-wide-embed",
+        )}
+      >
         {message.scanReport ? (
           <div className="space-y-2">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
@@ -143,7 +151,7 @@ export function AIStreamingScanMessage({
         ) : null}
 
         {showResults ? (
-          <div className="space-y-2">
+          <div className="sc-scan-results-block space-y-2 lg:space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                 {isLiveScan ? "Live scan sheet" : "Scan results"}
@@ -162,23 +170,17 @@ export function AIStreamingScanMessage({
                 onRowSelect={cardHandlers?.onSelectSpecimen}
               />
             ) : (
-              <div className="space-y-2">
-                {liveCards.map((card, i) => (
-                  <CardMatchResult
-                    key={card.id}
-                    card={card}
-                    index={i}
-                    stackPricing
-                    selected={cardHandlers?.selectedSpecimenId === card.specimenId}
-                    onSelect={cardHandlers?.onSelectSpecimen}
-                    onCorrectMatch={cardHandlers?.onCorrectMatch}
-                    onWrongMatch={cardHandlers?.onWrongMatch}
-                    onViewComps={cardHandlers?.onViewComps}
-                    onAddToCollection={cardHandlers?.onAddToCollection}
-                    onExclude={cardHandlers?.onExclude}
-                  />
-                ))}
-              </div>
+              <ExtractedCardsCarousel
+                cards={liveCards}
+                scannedAt={message.createdAt}
+                selectedSpecimenId={cardHandlers?.selectedSpecimenId}
+                onSelectSpecimen={cardHandlers?.onSelectSpecimen}
+                onCorrectMatch={cardHandlers?.onCorrectMatch}
+                onWrongMatch={cardHandlers?.onWrongMatch}
+                onViewComps={cardHandlers?.onViewComps}
+                onAddToCollection={cardHandlers?.onAddToCollection}
+                onExclude={cardHandlers?.onExclude}
+              />
             )}
           </div>
         ) : null}

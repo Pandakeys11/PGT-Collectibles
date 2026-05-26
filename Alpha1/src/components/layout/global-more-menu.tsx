@@ -6,39 +6,10 @@ import Link from "next/link";
 import { useLayoutEffect, useState } from "react";
 import { ThemeSwatchOrb, ThemeSwatchStrip } from "@/components/shell/theme-swatch";
 import { Button } from "@/components/ui/button";
-import {
-  DEFAULT_THEME_ID,
-  isThemeId,
-  THEME_GROUP_LABELS,
-  THEME_STORAGE_KEY,
-  THEMES,
-  type ThemeGroup,
-  type ThemeId,
-} from "@/lib/themes";
+import { applyTheme, readActiveTheme, THEME_CHANGE_EVENT } from "@/lib/apply-theme";
+import { themeEnergyLabel } from "@/lib/energy-theme";
+import { DEFAULT_THEME_ID, THEME_GROUP_LABELS, THEMES, type ThemeGroup, type ThemeId } from "@/lib/themes";
 import { cn } from "@/lib/cn";
-
-function applyTheme(id: ThemeId) {
-  document.documentElement.setAttribute("data-theme", id);
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, id);
-  } catch {
-    /* private mode */
-  }
-  window.dispatchEvent(new Event("pgt-theme-change"));
-}
-
-function readActiveTheme(): ThemeId {
-  if (typeof window === "undefined") return DEFAULT_THEME_ID;
-  try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored && isThemeId(stored)) return stored;
-  } catch {
-    /* ignore */
-  }
-  const attr = document.documentElement.getAttribute("data-theme");
-  if (attr && isThemeId(attr)) return attr;
-  return DEFAULT_THEME_ID;
-}
 
 const THEME_GROUPS: ThemeGroup[] = ["core", "tcg"];
 
@@ -48,8 +19,8 @@ function ThemePickerGrid({ onPick }: { onPick: () => void }) {
   useLayoutEffect(() => {
     setActiveId(readActiveTheme());
     const sync = () => setActiveId(readActiveTheme());
-    window.addEventListener("pgt-theme-change", sync);
-    return () => window.removeEventListener("pgt-theme-change", sync);
+    window.addEventListener(THEME_CHANGE_EVENT, sync);
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, sync);
   }, []);
 
   return (
@@ -88,6 +59,9 @@ function ThemePickerGrid({ onPick }: { onPick: () => void }) {
                         {active ? (
                           <Check className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
                         ) : null}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] font-medium leading-snug text-accent/90">
+                        {themeEnergyLabel(theme.id)}
                       </span>
                       <span className="mt-0.5 block text-[10px] leading-snug text-muted">{theme.hint}</span>
                     </span>

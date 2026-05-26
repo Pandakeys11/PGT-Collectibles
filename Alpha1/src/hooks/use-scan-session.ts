@@ -10,6 +10,7 @@ import { buildScanCardContext, pickCatalogContext } from "@/lib/scan/context-bui
 import { readResponseJson } from "@/lib/http/read-response-json";
 import {
   enrichExtractedCard,
+  fetchCatalogCandidates,
   flushRuntimeCaches,
 } from "@/lib/scan/enrich-client";
 import {
@@ -175,6 +176,9 @@ export function useScanSession(options?: { speedOn?: boolean }) {
   const [progress, setProgress] = useState<string | null>(null);
   const [rescanningId, setRescanningId] = useState<string | null>(null);
   const [enrichingSpecimenId, setEnrichingSpecimenId] = useState<string | null>(
+    null,
+  );
+  const [catalogRefreshingId, setCatalogRefreshingId] = useState<string | null>(
     null,
   );
   const [uploadQueuedCount, setUploadQueuedCount] = useState(0);
@@ -1189,6 +1193,57 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     [],
   );
 
+  const refreshCatalogCandidates = useCallback(async (id: string) => {
+    const item = specimensRef.current.find((entry) => entry.id === id);
+    if (!item || !hasMinimumIdentityForCatalog(item.card)) return;
+
+    setCatalogRefreshingId(id);
+    try {
+      const result = await fetchCatalogCandidates({
+        card: item.card,
+        existingCandidates: item.context.catalogCandidates,
+      });
+      const manualLock = hasUserCatalogOverride(item.context);
+
+      setSpecimens((current) =>
+        current.map((entry) => {
+          if (entry.id !== id) return entry;
+          return {
+            ...entry,
+            context: buildScanCardContext({
+              specimenId: id,
+              card: entry.card,
+              catalogId: manualLock ? entry.context.catalogId : result.catalogId,
+              catalogIdentityStatus: manualLock
+                ? entry.context.catalogIdentityStatus
+                : result.catalogIdentityStatus,
+              catalogConfidence: manualLock
+                ? entry.context.catalogConfidence
+                : result.catalogConfidence,
+              catalogCandidates: result.candidates,
+              identityEvidence:
+                result.identityEvidence.length > 0
+                  ? result.identityEvidence
+                  : entry.context.identityEvidence,
+              catalogImageUrl: manualLock
+                ? entry.context.catalogImageUrl
+                : result.catalogImageUrl ?? entry.context.catalogImageUrl,
+              marketEvidence: entry.context.marketEvidence,
+              marketSourceLinks: entry.context.marketSourceLinks,
+              fairValueUsd: entry.context.fairValueUsd,
+              fairValueBasis: entry.context.fairValueBasis,
+              year: entry.card.year ?? entry.context.year,
+            }),
+          };
+        }),
+      );
+    } catch {
+      // Keep current candidates if refresh fails.
+    } finally {
+      setCatalogRefreshingId((current) => (current === id ? null : current));
+    }
+  }, []);
+
   const confirmCatalogCandidate = useCallback(
     (id: string, candidate: CatalogCandidate) => {
       const currentItem = specimensRef.current.find((item) => item.id === id);
@@ -1415,6 +1470,7 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     enriching,
     rescanningId,
     enrichingSpecimenId,
+    catalogRefreshingId,
     error,
     scanLimit,
     clearScanLimit: () => setScanLimit(null),
@@ -1429,6 +1485,7 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     updateSpecimen,
     confirmCatalogCandidate,
     rejectCatalogCandidate,
+    refreshCatalogCandidates,
     flushManualEnrich,
     rescanSpecimen,
     setUserEvidenceCrop,

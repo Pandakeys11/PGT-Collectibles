@@ -4,6 +4,7 @@ import { useLayoutEffect, useState } from "react";
 import { ENERGY_UI, type EnergyUiTokens } from "@/lib/energy-ui";
 import { THEME_ENERGY_MAP } from "@/lib/energy-theme";
 import type { EnergyType } from "@/lib/energy-theme";
+import { THEME_CHANGE_EVENT } from "@/lib/apply-theme";
 import { DEFAULT_THEME_ID, isThemeId, THEME_STORAGE_KEY, type ThemeId } from "@/lib/themes";
 
 function readThemeId(): ThemeId {
@@ -30,8 +31,8 @@ export function useActiveThemeEnergy(): {
   useLayoutEffect(() => {
     const sync = () => setThemeId(readThemeId());
     sync();
-    window.addEventListener("pgt-theme-change", sync);
-    return () => window.removeEventListener("pgt-theme-change", sync);
+    window.addEventListener(THEME_CHANGE_EVENT, sync);
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, sync);
   }, []);
 
   const { primary, secondary } = THEME_ENERGY_MAP[themeId];

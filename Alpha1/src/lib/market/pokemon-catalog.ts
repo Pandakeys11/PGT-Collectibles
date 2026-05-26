@@ -8,8 +8,10 @@ import { parseCollectorFraction } from "@/lib/scan/collector-fraction";
 import {
   canonicalPromoSetName,
   normalizePromoCardIdentity,
+  promoSetNamesMatch,
   resolvePokemonPromoSet,
 } from "@/lib/scan/promo-set-aliases";
+import { pokemonTcgFetch } from "@/lib/pokemon-tcg-api-client";
 import {
   catalogHitMatchesPrintedTotal,
   isEditionOnlySetName,
@@ -238,25 +240,26 @@ function toCatalogMatch(
 
 async function fetchCatalogCards(
   query: string,
-  apiKey: string | undefined,
   pageSize: number,
+  options?: { orderByNumber?: boolean },
 ): Promise<PokemonTcgCard[]> {
-  const url = `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(query)}&pageSize=${pageSize}`;
-  const headers: HeadersInit = { Accept: "application/json" };
-  if (apiKey) headers["X-Api-Key"] = apiKey;
+  const order = options?.orderByNumber ? "&orderBy=number" : "";
+  const path = `/cards?q=${encodeURIComponent(query)}&pageSize=${pageSize}${order}`;
 
-  try {
-    const response = await fetch(url, {
-      headers,
-      next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!response.ok) return [];
-    const payload = (await response.json()) as { data?: PokemonTcgCard[] };
-    return payload.data ?? [];
-  } catch {
-    return [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await pokemonTcgFetch(path, {
+        kind: "scan",
+        cache: "no-store",
+      });
+      if (!response.ok) continue;
+      const payload = (await response.json()) as { data?: PokemonTcgCard[] };
+      return payload.data ?? [];
+    } catch {
+      if (attempt === 1) return [];
+    }
   }
+  return [];
 }
 
 type ScoredCatalogCandidate = CatalogCandidate & {
@@ -384,17 +387,27 @@ function scoreCatalogCandidate(
 
   const extractedSet = scoringCard.set?.trim() ?? "";
   const catalogSet = hit.set?.name ?? null;
+  const promoResolved = resolvePokemonPromoSet(extractedSet);
+  const promoSetIdMatch =
+    promoResolved != null &&
+    (hit.set?.id ?? "").trim().toLowerCase() === promoResolved.setId.toLowerCase();
   if (extractedSet && !isEditionOnlySetName(extractedSet)) {
-    if (setNamesMatch(catalogSet ?? undefined, extractedSet)) {
+    if (
+      setNamesMatch(catalogSet ?? undefined, extractedSet) ||
+      promoSetNamesMatch(catalogSet ?? undefined, extractedSet) ||
+      promoSetIdMatch
+    ) {
       score += pushEvidence(evidence, {
         field: "set",
         extracted: extractedSet,
-        catalog: catalogSet,
+        catalog: promoSetIdMatch ? `${catalogSet} (${hit.set?.id})` : catalogSet,
         status: "match",
-        weight: 18,
-        reason: "Set name agrees with catalog.",
+        weight: promoSetIdMatch ? 24 : 18,
+        reason: promoSetIdMatch
+          ? "Promo set id agrees with catalog."
+          : "Set name agrees with catalog.",
       });
-      reasons.push("set");
+      reasons.push(promoSetIdMatch ? "set.id" : "set");
     } else {
       score += pushEvidence(evidence, {
         field: "set",
@@ -601,6 +614,20 @@ function scoreCatalogCandidate(
   };
 }
 
+function topHasCollectorNumberMatch(top: ScoredCatalogCandidate): boolean {
+  return top.evidence.some(
+    (row) => row.field === "collector number" && row.status === "match",
+  );
+}
+
+function extractedExpectsCollectorNumber(card?: ExtractedCard): boolean {
+  if (!card?.number?.trim()) return false;
+  return (
+    parseCollectorFraction(card.number) != null ||
+    looksLikeCollectorNumber(card.number)
+  );
+}
+
 function resolveCatalogIdentityStatus(
   scored: ScoredCatalogCandidate[],
   card?: ExtractedCard,
@@ -611,9 +638,29 @@ function resolveCatalogIdentityStatus(
   const slabTrusted =
     hasReadableCertNumber(card?.cert) &&
     (card?.encapsulation === "graded_slab" || card?.visionLane === "graded");
-  if (top.score >= 90 && gap >= 15) return "confirmed";
-  if (top.score >= 85 && scored.length === 1) return "confirmed";
-  if (slabTrusted && top.score >= 82 && gap >= 8 && top.reasons.includes("slab label")) {
+  const expectsNumber = extractedExpectsCollectorNumber(card);
+  const numberOk = topHasCollectorNumberMatch(top);
+  const nameConflict = top.conflicts.includes("name conflict");
+
+  const canConfirm = (scoreFloor: number, gapFloor: number) => {
+    if (nameConflict) return false;
+    if (top.score < scoreFloor || gap < gapFloor) return false;
+    if (expectsNumber && !numberOk) return false;
+    return true;
+  };
+
+  if (canConfirm(90, 15)) return "confirmed";
+  if (top.score >= 85 && scored.length === 1 && !nameConflict) {
+    if (!expectsNumber || numberOk) return "confirmed";
+  }
+  if (
+    slabTrusted &&
+    top.score >= 82 &&
+    gap >= 8 &&
+    top.reasons.includes("slab label") &&
+    !nameConflict &&
+    (!expectsNumber || numberOk)
+  ) {
     return "confirmed";
   }
   if (top.score >= 75 && gap >= 10) return "likely";
@@ -637,62 +684,84 @@ function buildCatalogQueries(
 
   const name = (searchCard.name?.trim() || searchCard.printedName?.trim() || "").trim();
   if (!name) return [];
-  const queries: string[] = [];
+  const strict: string[] = [];
+  const broad: string[] = [];
   const frac = parseCollectorFraction(searchCard.number);
   const setName = searchCard.set?.trim();
   const number = searchCard.number?.trim();
-  const promoSet = resolvePokemonPromoSet(setName);
+  const promoSet =
+    resolvePokemonPromoSet(setName) ?? resolvePokemonPromoSet(promoNorm.set);
 
+  if (promoSet && number) {
+    strict.push(
+      `set.id:${promoSet.setId} name:"${escapeQueryValue(name)}" number:"${escapeQueryValue(number)}"`,
+    );
+  }
+  if (promoSet && frac) {
+    strict.push(
+      `set.id:${promoSet.setId} name:"${escapeQueryValue(name)}" number:"${escapeQueryValue(frac.num)}"`,
+    );
+  }
   if (setName && number && !isEditionOnlySetName(setName)) {
-    queries.push(
+    strict.push(
       `name:"${escapeQueryValue(name)}" set.name:"${escapeQueryValue(setName)}" number:"${escapeQueryValue(number)}"`,
     );
   }
-  if (promoSet && number) {
-    queries.push(
-      `set.id:${promoSet.setId} name:"${escapeQueryValue(name)}" number:"${escapeQueryValue(number)}"`,
-    );
-  } else if (promoSet) {
-    queries.push(`set.id:${promoSet.setId} name:"${escapeQueryValue(name)}"`);
-  }
   for (const alias of aliases) {
-    queries.push(`id:${alias.tcgdexId}`);
-    queries.push(`name:"${escapeQueryValue(alias.englishName)}"`);
+    strict.push(`id:${alias.tcgdexId}`);
     if (alias.englishNumber) {
-      queries.push(
+      strict.push(
         `name:"${escapeQueryValue(alias.englishName)}" number:"${escapeQueryValue(alias.englishNumber)}"`,
       );
     }
+    if (alias.englishSetName && alias.englishNumber) {
+      strict.push(
+        `name:"${escapeQueryValue(alias.englishName)}" set.name:"${escapeQueryValue(alias.englishSetName)}" number:"${escapeQueryValue(alias.englishNumber)}"`,
+      );
+    }
+    broad.push(`name:"${escapeQueryValue(alias.englishName)}"`);
     if (alias.englishSetName) {
-      queries.push(
+      broad.push(
         `name:"${escapeQueryValue(alias.englishName)}" set.name:"${escapeQueryValue(alias.englishSetName)}"`,
       );
     }
   }
 
   if (frac) {
-    queries.push(
+    broad.push(
       `name:"${escapeQueryValue(name)}" number:"${escapeQueryValue(frac.num)}"`,
     );
   } else if (number && looksLikeCollectorNumber(number)) {
     const head = number.split("/")[0]?.trim();
     if (head) {
-      queries.push(
+      broad.push(
         `name:"${escapeQueryValue(name)}" number:"${escapeQueryValue(head)}"`,
       );
     }
   }
+  if (promoSet) {
+    broad.push(`set.id:${promoSet.setId} name:"${escapeQueryValue(name)}"`);
+  }
   if (setName && !isEditionOnlySetName(setName)) {
-    queries.push(
+    broad.push(
       `name:"${escapeQueryValue(name)}" set.name:"${escapeQueryValue(setName)}"`,
     );
   }
-  queries.push(`name:"${escapeQueryValue(name)}"`);
-  return Array.from(new Set(queries)).slice(0, 6);
+  broad.push(`name:"${escapeQueryValue(name)}"`);
+  return Array.from(new Set([...strict, ...broad])).slice(0, MAX_LIVE_CATALOG_QUERIES);
 }
 
 const LIVE_CATALOG_PAGE_SIZE = 28;
 const MAX_LIVE_CATALOG_QUERIES = 6;
+const DEEP_CATALOG_PAGE_SIZE = 50;
+const DEEP_CATALOG_MAX_QUERIES = 8;
+const DEEP_CATALOG_MIN_HITS = 24;
+export const MAX_CATALOG_CANDIDATE_ROWS = 16;
+
+type CollectCatalogHitsOptions = {
+  /** Run more API queries and keep a wider hit pool for manual pick lists. */
+  deep?: boolean;
+};
 
 function needsTcgDexAliasLookup(card: ExtractedCard): boolean {
   const lang = (card.language ?? "").trim();
@@ -705,61 +774,55 @@ function needsTcgDexAliasLookup(card: ExtractedCard): boolean {
 async function collectCatalogHits(
   cardForSearch: ExtractedCard,
   aliases: TcgDexAlias[],
-  apiKey: string | undefined,
+  options?: CollectCatalogHitsOptions,
 ): Promise<PokemonTcgCard[]> {
-  const queries = buildCatalogQueries(cardForSearch, aliases).slice(
-    0,
-    MAX_LIVE_CATALOG_QUERIES,
-  );
+  const deep = options?.deep === true;
+  const maxQueries = deep ? DEEP_CATALOG_MAX_QUERIES : MAX_LIVE_CATALOG_QUERIES;
+  const pageSize = deep ? DEEP_CATALOG_PAGE_SIZE : LIVE_CATALOG_PAGE_SIZE;
+  const minHitsBeforeStop = deep ? DEEP_CATALOG_MIN_HITS : 8;
+
+  const queries = buildCatalogQueries(cardForSearch, aliases).slice(0, maxQueries);
   const seen = new Set<string>();
   const hits: PokemonTcgCard[] = [];
 
   for (const query of queries) {
-    const batch = await fetchCatalogCards(query, apiKey, LIVE_CATALOG_PAGE_SIZE);
+    const batch = await fetchCatalogCards(query, pageSize, {
+      orderByNumber: /\bnumber:/.test(query),
+    });
     for (const hit of batch) {
       if (seen.has(hit.id)) continue;
       seen.add(hit.id);
       hits.push(hit);
     }
-    if (hits.length >= 8) {
+    if (hits.length >= minHitsBeforeStop) {
       const scored = hits
         .map((hit) => scoreCatalogCandidate(cardForSearch, hit, aliases))
         .sort((a, b) => b.score - a.score)
-        .slice(0, 8);
+        .slice(0, MAX_CATALOG_CANDIDATE_ROWS);
       const status = resolveCatalogIdentityStatus(scored, cardForSearch);
       const top = scored[0];
-      if (status === "confirmed" && top && top.score >= 85) break;
+      if (!deep && status === "confirmed" && top && top.score >= 85) break;
+      if (deep && status === "confirmed" && top && top.score >= 92 && scored.length >= 6) {
+        break;
+      }
     }
   }
 
   return hits;
 }
 
-export async function matchPokemonCatalog(
+function buildCatalogMatchFromHits(
+  cardForSearch: ExtractedCard,
   card: ExtractedCard,
-): Promise<CatalogMatch | null> {
-  if (!inferCardFranchise(card).isPokemon) return null;
-  const searchName = effectiveCatalogSearchName(card);
-  if (!searchName) return null;
-
-  const promoNorm = normalizePromoCardIdentity({ set: card.set, number: card.number });
-  const cardForSearch = {
-    ...card,
-    name: searchName,
-    set: canonicalPromoSetName(promoNorm.set) ?? promoNorm.set ?? card.set,
-    number: promoNorm.number ?? card.number,
-  };
-  const apiKey = process.env.POKEMON_TCG_API_KEY?.trim();
-  const aliases = needsTcgDexAliasLookup(card)
-    ? await resolveTcgDexAliases(card)
-    : [];
-  const hits = await collectCatalogHits(cardForSearch, aliases, apiKey);
+  hits: PokemonTcgCard[],
+  aliases: TcgDexAlias[],
+): CatalogMatch | null {
   if (hits.length === 0) return null;
 
   const scored = hits
     .map((hit) => scoreCatalogCandidate(cardForSearch, hit, aliases))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
-    .slice(0, 12);
+    .slice(0, MAX_CATALOG_CANDIDATE_ROWS);
   const top = scored[0];
   if (!top) return null;
 
@@ -785,4 +848,47 @@ export async function matchPokemonCatalog(
     candidates,
     evidence: top.evidence,
   });
+}
+
+/** Wide master-catalog search for manual pick UI (Pokédex-aligned API). */
+export async function suggestPokemonCatalogCandidates(
+  card: ExtractedCard,
+): Promise<CatalogMatch | null> {
+  if (!inferCardFranchise(card).isPokemon) return null;
+  const searchName = effectiveCatalogSearchName(card);
+  if (!searchName) return null;
+
+  const promoNorm = normalizePromoCardIdentity({ set: card.set, number: card.number });
+  const cardForSearch = {
+    ...card,
+    name: searchName,
+    set: canonicalPromoSetName(promoNorm.set) ?? promoNorm.set ?? card.set,
+    number: promoNorm.number ?? card.number,
+  };
+  const aliases = needsTcgDexAliasLookup(card)
+    ? await resolveTcgDexAliases(card)
+    : [];
+  const hits = await collectCatalogHits(cardForSearch, aliases, { deep: true });
+  return buildCatalogMatchFromHits(cardForSearch, card, hits, aliases);
+}
+
+export async function matchPokemonCatalog(
+  card: ExtractedCard,
+): Promise<CatalogMatch | null> {
+  if (!inferCardFranchise(card).isPokemon) return null;
+  const searchName = effectiveCatalogSearchName(card);
+  if (!searchName) return null;
+
+  const promoNorm = normalizePromoCardIdentity({ set: card.set, number: card.number });
+  const cardForSearch = {
+    ...card,
+    name: searchName,
+    set: canonicalPromoSetName(promoNorm.set) ?? promoNorm.set ?? card.set,
+    number: promoNorm.number ?? card.number,
+  };
+  const aliases = needsTcgDexAliasLookup(card)
+    ? await resolveTcgDexAliases(card)
+    : [];
+  const hits = await collectCatalogHits(cardForSearch, aliases);
+  return buildCatalogMatchFromHits(cardForSearch, card, hits, aliases);
 }

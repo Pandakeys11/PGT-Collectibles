@@ -93,3 +93,10 @@ export const THEME_ENERGY_MAP: Record<ThemeId, { primary: EnergyType; secondary:
   "hoenn-dawn": { primary: "grass", secondary: "fighting" },
   "rainbow-chase": { primary: "dragon", secondary: "psychic" },
 };
+
+/** Human-readable energy pair for a theme preset (single source of truth for UI copy). */
+export function themeEnergyLabel(id: ThemeId): string {
+  const { primary, secondary } = THEME_ENERGY_MAP[id];
+  if (primary === secondary) return ENERGY_LABELS[primary];
+  return `${ENERGY_LABELS[primary]} + ${ENERGY_LABELS[secondary]}`;
+}

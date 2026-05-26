@@ -388,20 +388,25 @@ export function PokedexBrowser({
     let cancelled = false;
     setRarityCountsLoading(true);
     setRarityCounts(null);
-    void fetchJson<{ counts: Record<RarityBucketId, number> }>(
-      `/api/pokedex/cards/rarity-counts?setId=${encodeURIComponent(selectedSetId)}`,
-    )
-      .then((payload) => {
-        if (!cancelled) setRarityCounts(payload.counts);
-      })
-      .catch(() => {
-        if (!cancelled) setRarityCounts(null);
-      })
-      .finally(() => {
-        if (!cancelled) setRarityCountsLoading(false);
-      });
+    // Let the card grid hit pokemontcg.io first — rarity-counts runs 5 API queries in parallel.
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      void fetchJson<{ counts: Record<RarityBucketId, number> }>(
+        `/api/pokedex/cards/rarity-counts?setId=${encodeURIComponent(selectedSetId)}`,
+      )
+        .then((payload) => {
+          if (!cancelled) setRarityCounts(payload.counts);
+        })
+        .catch(() => {
+          if (!cancelled) setRarityCounts(null);
+        })
+        .finally(() => {
+          if (!cancelled) setRarityCountsLoading(false);
+        });
+    }, 1000);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [selectedSetId]);
 

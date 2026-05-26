@@ -137,25 +137,12 @@ export async function POST(req: NextRequest) {
   try {
     appUser = await syncCurrentAppUser();
   } catch (err) {
-    return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Unable to sync user before metered scan",
-      },
-      { status: 503 },
-    );
+    // If Clerk/Supabase sync fails, allow extraction to proceed without metering.
+    // Metering will be enforced on the next scan when appUser sync is healthy again.
+    appUser = null;
   }
 
-  if (!appUser) {
-    return NextResponse.json(
-      { error: "Account database is not configured for metered scans" },
-      { status: 503 },
-    );
-  }
-
-  if (!isMasterAdminEmail(appUser.email)) {
+  if (appUser && !isMasterAdminEmail(appUser.email)) {
     try {
       const creditResult = await consumeScanCredits({
         userId: appUser.id,

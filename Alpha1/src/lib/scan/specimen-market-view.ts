@@ -70,14 +70,40 @@ const SOURCE_BRAND: Record<
   fanatics: { accent: "#1d4ed8", tagline: "Fanatics Collect" },
 };
 
+/** Prefer dated comps inside the evidence age window; fall back to undated rows. */
+function preferRecentEvidence(items: MarketEvidence[]): MarketEvidence[] {
+  const maxAgeMs =
+    (Number(process.env.MARKET_MAX_EVIDENCE_AGE_DAYS) > 30
+      ? Number(process.env.MARKET_MAX_EVIDENCE_AGE_DAYS)
+      : 460) *
+    24 *
+    60 *
+    60 *
+    1000;
+  const now = Date.now();
+  const dated = items.filter((i) => {
+    const ms = evidenceTimeMs(i);
+    return ms > 0 && now - ms <= maxAgeMs;
+  });
+  if (dated.length >= 1) {
+    const undated = items.filter((i) => !dated.includes(i));
+    return [...sortEvidenceNewestFirst(dated), ...undated];
+  }
+  return items;
+}
+
 function buildHighlight(
   evidence: MarketEvidence[],
   bucket: GradeBucketId,
 ): GradeHighlightView {
   const matcher = GRADE_MATCHERS[bucket];
   const pool = evidence.filter(matcher);
-  const sold = sortEvidenceNewestFirst(pool.filter((i) => i.kind === "sold"));
-  const active = sortEvidenceNewestFirst(pool.filter((i) => i.kind === "active"));
+  const sold = sortEvidenceNewestFirst(
+    preferRecentEvidence(pool.filter((i) => i.kind === "sold")),
+  );
+  const active = sortEvidenceNewestFirst(
+    preferRecentEvidence(pool.filter((i) => i.kind === "active")),
+  );
   const fmv = deriveFairValueResult(pool);
 
   return {

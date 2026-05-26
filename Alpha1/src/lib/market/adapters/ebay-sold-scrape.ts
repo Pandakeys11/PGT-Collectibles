@@ -43,7 +43,9 @@ function stripTags(value: string): string {
 function inferSlab(hay: string): string | null {
   if (/bgs.*black\s*label|black\s*label/i.test(hay)) return "BGS Black Label";
   if (/psa\s*10/i.test(hay)) return "PSA 10";
-  if (/cgc/i.test(hay) && /cgc\s*10(\.0)?\b/i.test(hay)) return "CGC 10";
+  if (/cgc/i.test(hay) && (/pristine/i.test(hay) || /cgc\s*10(\.0)?\b/i.test(hay))) {
+    return /pristine/i.test(hay) ? "CGC Pristine 10" : "CGC 10";
+  }
   if (/psa\s*9\b|cgc\s*9\b|bgs\s*9\b/i.test(hay)) return "PSA 9";
   return null;
 }

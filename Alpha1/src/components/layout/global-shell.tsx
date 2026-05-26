@@ -24,7 +24,7 @@ export function GlobalShell({
   if (isCommandCenter) {
     return (
       <SpriteManifestProvider>
-        <div className="relative min-h-screen">{children}</div>
+        <div className="relative min-h-screen w-full max-w-[100vw] overflow-x-hidden">{children}</div>
       </SpriteManifestProvider>
     );
   }

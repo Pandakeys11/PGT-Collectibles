@@ -145,7 +145,7 @@ export function ScannerChatShell() {
   );
 
   return (
-    <div className="scanner-chat-root flex h-[100dvh] flex-col overflow-hidden">
+    <div className="scanner-chat-root flex h-[100dvh] w-full max-w-[100vw] flex-col overflow-hidden">
       <Suspense fallback={null}>
         <LiquidScanPanelBootstrap
           onOpenCatalog={chat.openCatalogOutput}
@@ -166,7 +166,7 @@ export function ScannerChatShell() {
         scanning={chat.isBusy}
         quota={quota}
       />
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 w-full min-w-0 flex-1">
         <ScannerSidebar
           mobileOpen={chat.sidebarOpen}
           onMobileClose={() => chat.setSidebarOpen(false)}
@@ -179,6 +179,12 @@ export function ScannerChatShell() {
           historyExpanded={chat.historyExpanded}
           onToggleHistory={() => chat.setHistoryExpanded((v) => !v)}
           onLoadSession={(id) => void chat.loadSession(id)}
+          onDeleteSession={(id) => void chat.deleteSession(id)}
+          onClearRecentSessions={() => void chat.clearRecentSessions()}
+          clearingHistory={chat.clearingHistory}
+          onSaveScan={() => void chat.saveToCollection()}
+          canSaveScan={chat.specimens.length > 0}
+          savingScan={chat.saving}
           onNav={(id: SidebarNavId) => {
             if (id === "catalog") chat.openCatalogOutput();
             else if (id === "companion") chat.openCompanionOutput();
@@ -191,12 +197,12 @@ export function ScannerChatShell() {
             }
           }}
         />
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex w-full min-w-0 flex-1 flex-col">
           <div
             ref={feedRef}
-            className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 scanner-chat-scrollbar"
+            className="sc-mobile-feed sc-desktop-chat-feed flex-1 overflow-y-auto overflow-x-hidden py-4 sm:px-6 lg:px-5 lg:py-5 xl:px-6 scanner-chat-scrollbar"
           >
-            <div className="mx-auto max-w-3xl space-y-3">
+            <div className="sc-mobile-feed-inner sc-desktop-feed-inner mx-auto w-full max-w-3xl space-y-3 lg:max-w-none">
               <div className="lg:hidden">
                 <ScanQuotaTip quota={quota} />
               </div>
@@ -270,12 +276,15 @@ export function ScannerChatShell() {
             onSelectSpecimen={chat.setSelectedSpecimenId}
             onConfirmCandidate={chat.handleConfirmCandidate}
             onRejectCandidate={chat.handleRejectCandidate}
+            onRefreshCatalogCandidates={chat.handleRefreshCatalogCandidates}
+            refreshingCatalogCandidates={chat.refreshingCatalogCandidates}
             onExport={handleExport}
             onNewScan={chat.resetScan}
             onReviewUncertain={reviewUncertain}
             onSaveCollection={() => void chat.saveToCollection()}
             saveStatus={chat.saveStatus}
             saving={chat.saving}
+            loadedSessionId={chat.loadedSessionId}
             historyRefreshKey={chat.historyRefreshKey}
             compsSectionRef={chat.compsSectionRef}
             isPro={isPro}
@@ -330,10 +339,13 @@ export function ScannerChatShell() {
         onSelectSpecimen={chat.setSelectedSpecimenId}
         onConfirmCandidate={chat.handleConfirmCandidate}
         onRejectCandidate={chat.handleRejectCandidate}
+        onRefreshCatalogCandidates={chat.handleRefreshCatalogCandidates}
+        refreshingCatalogCandidates={chat.refreshingCatalogCandidates}
         onExport={handleExport}
         onSaveCollection={() => void chat.saveToCollection()}
         saveStatus={chat.saveStatus}
         saving={chat.saving}
+        loadedSessionId={chat.loadedSessionId}
         historyRefreshKey={chat.historyRefreshKey}
         onNewScan={chat.resetScan}
         compsSectionRef={chat.compsSectionRef}

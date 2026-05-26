@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enrichCacheKey, getEnrichMarketCache, setEnrichMarketCache } from "@/lib/market/enrich-cache";
-import { matchCatalogWithFallback } from "@/lib/market/catalog-router";
+import { matchCatalogForEnrich } from "@/lib/market/catalog-router";
 import { hydrateRegistryFromCard } from "@/lib/market/hydrate-registry-from-card";
 import { researchCardMarket } from "@/lib/market/research";
-import { catalogMatchIsAuthoritative, mergeExtractedCardWithCatalog } from "@/lib/scan/catalog-merge";
+import {
+  catalogMatchIsAuthoritative,
+  mergeExtractedCardWithCatalog,
+  resolveCatalogImageUrl,
+} from "@/lib/scan/catalog-merge";
 import { buildScanCardContext } from "@/lib/scan/context-builder";
 import { mergeRegistrySlabIntoCard, normalizeGradedSlabFields } from "@/lib/scan/graded-slab";
 import { classifyCardLane } from "@/lib/scan/lane";
@@ -160,11 +164,10 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const catalog = await matchCatalogWithFallback(inputCard);
+  const catalog = await matchCatalogForEnrich(inputCard);
   const mergedCard = mergeExtractedCardWithCatalog(inputCard, catalog);
   const authoritativeCatalog = catalogMatchIsAuthoritative(catalog, mergedCard);
-  const resolvedCatalogImageUrl =
-    authoritativeCatalog ? (catalog?.imageSmallUrl ?? catalog?.imageLargeUrl ?? catalog?.imageUrl ?? null) : null;
+  const resolvedCatalogImageUrl = resolveCatalogImageUrl(catalog, mergedCard);
 
   if (phase === "catalog") {
     const context = buildScanCardContext({

@@ -11,6 +11,7 @@ import {
   type MarketSourceId,
 } from "@/lib/market/sources";
 import { collectApiMarketEvidence } from "@/lib/market/adapters/run-api-evidence";
+import { collectPremiumGradeLanes } from "@/lib/market/collect-premium-grade-lanes";
 import { harvestGradedMarketEvidence } from "@/lib/market/graded-sales-harvest";
 import { classifyCardLane } from "@/lib/scan/lane";
 import { sanitizeEvidenceList } from "@/lib/market/evidence-dates";
@@ -330,6 +331,16 @@ export async function researchCardMarket(card: ExtractedCard): Promise<{
   const apiEvidence = await withTimeout(collectApiMarketEvidence(card), 15_000, "market api adapters").catch(
     () => [],
   );
+
+  const rawSoldForLanes = apiEvidence.filter(
+    (item) => item.kind === "sold" && /ebay/i.test(item.source ?? ""),
+  );
+  const premiumGradeLanes = await withTimeout(
+    collectPremiumGradeLanes(card, rawSoldForLanes),
+    26_000,
+    "premium grade lanes",
+  ).catch(() => []);
+
   const { bundles, heuristicEvidence } = await withTimeout(
     collectSourceSnippets(card),
     20_000,
@@ -338,6 +349,7 @@ export async function researchCardMarket(card: ExtractedCard): Promise<{
 
   const evidence: MarketEvidence[] = [
     ...apiEvidence,
+    ...premiumGradeLanes,
     ...(gradedHarvest?.evidence ?? []),
     ...heuristicEvidence,
   ];
@@ -355,7 +367,9 @@ export async function researchCardMarket(card: ExtractedCard): Promise<{
     evidence.push(...chunk);
   }
 
-  const marketEvidence = decorateEvidence(rankEvidence(dedupeEvidence(sanitizeEvidenceList(evidence))).slice(0, 36));
+  const marketEvidence = decorateEvidence(
+    rankEvidence(dedupeEvidence(sanitizeEvidenceList(evidence))).slice(0, 48),
+  );
   const { fairValueUsd, fairValueBasis } = deriveFairValueResult(marketEvidence, {
     card,
     gradeCard: card,

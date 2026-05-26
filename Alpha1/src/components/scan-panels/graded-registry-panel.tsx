@@ -1,9 +1,10 @@
 "use client";
 
-import { ExternalLink, Loader2 } from "lucide-react";
+import { AlertTriangle, BadgeCheck, CircleHelp, ExternalLink, Loader2 } from "lucide-react";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import { cn } from "@/lib/cn";
 import { hasReadableCertNumber, isCertNotApplicable } from "@/lib/scan/graded-slab";
+import { sortEvidenceNewestFirst } from "@/lib/scan/market-intelligence";
 
 export function specimenShowsGradedRegistry(
   specimen: Pick<ScanSpecimen, "card" | "context"> | null,
@@ -15,6 +16,18 @@ export function specimenShowsGradedRegistry(
 function normalizeSupplyText(value: string | null | undefined): string | null {
   const text = value?.trim();
   return text && text.length > 0 ? text : null;
+}
+
+function formatUsd(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `$${Math.round(value).toLocaleString()}`;
+}
+
+function formatEvidenceDate(iso: string | null | undefined): string {
+  if (!iso) return "Best-effort match";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Best-effort match";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export function GradedRegistryPanel({
@@ -42,6 +55,24 @@ export function GradedRegistryPanel({
   ).length;
   const extra = normalizeSupplyText(supplementalSupply);
   const showExtra = Boolean(extra && extra !== population);
+
+  const certDigits = hasReadableCertNumber(specimen.card.cert)
+    ? (specimen.card.cert ?? "").replace(/\D/g, "")
+    : null;
+
+  const certField =
+    specimen.context.verificationFields?.find((f) => f.field === "cert") ?? null;
+  const certFieldStatus = certField?.status ?? "unverified";
+
+  const certLookupReady = Boolean(registryUrl);
+  const certLookupVerified = Boolean(population && registryUrl);
+
+  const certSoldRows = sortEvidenceNewestFirst(
+    specimen.context.certMarketEvidence ?? [],
+  )
+    .filter((r) => r.kind === "sold")
+    .slice(0, 3);
+
   const metaLine = [
     certProvider ? `Source: ${certProvider.replace(/_/g, " ")}` : null,
     certGradeDate ? `Graded ${certGradeDate}` : null,
@@ -181,6 +212,136 @@ export function GradedRegistryPanel({
             Add a readable cert number and run enrich to load population.
           </p>
         )}
+
+        {certDigits ? (
+          <div
+            className={cn(
+              "mt-3 rounded-lg border bg-white/[0.02] p-2.5",
+              compact ? "px-2 py-2" : "p-2.5",
+            )}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-faint">
+                Cert verification
+              </p>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium",
+                  certLookupVerified
+                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+                    : certLookupReady
+                      ? "border-amber-500/25 bg-amber-500/10 text-amber-200"
+                      : "border-white/10 bg-white/5 text-slate-300",
+                )}
+              >
+                {certLookupVerified ? (
+                  <BadgeCheck className="h-3 w-3" aria-hidden />
+                ) : certLookupReady ? (
+                  <CircleHelp className="h-3 w-3" aria-hidden />
+                ) : (
+                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                )}
+                {certLookupVerified
+                  ? "Verified"
+                  : certLookupReady
+                    ? "Lookup loaded"
+                    : "Not loaded"}
+              </span>
+            </div>
+
+            <div className="mt-2 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-slate-300">
+                  Cert # <span className="font-mono text-slate-100">{certDigits}</span>
+                  {certProvider ? (
+                    <>
+                      {" "}
+                      · Source:{" "}
+                      <span className="text-slate-200">{certProvider.replace(/_/g, " ")}</span>
+                    </>
+                  ) : null}
+                </p>
+                {certGradeDate ? <p className="text-[11px] text-muted">Graded {certGradeDate}</p> : null}
+              </div>
+
+              <div className="flex items-center gap-2 text-[11px] text-muted">
+                {certFieldStatus === "verified" ? (
+                  <BadgeCheck className="h-4 w-4 text-emerald-400" aria-hidden />
+                ) : certFieldStatus === "mismatch" ? (
+                  <AlertTriangle className="h-4 w-4 text-rose-300" aria-hidden />
+                ) : (
+                  <CircleHelp className="h-4 w-4 text-amber-200" aria-hidden />
+                )}
+                <span>
+                  Vision ↔ registry check:{" "}
+                  <span className="text-slate-200">
+                    {certFieldStatus === "verified"
+                      ? "cert matches"
+                      : certFieldStatus === "mismatch"
+                        ? "cert mismatch"
+                        : "cert not verified"}
+                  </span>
+                </span>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-faint">
+                  This exact cert — last sold
+                </p>
+                {certSoldRows.length > 0 ? (
+                  <ul className={cn("mt-2 space-y-1", compact ? "text-[11px]" : "text-[11px]")}>
+                    {certSoldRows.map((row) => (
+                      <li
+                        key={`${row.url ?? row.title}|${row.priceUsd ?? ""}`}
+                        className="flex items-start justify-between gap-3 rounded-md bg-white/[0.03] px-2 py-1.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-slate-200">{row.title}</p>
+                          <p className="text-[10px] text-muted">{formatEvidenceDate(row.observedAt)}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="font-mono text-[11px] text-slate-100 tabular-nums">
+                            {formatUsd(row.priceUsd)}
+                          </p>
+                          {row.url ? (
+                            <a
+                              href={row.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-1 inline-flex items-center gap-1 text-[10px] text-accent hover:underline"
+                            >
+                              Open
+                              <ExternalLink className="h-3 w-3" aria-hidden />
+                            </a>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-[11px] text-muted">
+                    No exact-cert sold comps captured yet. Similar grade comps are shown in the Market rail.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <p className="text-[10px] text-faint">Similar sales (same grade)</p>
+                {specimen.context.ebaySoldSearchUrl ? (
+                  <a
+                    href={specimen.context.ebaySoldSearchUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline"
+                  >
+                    eBay sold search
+                    <ExternalLink className="h-3 w-3" aria-hidden />
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );

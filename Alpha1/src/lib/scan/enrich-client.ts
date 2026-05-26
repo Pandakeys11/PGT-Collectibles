@@ -90,3 +90,35 @@ export async function enrichExtractedCard(args: {
 
   throw new Error(lastError);
 }
+
+export type CatalogCandidatesPayload = {
+  candidates: ScanCardContext["catalogCandidates"];
+  catalogIdentityStatus: ScanCardContext["catalogIdentityStatus"];
+  catalogConfidence: number;
+  catalogId: string | null;
+  catalogImageUrl: string | null;
+  identityEvidence: ScanCardContext["identityEvidence"];
+  catalogMatched: boolean;
+};
+
+/** Deep master-catalog / Pokédex search for manual identity pick. */
+export async function fetchCatalogCandidates(args: {
+  card: ExtractedCard;
+  existingCandidates?: ScanCardContext["catalogCandidates"];
+}): Promise<CatalogCandidatesPayload> {
+  const response = await fetch("/api/scan/catalog-candidates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      card: args.card,
+      existingCandidates: args.existingCandidates,
+    }),
+    signal: AbortSignal.timeout(45_000),
+  });
+
+  const data = await readResponseJson<CatalogCandidatesPayload & { error?: string }>(response);
+  if (!response.ok) {
+    throw new Error(data.error || `Catalog search failed (${response.status})`);
+  }
+  return data;
+}

@@ -65,7 +65,7 @@ export function LiquidScanAuthShowcase() {
                       <Icon className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
                       <p className="text-sm font-medium text-slate-100">{step.title}</p>
                     </div>
-                    <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{step.body}</p>
+                    <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{step.hook}</p>
                   </div>
                 </li>
               );

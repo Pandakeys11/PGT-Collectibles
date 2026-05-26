@@ -87,6 +87,38 @@ export function catalogMatchIsAuthoritative(
   return false;
 }
 
+function catalogHasCollectorNumberAgreement(catalog: CatalogMatch): boolean {
+  return catalog.identityEvidence.some(
+    (row) => row.field === "collector number" && row.status === "match",
+  );
+}
+
+/**
+ * Official catalog art for thumbnails — stricter than field merge.
+ * Confirmed / trusted-slab matches always qualify; high-confidence likely
+ * matches qualify when name + collector number agree (no name conflict).
+ */
+export function resolveCatalogImageUrl(
+  catalog: CatalogMatch | null,
+  card?: ExtractedCard,
+): string | null {
+  if (!catalog) return null;
+  const url =
+    catalog.imageSmallUrl ?? catalog.imageLargeUrl ?? catalog.imageUrl ?? null;
+  if (!url) return null;
+  if (catalogMatchIsAuthoritative(catalog, card)) return url;
+
+  if (catalog.catalogIdentityStatus !== "likely") return null;
+  if (catalog.candidates[0]?.conflicts?.includes("name conflict")) return null;
+  const runnerScore = catalog.candidates[1]?.score ?? 0;
+  const gap = catalog.score - runnerScore;
+  if (catalog.score < 86 || gap < 12) return null;
+
+  const expectsNumber = Boolean(card?.number?.trim());
+  if (!expectsNumber) return url;
+  return catalogHasCollectorNumberAgreement(catalog) ? url : null;
+}
+
 /** User explicitly selected a catalog row (Select in catalog panel). */
 export function hasUserCatalogOverride(context: {
   catalogId: string | null;

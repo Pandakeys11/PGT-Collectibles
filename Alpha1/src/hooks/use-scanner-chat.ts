@@ -104,8 +104,10 @@ export function useScannerChat() {
     selectedId,
     confirmCatalogCandidate,
     rejectCatalogCandidate,
+    refreshCatalogCandidates,
     removeSpecimen,
     enrichingSpecimenId,
+    catalogRefreshingId,
     hydrateSavedSession,
     ingestCatalogPrefill,
     rescanSpecimen,
@@ -131,6 +133,7 @@ export function useScannerChat() {
   const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
   const [loadingSession, setLoadingSession] = useState(false);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
+  const [clearingHistory, setClearingHistory] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(true);
   const [isAsking, setIsAsking] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -503,6 +506,14 @@ export function useScannerChat() {
     [rejectCatalogCandidate, selectedSpecimenId],
   );
 
+  const handleRefreshCatalogCandidates = useCallback(() => {
+    if (!selectedSpecimenId) return;
+    void refreshCatalogCandidates(selectedSpecimenId);
+  }, [refreshCatalogCandidates, selectedSpecimenId]);
+
+  const refreshingCatalogCandidates =
+    Boolean(selectedSpecimenId) && catalogRefreshingId === selectedSpecimenId;
+
   const handleUpdateSpecimen = useCallback(
     (patch: Partial<ExtractedCard>) => {
       if (!selectedSpecimenId) return;
@@ -532,34 +543,51 @@ export function useScannerChat() {
   }, []);
 
   const persistSpecimens = useCallback(
-    async (items: typeof specimens, title: string) => {
-      if (items.length === 0 || saving) return false;
+    async (items: typeof specimens, title: string, existingSessionId?: string | null) => {
+      if (items.length === 0 || saving) return null;
       setSaving(true);
       setSaveStatus(null);
       try {
-        const response = await fetch("/api/saved/sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title,
-            specimens: items.map((item) => ({
-              card: item.card,
-              context: item.context,
-            })),
-          }),
-        });
+        const body = {
+          title,
+          specimens: items.map((item) => ({
+            card: item.card,
+            context: item.context,
+          })),
+        };
+        const isUpdate = Boolean(existingSessionId?.trim());
+        const response = await fetch(
+          isUpdate
+            ? `/api/saved/sessions/${encodeURIComponent(existingSessionId!)}`
+            : "/api/saved/sessions",
+          {
+            method: isUpdate ? "PATCH" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
         const payload = (await response.json().catch(() => ({}))) as {
           error?: string;
           savedCount?: number;
+          sessionId?: string;
         };
         if (!response.ok) throw new Error(payload.error ?? "Unable to save session");
         const count = payload.savedCount ?? items.length;
-        setSaveStatus(`Saved ${count} card(s) to collection. FMV history will update for saved cards.`);
+        const sessionId = payload.sessionId ?? existingSessionId ?? null;
+        if (sessionId) {
+          setLoadedSessionId(sessionId);
+          setActiveScanId(`saved:${sessionId}`);
+        }
+        setSaveStatus(
+          isUpdate
+            ? `Scan updated (${count} card${count === 1 ? "" : "s"}). Reopen anytime from Recent scans.`
+            : `Scan saved (${count} card${count === 1 ? "" : "s"}). Find it under Recent scans in the sidebar.`,
+        );
         setHistoryRefreshKey((k) => k + 1);
-        return true;
+        return sessionId;
       } catch (err) {
         setSaveStatus(err instanceof Error ? err.message : "Save failed");
-        return false;
+        return null;
       } finally {
         setSaving(false);
       }
@@ -568,11 +596,59 @@ export function useScannerChat() {
   );
 
   const saveToCollection = useCallback(async () => {
-    await persistSpecimens(
-      specimens,
-      `PGT Liquid Scan ${new Date().toLocaleString()}`,
-    );
-  }, [persistSpecimens, specimens]);
+    const title =
+      loadedSessionId && recentSessions.find((s) => s.id === loadedSessionId)?.title
+        ? recentSessions.find((s) => s.id === loadedSessionId)!.title
+        : `PGT Liquid Scan ${new Date().toLocaleString()}`;
+    await persistSpecimens(specimens, title, loadedSessionId);
+  }, [persistSpecimens, specimens, loadedSessionId, recentSessions]);
+
+  const deleteSession = useCallback(
+    async (sessionId: string) => {
+      try {
+        const response = await fetch(`/api/saved/sessions/${encodeURIComponent(sessionId)}`, {
+          method: "DELETE",
+        });
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Unable to delete session");
+        setRecentSessions((prev) => prev.filter((s) => s.id !== sessionId));
+        if (loadedSessionId === sessionId) {
+          setLoadedSessionId(null);
+          if (activeScanId === `saved:${sessionId}`) setActiveScanId(null);
+        }
+        setSaveStatus("Removed scan from history.");
+        setHistoryRefreshKey((k) => k + 1);
+      } catch (err) {
+        setSaveStatus(err instanceof Error ? err.message : "Delete failed");
+      }
+    },
+    [activeScanId, loadedSessionId],
+  );
+
+  const clearRecentSessions = useCallback(async () => {
+    setClearingHistory(true);
+    try {
+      const response = await fetch("/api/saved/sessions", { method: "DELETE" });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        deleted?: number;
+      };
+      if (!response.ok) throw new Error(payload.error ?? "Unable to clear history");
+      setRecentSessions([]);
+      setLoadedSessionId(null);
+      setActiveScanId(null);
+      setSaveStatus(
+        payload.deleted
+          ? `Cleared ${payload.deleted} saved scan${payload.deleted === 1 ? "" : "s"}.`
+          : "Recent scans cleared.",
+      );
+      setHistoryRefreshKey((k) => k + 1);
+    } catch (err) {
+      setSaveStatus(err instanceof Error ? err.message : "Clear failed");
+    } finally {
+      setClearingHistory(false);
+    }
+  }, []);
 
   const saveSpecimenToCollection = useCallback(
     async (specimenId: string) => {
@@ -1035,6 +1111,8 @@ export function useScannerChat() {
     enrichingSpecimenId,
     handleConfirmCandidate,
     handleRejectCandidate,
+    handleRefreshCatalogCandidates,
+    refreshingCatalogCandidates,
     handleExcludeSpecimen,
     scrollToComps,
     compsSectionRef,
@@ -1055,6 +1133,9 @@ export function useScannerChat() {
     sendLiquidAsk,
     resetScan,
     loadSession,
+    deleteSession,
+    clearRecentSessions,
+    clearingHistory,
     loadingSession,
     loadingSessionId,
     recentSessions,

@@ -38,7 +38,7 @@ export function ScanResultsViewToggle({
         )}
       >
         <LayoutGrid className="h-3 w-3" />
-        Cards
+        Cards ({cardCount})
       </button>
       <button
         type="button"

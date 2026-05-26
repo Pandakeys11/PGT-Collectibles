@@ -50,15 +50,15 @@ export function ScanQuotaChip({
         <Link
           href="/usage"
           className={cn(
-            "sc-mobile-quota-bar flex w-full items-center justify-between gap-2 border-b border-emerald-500/20 bg-emerald-500/8 px-3 py-2.5 touch-manipulation",
+            "sc-mobile-quota-bar flex w-full items-center justify-between gap-2 border-b border-success/20 bg-success/8 px-3 py-2.5 touch-manipulation",
             className,
           )}
         >
           <div className="flex min-w-0 items-center gap-2">
-            <Sparkles className="h-4 w-4 shrink-0 text-emerald-300" />
-            <span className="text-xs font-medium text-emerald-100">Unlimited scan credits</span>
+            <Sparkles className="h-4 w-4 shrink-0 text-success" />
+            <span className="text-xs font-medium text-primary">Unlimited scan credits</span>
           </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-emerald-300/70" />
+          <ChevronRight className="h-4 w-4 shrink-0 text-success/70" />
         </Link>
       );
     }

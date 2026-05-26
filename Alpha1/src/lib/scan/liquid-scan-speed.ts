@@ -40,7 +40,7 @@ export function getLiquidScanSpeedProfile(speedOn: boolean): LiquidScanSpeedProf
       precisionConcurrency: 2,
       skipRegistryOnBulkEnrich: false,
       precisionCropEnabled: true,
-      precisionCropMax: 4,
+      precisionCropMax: 6,
       autoSessionReport: true,
     };
   }
@@ -51,9 +51,20 @@ export function getLiquidScanSpeedProfile(speedOn: boolean): LiquidScanSpeedProf
     precisionConcurrency: 1,
     skipRegistryOnBulkEnrich: true,
     precisionCropEnabled: true,
-    precisionCropMax: 3,
+    precisionCropMax: 5,
     autoSessionReport: false,
   };
+}
+
+/** Scale precision-crop budget for dense binder/grid captures (weak set/# rows). */
+export function precisionCropMaxForCardCount(
+  cardCount: number,
+  profile: LiquidScanSpeedProfile,
+): number {
+  const base = profile.precisionCropMax;
+  if (cardCount >= 20) return Math.max(base, 8);
+  if (cardCount >= 12) return Math.max(base, 6);
+  return base;
 }
 
 export function shouldAutoSessionReport(speedOn: boolean): boolean {

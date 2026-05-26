@@ -3,7 +3,11 @@ import type { CatalogMatch } from "@/lib/market/pokemon-catalog";
 import { matchGenericCatalog } from "@/lib/market/generic-catalog";
 import { matchLorcanaCatalog } from "@/lib/market/lorcana-catalog";
 import { matchOnepieceCatalog } from "@/lib/market/onepiece-catalog";
-import { matchPokemonCatalog } from "@/lib/market/pokemon-catalog";
+import {
+  matchPokemonCatalog,
+  suggestPokemonCatalogCandidates,
+} from "@/lib/market/pokemon-catalog";
+import { mergeCatalogMatches } from "@/lib/market/catalog-candidate-merge";
 import { matchScryfallCatalog } from "@/lib/market/scryfall-catalog";
 import { matchYugiohCatalog } from "@/lib/market/yugioh-catalog";
 import { inferCardFranchise, type CardFranchise } from "@/lib/scan/franchise";
@@ -79,4 +83,41 @@ export async function matchCatalogWithFallback(card: ExtractedCard): Promise<Cat
   if (dedicated?.catalogIdentityStatus === "confirmed") return dedicated;
   const generic = await matchGenericCatalog(card);
   return pickStronger(dedicated, generic);
+}
+
+function needsMoreCatalogOptions(match: CatalogMatch | null): boolean {
+  if (!match) return true;
+  if (match.catalogIdentityStatus !== "confirmed") return true;
+  return match.candidates.length < 5;
+}
+
+/** Enrich + manual-pick: widen candidate list from master catalog / cache. */
+export async function suggestCatalogCandidates(
+  card: ExtractedCard,
+): Promise<CatalogMatch | null> {
+  const franchise = inferCardFranchise(card).id;
+  const cached = await searchDbCatalog(card, franchise);
+
+  let live: CatalogMatch | null = null;
+  if (franchise === "pokemon") {
+    live = await suggestPokemonCatalogCandidates(card);
+  } else {
+    live = await matchFranchiseLive(card, franchise);
+  }
+
+  let merged = mergeCatalogMatches(live, cached);
+  if (needsMoreCatalogOptions(merged) && franchise !== "pokemon") {
+    const generic = await matchGenericCatalog(card);
+    merged = mergeCatalogMatches(merged, generic);
+  }
+  return merged;
+}
+
+/** Fast match, then deep suggestion pass when identity is weak or options are thin. */
+export async function matchCatalogForEnrich(card: ExtractedCard): Promise<CatalogMatch | null> {
+  const base = await matchCatalogWithFallback(card);
+  if (!needsMoreCatalogOptions(base)) return base;
+
+  const wider = await suggestCatalogCandidates(card);
+  return mergeCatalogMatches(base, wider);
 }

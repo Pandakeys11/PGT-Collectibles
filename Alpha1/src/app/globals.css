@@ -19,6 +19,9 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     scroll-padding-bottom: calc(14.5rem + env(safe-area-inset-bottom, 0px));
+    transition:
+      background-color 0.4s ease,
+      color 0.35s ease;
   }
 
   @media (min-width: 1024px) {
@@ -34,6 +37,10 @@
 
   body {
     overflow-x: hidden;
+    transition:
+      background-color 0.45s ease,
+      background-image 0.55s ease,
+      color 0.35s ease;
     background-color: rgb(var(--bg-canvas));
     background-image:
       radial-gradient(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertCircle, ChevronDown, History, Layers } from "lucide-react";
+import { AlertCircle, ChevronDown, Layers } from "lucide-react";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import {
   computeFilteredFmv,
@@ -19,12 +19,12 @@ import {
 import { buildSpecimenMarketView } from "@/lib/scan/specimen-market-view";
 import { SpecimenMarketSummary } from "@/components/scan-panels/specimen-market-summary";
 import { GradedRegistryPanel } from "@/components/scan-panels/graded-registry-panel";
-import { MarketPriceChart } from "@/components/scanner-chat/market-price-chart";
+import { MarketPriceHeatmap } from "@/components/scanner-chat/market-price-heatmap";
 import { MarketPremiumGrades } from "@/components/scanner-chat/market-premium-grades";
 import { MarketListingCard } from "@/components/scanner-chat/market-listing-card";
+import { MarketEvidenceFeed } from "@/components/scanner-chat/market-evidence-row";
 import { MarketSoldsList } from "@/components/scanner-chat/market-solds-list";
 import { MarketSourceAds } from "@/components/scanner-chat/market-source-ads";
-import { MarketHistoryPanel } from "@/components/scan-panels/market-history-panel";
 import { cn } from "@/lib/cn";
 
 type MarketTab = "overview" | "listed" | "sold" | "auctions";
@@ -54,6 +54,32 @@ function FilterChip({
   );
 }
 
+function CompsSectionHeader({
+  title,
+  count,
+  hint,
+}: {
+  title: string;
+  count?: number;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+        {title}
+      </p>
+      <div className="flex items-center gap-2 text-[9px] text-slate-600">
+        {hint ? <span className="max-w-[10rem] truncate">{hint}</span> : null}
+        {count != null ? (
+          <span className="rounded bg-white/6 px-1.5 py-0.5 font-mono text-slate-400">
+            {count}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function StatTile({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <div className="min-w-0 rounded-lg border border-white/8 bg-white/[0.03] px-2 py-1.5">
@@ -76,7 +102,6 @@ export function SpecimenMarketHub({
   excludedKeys,
   onToggleExclude,
   compsSectionRef,
-  historyRefreshKey = 0,
   className,
 }: {
   specimen: ScanSpecimen;
@@ -84,6 +109,7 @@ export function SpecimenMarketHub({
   excludedKeys: Set<string>;
   onToggleExclude: (key: string) => void;
   compsSectionRef?: React.RefObject<HTMLDivElement>;
+  /** @deprecated No longer used — kept for call-site compatibility */
   historyRefreshKey?: number;
   className?: string;
 }) {
@@ -198,7 +224,15 @@ export function SpecimenMarketHub({
         className="min-w-0 rounded-xl border border-white/8 sc-glass-raised p-3"
       />
 
-      <MarketPremiumGrades rows={view.premiumGrades} hubMap={view.hubMap} />
+      <MarketPremiumGrades
+        rows={view.premiumGrades}
+        hubMap={view.hubMap}
+        card={specimen.card}
+        specimenId={specimen.id}
+        enriching={enriching}
+        sessionCompCount={specimen.context.marketEvidence?.length ?? 0}
+        marketAsOf={specimen.context.marketAsOf}
+      />
 
       <div className="grid min-w-0 grid-cols-3 gap-1.5">
         <StatTile label="Sold" value={String(stats.sold.length)} detail="Session comps" />
@@ -245,98 +279,67 @@ export function SpecimenMarketHub({
 
       {tab === "overview" ? (
         <div className="min-w-0 space-y-3">
-          <MarketPriceChart
+          <MarketPriceHeatmap
             specimen={specimen}
             evidence={chartEvidence}
             fmvOverride={adjustedFmv.fmv}
-            className="min-w-0 rounded-xl border border-white/8 bg-black/20 p-2"
+            className="min-w-0"
           />
 
-          <section className="min-w-0 space-y-2">
-            <div className="flex items-center gap-1.5">
-              <History className="h-3.5 w-3.5 text-slate-500" aria-hidden />
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                Market history
-              </p>
-            </div>
-            <MarketHistoryPanel
-              specimen={specimen}
-              refreshKey={historyRefreshKey}
-              className="min-w-0"
+          <section className="min-w-0 space-y-2 rounded-xl border border-white/8 bg-black/15 p-2.5">
+            <CompsSectionHeader
+              title="Recent sales"
+              count={soldForFeed.length}
+              hint="Session sold comps"
+            />
+            <MarketEvidenceFeed
+              items={soldForFeed}
+              hubMap={view.hubMap}
+              ebayGradeHubs={view.ebayGradeHubs}
+              card={specimen.card}
+              excludedKeys={excludedKeys}
+              outlierKeys={outlierKeys}
+              onToggleExclude={onToggleExclude}
+              maxRows={5}
+              emptyMessage="No sold comps yet — run enrich or open eBay sold via Search links."
             />
           </section>
 
-          {soldForFeed.length > 0 ? (
-            <section className="min-w-0 space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                Recent sales
-              </p>
-              <MarketSoldsList
-                items={soldForFeed}
-                hubMap={view.hubMap}
-                ebayGradeHubs={view.ebayGradeHubs}
-                card={specimen.card}
-                excludedKeys={excludedKeys}
-                outlierKeys={outlierKeys}
-                onToggleExclude={onToggleExclude}
-                maxRows={6}
-              />
-            </section>
-          ) : (
-            <p className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-[11px] text-slate-500">
-              No sold comps yet — run enrich or open eBay sold via premium grade Search links.
-            </p>
-          )}
-
-          {listedForFeed.length > 0 ? (
-            <section className="min-w-0 space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                Live listings
-              </p>
-              <div className="grid min-w-0 grid-cols-1 gap-2">
-                {listedForFeed.slice(0, 4).map((item) => (
-                  <MarketListingCard
-                    key={evidenceRowKey(item)}
-                    item={item}
-                    hubMap={view.hubMap}
-                    ebayGradeHubs={view.ebayGradeHubs}
-                    card={specimen.card}
-                    variant="listing"
-                    layout="fill"
-                  />
-                ))}
-              </div>
-            </section>
-          ) : null}
+          <section className="min-w-0 space-y-2 rounded-xl border border-white/8 bg-black/15 p-2.5">
+            <CompsSectionHeader
+              title="Live listings"
+              count={listedForFeed.length}
+              hint="Active asks & BIN"
+            />
+            <MarketEvidenceFeed
+              items={listedForFeed}
+              hubMap={view.hubMap}
+              ebayGradeHubs={view.ebayGradeHubs}
+              card={specimen.card}
+              maxRows={5}
+              emptyMessage="No live listings in session — check Listed tab or run enrich."
+            />
+          </section>
 
           <MarketSourceAds sources={view.sourceAds} />
         </div>
       ) : null}
 
       {tab === "listed" ? (
-        <section className="min-w-0 space-y-2">
-          <p className="text-[10px] text-slate-500">
-            Active asks from enrich — tap to open on eBay or the source site.
-          </p>
-          {listedForFeed.length > 0 ? (
-            <div className="grid min-w-0 grid-cols-1 gap-2">
-              {listedForFeed.map((item) => (
-                <MarketListingCard
-                  key={evidenceRowKey(item)}
-                  item={item}
-                  hubMap={view.hubMap}
-                  ebayGradeHubs={view.ebayGradeHubs}
-                  card={specimen.card}
-                  variant="listing"
-                  layout="fill"
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-lg border border-dashed border-white/10 px-3 py-8 text-center text-xs text-slate-500">
-              No active listings in session. Use Shop & research below or re-run enrich.
-            </p>
-          )}
+        <section className="min-w-0 space-y-2 rounded-xl border border-white/8 bg-black/15 p-2.5">
+          <CompsSectionHeader
+            title="Live listings"
+            count={listedForFeed.length}
+            hint="Active asks from enrich"
+          />
+          <MarketEvidenceFeed
+            items={listedForFeed}
+            hubMap={view.hubMap}
+            ebayGradeHubs={view.ebayGradeHubs}
+            card={specimen.card}
+            maxRows={20}
+            emptyMessage="No active listings in session. Use Shop & research below or re-run enrich."
+          />
           <MarketSourceAds sources={view.sourceAds} />
         </section>
       ) : null}

@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, Loader2, Search } from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2, Search } from "lucide-react";
+import { CatalogCardDetailSheet } from "@/components/catalog/catalog-card-detail-sheet";
 import { CatalogFocusGrid } from "@/components/pokedex/catalog-focus-grid";
+import { useCatalogMobileLayout } from "@/hooks/use-catalog-mobile-layout";
 import { ScanThisCardButton } from "@/components/pokedex/scan-this-card-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +70,7 @@ export function GenericCatalogBrowser({
   const [cardsLoading, setCardsLoading] = useState(false);
   const [cardsError, setCardsError] = useState<string | null>(null);
   const [detail, setDetail] = useState<CatalogCardSummary | null>(null);
+  const mobileStepped = useCatalogMobileLayout(embedded);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSetQ(setQuery.trim()), 280);
@@ -184,7 +187,7 @@ export function GenericCatalogBrowser({
     : "h-10 pl-9";
 
   return (
-    <div className={cn(embedded ? "space-y-2" : "space-y-3")}>
+    <div className={cn("w-full min-w-0 max-w-full", embedded ? "space-y-3" : "space-y-3")}>
       <p className={cn(embedded ? "text-[10px] leading-snug text-slate-500" : "text-[11px] text-muted")}>
         {syncHint}
       </p>
@@ -220,8 +223,12 @@ export function GenericCatalogBrowser({
           ) : (
             <ul
               className={cn(
-                "space-y-1 overflow-y-auto pr-0.5 scanner-chat-scrollbar",
-                embedded ? "max-h-[min(34dvh,280px)]" : "max-h-[min(42vh,360px)]",
+                "space-y-1.5 overflow-y-auto pr-0.5 scanner-chat-scrollbar",
+                embedded
+                  ? mobileStepped
+                    ? "min-h-[min(48dvh,420px)] max-h-[min(56dvh,480px)]"
+                    : "max-h-[min(38dvh,300px)]"
+                  : "max-h-[min(42vh,360px)]",
               )}
             >
               {sets.map((set) => (
@@ -297,16 +304,17 @@ export function GenericCatalogBrowser({
           ) : null}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className={cn("space-y-3", embedded && mobileStepped && "min-h-[min(52dvh,480px)]")}>
           <button
             type="button"
             onClick={() => {
               setSelectedSet(null);
               setDetail(null);
             }}
-            className="inline-flex min-h-8 items-center text-[11px] font-medium text-amber-300/95 hover:underline touch-manipulation"
+            className="inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-amber-300/95 touch-manipulation hover:text-amber-200"
           >
-            ← All sets
+            <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+            All sets
           </button>
           <p
             className={cn(
@@ -342,6 +350,7 @@ export function GenericCatalogBrowser({
             <>
               <CatalogFocusGrid
                 items={cards}
+                className={cn(embedded && "gap-2.5 sm:grid-cols-3", mobileStepped && "grid-cols-2 gap-3")}
                 getKey={(c) => c.id}
                 renderItem={(card, { focused }) => (
                   <button
@@ -370,9 +379,16 @@ export function GenericCatalogBrowser({
                         </div>
                       )}
                     </div>
-                    <div className="border-t border-white/8 px-1.5 py-1">
-                      <p className="truncate text-[10px] font-medium text-slate-100">{card.name}</p>
-                      <p className="truncate text-[9px] text-slate-500">
+                    <div className={cn("border-t border-white/8 px-2 py-1.5", embedded && "px-2.5 py-2")}>
+                      <p
+                        className={cn(
+                          "truncate font-medium text-slate-100",
+                          embedded ? "text-xs" : "text-[10px]",
+                        )}
+                      >
+                        {card.name}
+                      </p>
+                      <p className={cn("truncate text-slate-500", embedded ? "text-[11px]" : "text-[9px]")}>
                         {[card.number, card.rarity].filter(Boolean).join(" · ")}
                       </p>
                     </div>
@@ -407,49 +423,66 @@ export function GenericCatalogBrowser({
             </>
           )}
 
-          {detail ? (
-            <div
-              className={cn(
-                "rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06]",
-                embedded ? "p-2" : "rounded-xl p-3",
-              )}
-            >
-              <div className="flex gap-2">
-                <div
-                  className={cn(
-                    "shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40",
-                    embedded ? "h-20 w-14" : "h-28 w-20 rounded-lg",
-                  )}
-                >
-                  {detail.images?.large || detail.images?.small ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={detail.images.large ?? detail.images.small}
-                      alt=""
-                      className="h-full w-full object-contain"
-                    />
-                  ) : null}
-                </div>
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className={cn("font-semibold text-slate-100", embedded ? "text-[11px]" : "")}>
-                    {detail.name}
-                  </p>
-                  <p className={cn("text-slate-500", embedded ? "text-[10px]" : "text-[11px] text-muted")}>
-                    {[detail.set?.name, detail.number, detail.rarity].filter(Boolean).join(" · ")}
-                  </p>
-                  <ScanThisCardButton
-                    prefill={cardToPrefill(detail, franchise)}
-                    targetPath={scanTargetPath}
-                    onScan={onScanPrefill}
-                    compact={embedded}
-                    className="mt-1"
+        </div>
+      )}
+
+      <CatalogCardDetailSheet
+        open={detail != null}
+        onClose={() => setDetail(null)}
+        onBack={() => setDetail(null)}
+        title={detail?.name ?? "Card"}
+        subtitle={
+          detail
+            ? [detail.set?.name ?? selectedSet?.name, detail.number, detail.rarity]
+                .filter(Boolean)
+                .join(" · ")
+            : null
+        }
+        footer={
+          detail ? (
+            <ScanThisCardButton
+              prefill={cardToPrefill(detail, franchise)}
+              targetPath={scanTargetPath}
+              onScan={onScanPrefill}
+              compact={false}
+              className="w-full sm:w-auto"
+            />
+          ) : undefined
+        }
+      >
+        {detail ? (
+          <>
+            {detail.images?.large || detail.images?.small ? (
+              <div className="mx-auto w-full max-w-[min(78vw,15rem)]">
+                <div className="aspect-[2.5/3.5] overflow-hidden rounded-2xl border border-white/10 bg-black/40 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.65)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={detail.images.large ?? detail.images.small}
+                    alt={detail.name}
+                    className="h-full w-full object-contain p-3"
                   />
                 </div>
               </div>
-            </div>
-          ) : null}
-        </div>
-      )}
+            ) : null}
+            <dl className="mt-4 space-y-3 text-sm">
+              <div className="flex justify-between gap-4 border-b border-white/8 pb-3">
+                <dt className="text-muted">Set</dt>
+                <dd className="text-right font-medium text-slate-100">
+                  {detail.set?.name ?? selectedSet?.name}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4 border-b border-white/8 pb-3">
+                <dt className="text-muted">Number</dt>
+                <dd className="text-right font-medium text-slate-100">{detail.number ?? "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted">Rarity</dt>
+                <dd className="text-right font-medium text-slate-100">{detail.rarity ?? "—"}</dd>
+              </div>
+            </dl>
+          </>
+        ) : null}
+      </CatalogCardDetailSheet>
     </div>
   );
 }

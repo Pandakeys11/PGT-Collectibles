@@ -61,15 +61,21 @@ function mapAppUser(row: AppUserRow): AppUser {
 }
 
 async function clerkIdentity() {
-  const user = await currentUser();
-  if (!user) return { email: null, displayName: null, avatarUrl: null };
-  const email =
-    user.emailAddresses.find((item) => item.id === user.primaryEmailAddressId)?.emailAddress ??
-    user.emailAddresses[0]?.emailAddress ??
-    null;
-  const displayName =
-    [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.username || null;
-  return { email, displayName, avatarUrl: user.imageUrl ?? null };
+  try {
+    const user = await currentUser();
+    if (!user) return { email: null, displayName: null, avatarUrl: null };
+    const email =
+      user.emailAddresses.find((item) => item.id === user.primaryEmailAddressId)?.emailAddress ??
+      user.emailAddresses[0]?.emailAddress ??
+      null;
+    const displayName =
+      [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.username || null;
+    return { email, displayName, avatarUrl: user.imageUrl ?? null };
+  } catch {
+    // Clerk can transiently return 500 for `currentUser()` during incident/quota events.
+    // Scan/extraction routes should be able to proceed without hard-failing the whole request.
+    return { email: null, displayName: null, avatarUrl: null };
+  }
 }
 
 export async function syncCurrentAppUser(): Promise<AppUser | null> {
@@ -77,16 +83,20 @@ export async function syncCurrentAppUser(): Promise<AppUser | null> {
   if (!userId || !isSupabaseConfigured()) return null;
 
   const identity = await clerkIdentity();
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.rpc("sync_clerk_user", {
-    p_clerk_user_id: userId,
-    p_email: identity.email,
-    p_display_name: identity.displayName,
-    p_avatar_url: identity.avatarUrl,
-  });
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase.rpc("sync_clerk_user", {
+      p_clerk_user_id: userId,
+      p_email: identity.email,
+      p_display_name: identity.displayName,
+      p_avatar_url: identity.avatarUrl,
+    });
 
-  if (error) throw error;
-  return mapAppUser(data as AppUserRow);
+    if (error || !data) return null;
+    return mapAppUser(data as AppUserRow);
+  } catch {
+    return null;
+  }
 }
 
 export async function getCurrentAppUser(): Promise<AppUser | null> {

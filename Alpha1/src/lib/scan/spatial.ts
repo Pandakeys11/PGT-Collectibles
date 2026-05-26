@@ -11,8 +11,10 @@ export function inferSpecimenGridColumns(groupSize: number): number {
   if (groupSize <= 1) return 1;
   if (groupSize <= 4) return 2;
   if (groupSize <= 9) return 3;
-  if (groupSize <= 15) return 5;
-  return 6;
+  if (groupSize <= 12) return 4;
+  if (groupSize <= 20) return 5;
+  if (groupSize <= 30) return 6;
+  return Math.min(8, Math.ceil(Math.sqrt(groupSize)));
 }
 
 export function isMissingVisionLocation(location: unknown): boolean {

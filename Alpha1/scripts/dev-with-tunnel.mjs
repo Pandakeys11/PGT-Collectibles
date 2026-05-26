@@ -4,6 +4,7 @@
  *        npm run dev:tunnel -- 3003
  */
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnvLocal } from "./load-env-local.mjs";
@@ -44,7 +45,19 @@ function prefixStream(stream, label, out) {
   });
 }
 
-console.log(`Starting Next.js on http://localhost:${port} + ngrok tunnel…\n`);
+const nextDir = path.join(root, ".next");
+const routesManifest = path.join(nextDir, "routes-manifest.json");
+if (fs.existsSync(nextDir) && !fs.existsSync(routesManifest)) {
+  console.warn(
+    "Detected incomplete .next (missing routes-manifest.json). Removing stale build output…\n",
+  );
+  fs.rmSync(nextDir, { recursive: true, force: true });
+}
+
+console.log(`Starting Next.js on http://localhost:${port} + ngrok tunnel…`);
+console.log(
+  "If you see errors like Cannot find module './5745.js', stop the server and run: npm run dev:clean\n",
+);
 
 const next = spawn("npx", ["next", "dev", "-p", port], {
   cwd: root,

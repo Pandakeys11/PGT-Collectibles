@@ -136,7 +136,7 @@ export function buildCatalogMatch(
   const top = sorted[0];
   if (!top) return null;
   const status = resolveCatalogIdentityStatus(sorted);
-  const candidates = rowsToCandidates(sorted.slice(0, 8));
+  const candidates = rowsToCandidates(sorted.slice(0, 16));
   const tcgUrl = top.prices?.tcgPlayerUrl ?? null;
   return {
     catalogId: top.catalogId,

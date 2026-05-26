@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cleanShortText } from "@/lib/http/params";
 import { matchPokemonCatalog } from "@/lib/market/pokemon-catalog";
-import { catalogMatchIsAuthoritative } from "@/lib/scan/catalog-merge";
+import { resolveCatalogImageUrl } from "@/lib/scan/catalog-merge";
 import { extractedCardSchema } from "@/lib/scan/schemas";
 
 export const dynamic = "force-dynamic";
@@ -28,14 +28,15 @@ export async function GET(req: NextRequest) {
     if (!hit) {
       return NextResponse.json({ match: null });
     }
-    if (!catalogMatchIsAuthoritative(hit)) {
+    const imageSmallUrl = resolveCatalogImageUrl(hit, card);
+    if (!imageSmallUrl) {
       return NextResponse.json({ match: null });
     }
     return NextResponse.json({
       match: {
         catalogId: hit.catalogId,
-        imageSmallUrl: hit.imageSmallUrl,
-        imageLargeUrl: hit.imageLargeUrl,
+        imageSmallUrl,
+        imageLargeUrl: hit.imageLargeUrl ?? imageSmallUrl,
       },
     });
   } catch (e) {

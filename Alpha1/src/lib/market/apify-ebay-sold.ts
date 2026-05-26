@@ -29,7 +29,9 @@ function inferSlabFromTitle(title: string): string | null {
   const hay = title.toLowerCase();
   if (/black\s*label|bgs.*black/.test(hay)) return "BGS Black Label";
   if (/psa\s*10|gem\s*mint\s*10/.test(hay)) return "PSA 10";
-  if (/cgc/.test(hay) && /cgc\s*10(\.0)?\b/.test(hay)) return "CGC 10";
+  if (/cgc/.test(hay) && (/pristine/i.test(hay) || /cgc\s*10(\.0)?\b/.test(hay))) {
+    return /pristine/i.test(hay) ? "CGC Pristine 10" : "CGC 10";
+  }
   if (/psa\s*9\b|cgc\s*9\b|bgs\s*9\b/.test(hay)) return "PSA 9";
   return null;
 }
@@ -107,7 +109,7 @@ export async function fetchApifyEbaySoldForCard(card: ExtractedCard): Promise<Ma
 
   const categoryId = ebaySearchCategoryIdForCard(card);
   const count = Math.min(Math.max(Number(process.env.APIFY_EBAY_SOLD_COUNT ?? 40) || 40, 8), 100);
-  const daysToScrape = Math.min(Math.max(Number(process.env.APIFY_EBAY_SOLD_DAYS ?? 60) || 60, 7), 90);
+  const daysToScrape = Math.min(Math.max(Number(process.env.APIFY_EBAY_SOLD_DAYS ?? 90) || 90, 7), 120);
 
   const input: Record<string, unknown> = {
     keywords: [keyword],

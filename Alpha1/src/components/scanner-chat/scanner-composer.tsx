@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Camera, Loader2, Scan, Upload } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, ChevronDown, Loader2, Scan, Upload, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SCAN_MODE_OPTIONS } from "@/lib/scanner-chat/scan-mode-labels";
 import type { ScanMode, UploadedImage } from "@/lib/scanner-chat/types";
 import { ImagePreviewStrip } from "./image-preview-strip";
 import { cn } from "@/lib/cn";
+
+const MODE_SHORT: Record<ScanMode, string> = {
+  fast: "Fast",
+  deep: "Deep",
+  market: "Market",
+  graded: "Graded",
+  binder: "Binder",
+};
 
 export function ScannerComposer({
   prompt,
@@ -48,6 +56,11 @@ export function ScannerComposer({
   className?: string;
 }) {
   const [liveCameraOk, setLiveCameraOk] = useState(supportsLiveCamera ?? false);
+  const [modesOpen, setModesOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const nativeCameraRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     setLiveCameraOk(
       supportsLiveCamera ??
@@ -55,17 +68,35 @@ export function ScannerComposer({
           Boolean(navigator.mediaDevices?.getUserMedia)),
     );
   }, [supportsLiveCamera]);
+
+  const resizeTextarea = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 88)}px`;
+  }, []);
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [prompt, resizeTextarea]);
+
   const submitLabel = hasImages
     ? isBusy
       ? "Scanning…"
-      : "Start AI Scan"
+      : "Scan"
     : isBusy
-      ? "Thinking…"
+      ? "…"
       : hasScanResults
         ? "Ask"
         : "Send";
-  const fileRef = useRef<HTMLInputElement>(null);
-  const nativeCameraRef = useRef<HTMLInputElement>(null);
+
+  const placeholder = hasImages
+    ? "Optional note for scan…"
+    : hasScanResults
+      ? "Ask about FMV or comps…"
+      : "Ask PGT AI or add images…";
+
+  const activeMode = SCAN_MODE_OPTIONS.find((o) => o.id === scanMode);
 
   return (
     <div
@@ -74,38 +105,38 @@ export function ScannerComposer({
         className,
       )}
     >
-      <div className="mx-auto max-w-3xl px-3 pt-2 sm:px-4 sm:pt-3">
-        <ImagePreviewStrip
-          images={images}
-          onRemove={onRemoveImage}
-          onReorder={onReorderImages}
-          scanning={isBusy}
-          className="mb-2"
-        />
-        <div className="sc-glow-border rounded-2xl sc-glass-raised p-2 sm:p-3">
+      <div className="sc-mobile-composer-inner sc-desktop-composer-inner mx-auto w-full max-w-3xl px-0 pt-1.5 sm:pt-2 lg:max-w-none">
+        {images.length > 0 ? (
+          <ImagePreviewStrip
+            images={images}
+            onRemove={onRemoveImage}
+            onReorder={onReorderImages}
+            scanning={isBusy}
+            compact
+            className="mb-1.5"
+          />
+        ) : null}
+
+        <div className="sc-composer-panel sc-glow-border rounded-xl sc-glass-raised p-1.5 sm:rounded-2xl sm:p-2">
           <textarea
+            ref={textareaRef}
             value={prompt}
             onChange={(e) => onPromptChange(e.target.value)}
+            onInput={resizeTextarea}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 onSubmit();
               }
             }}
-            rows={2}
-            placeholder={
-              hasImages
-                ? "Optional: what should we look for?"
-                : hasScanResults
-                  ? "Ask about FMV, comps, or your scan…"
-                  : "Ask PGT AI or upload images to scan…"
-            }
-            className="sc-composer-input w-full resize-none bg-transparent px-2 py-1.5 text-base text-slate-100 placeholder:text-slate-600 focus:outline-none sm:text-sm"
+            rows={1}
+            placeholder={placeholder}
+            className="sc-composer-input max-h-[5.5rem] min-h-[2.35rem] w-full resize-none bg-transparent px-2 py-1 text-base leading-snug text-slate-100 placeholder:text-slate-600 focus:outline-none sm:min-h-[2.5rem] sm:text-sm"
             disabled={isBusy}
+            aria-label="Message or scan instructions"
           />
 
-          {/* Primary actions — touch-friendly row */}
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-1 flex items-center gap-1 sm:gap-1.5">
             <input
               ref={fileRef}
               type="file"
@@ -132,11 +163,12 @@ export function ScannerComposer({
                 e.target.value = "";
               }}
             />
+
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={isBusy || uploadsLocked}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-white/5 hover:text-slate-200 disabled:opacity-40 touch-manipulation"
+              className="sc-composer-icon-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/5 hover:text-slate-200 disabled:opacity-40 touch-manipulation lg:h-9 lg:w-9"
               aria-label="Upload images"
             >
               <Upload className="h-4 w-4" />
@@ -149,85 +181,115 @@ export function ScannerComposer({
               }}
               disabled={isBusy || uploadsLocked}
               className={cn(
-                "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition touch-manipulation disabled:opacity-40",
+                "sc-composer-icon-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition touch-manipulation lg:h-9 lg:w-9",
                 liveCameraOk
                   ? "text-emerald-300 ring-1 ring-emerald-500/35 hover:bg-emerald-500/10"
                   : "text-slate-500 hover:bg-white/5 hover:text-slate-200",
               )}
-              aria-label={liveCameraOk ? "Open PGT scan camera with HUD" : "Capture photo"}
-              title={
-                liveCameraOk
-                  ? "PGT helmet HUD · live auto-scan"
-                  : "Device camera (HUD needs HTTPS)"
-              }
+              aria-label={liveCameraOk ? "Open PGT scan camera" : "Capture photo"}
+              title={liveCameraOk ? "PGT helmet HUD" : "Device camera"}
             >
               <Camera className="h-4 w-4" />
             </button>
             <button
               type="button"
-              title={
-                speedOn
-                  ? "Speed on: faster scan"
-                  : "Speed off: cost control"
-              }
+              title={speedOn ? "Speed on — faster scan" : "Speed off — fewer API calls"}
               onClick={() => onSpeedOnChange(!speedOn)}
               disabled={isBusy}
               aria-pressed={speedOn}
               className={cn(
-                "h-11 shrink-0 rounded-full px-3 text-[11px] font-medium transition touch-manipulation",
+                "sc-composer-icon-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition touch-manipulation lg:h-9 lg:w-9",
                 speedOn
                   ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/30"
                   : "text-slate-500 hover:bg-white/5 hover:text-slate-300",
               )}
+              aria-label={speedOn ? "Speed on" : "Speed off"}
             >
-              Speed {speedOn ? "On" : "Off"}
+              <Zap className="h-4 w-4" />
             </button>
+
+            <button
+              type="button"
+              onClick={() => setModesOpen((v) => !v)}
+              disabled={isBusy}
+              aria-expanded={modesOpen}
+              aria-controls="sc-composer-modes"
+              className={cn(
+                "flex h-10 min-w-0 shrink items-center gap-1 rounded-lg px-2 text-[11px] font-medium transition touch-manipulation lg:h-9",
+                modesOpen
+                  ? "bg-white/8 text-slate-200"
+                  : "text-slate-500 hover:bg-white/5 hover:text-slate-300",
+              )}
+            >
+              <span className="truncate">{MODE_SHORT[scanMode]}</span>
+              <ChevronDown
+                className={cn("h-3.5 w-3.5 shrink-0 transition", modesOpen && "rotate-180")}
+                aria-hidden
+              />
+            </button>
+
             <Button
               type="button"
               variant="scan"
               size="sm"
               disabled={isBusy}
               onClick={onSubmit}
-              className="ml-auto h-11 min-w-[5.5rem] shrink-0 gap-1.5 rounded-xl px-4 touch-manipulation"
+              className="sc-composer-submit ml-auto h-10 min-w-[4.25rem] shrink-0 gap-1 rounded-lg px-3 touch-manipulation sm:min-w-[4.75rem] lg:h-9"
             >
               {isBusy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : hasImages ? (
                 <Scan className="h-4 w-4" />
               ) : null}
-              <span className="text-xs font-semibold sm:text-sm">{submitLabel}</span>
+              <span className="text-xs font-semibold">{submitLabel}</span>
             </Button>
           </div>
 
-          {/* Scan modes — own scroll row so they don't crush submit on narrow phones */}
-          <div className="sc-composer-modes mt-2 flex gap-1 overflow-x-auto pb-0.5 scanner-chat-scrollbar">
-            {SCAN_MODE_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                title={opt.description}
-                onClick={() => onScanModeChange(opt.id)}
-                disabled={isBusy}
-                className={cn(
-                  "shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium transition touch-manipulation",
-                  scanMode === opt.id
-                    ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/30"
-                    : "text-slate-500 hover:bg-white/5 hover:text-slate-300",
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
+          <div
+            id="sc-composer-modes"
+            className={cn(
+              "sc-composer-modes grid transition-[grid-template-rows] duration-200 ease-out",
+              modesOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+            )}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div className="flex gap-1 overflow-x-auto pb-0.5 pt-1.5 scanner-chat-scrollbar">
+                {SCAN_MODE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    title={opt.description}
+                    onClick={() => {
+                      onScanModeChange(opt.id);
+                      setModesOpen(false);
+                    }}
+                    disabled={isBusy}
+                    className={cn(
+                      "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-medium transition touch-manipulation sm:px-3 sm:py-1.5 sm:text-[11px]",
+                      scanMode === opt.id
+                        ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/30"
+                        : "text-slate-500 hover:bg-white/5 hover:text-slate-300",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-        <p className="sc-composer-hint mt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-center text-[10px] text-slate-600 sm:pb-2">
-          {hasImages
-            ? speedOn
-              ? "Speed on · parallel scan"
-              : "Speed off · fewer API calls"
-            : hasScanResults
-              ? "Tap a card or open Sheet for your list"
-              : "Camera opens PGT HUD · auto-scan · 1 credit per scan"}
+
+        {!hasImages && !hasScanResults ? (
+          <p className="sc-composer-hint mt-1 hidden text-center text-[10px] text-slate-600 sm:block lg:mt-0.5">
+            Upload or camera · tap mode for binder / graded · Enter to send
+          </p>
+        ) : null}
+        <p
+          className="sc-composer-hint-sr sr-only"
+          aria-live="polite"
+        >
+          {activeMode?.description}
+          {speedOn ? " Speed on." : " Speed off."}
         </p>
       </div>
     </div>

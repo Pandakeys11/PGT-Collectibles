@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileImage, Maximize2, Crop } from "lucide-react";
+import { ChevronDown, ChevronUp, FileImage, Maximize2, Crop } from "lucide-react";
 import { MarketEvidenceTable } from "@/components/scan-panels/market-evidence-table";
 import { MarketSourceHub } from "@/components/scan-panels/market-source-hub";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,24 @@ function catalogStatusLabel(status: ScanSpecimen["context"]["catalogIdentityStat
   if (status === "likely") return "Likely";
   if (status === "ambiguous") return "Ambiguous";
   return "Unmatched";
+}
+
+/** Identity looks stable enough to tuck the panel away in Market Intelligence. */
+function identityLooksSettled(specimen: ScanSpecimen): boolean {
+  const ctx = specimen.context;
+  const hasBasics = Boolean(
+    ctx.name?.trim() && (ctx.setName?.trim() || ctx.cardNumber?.trim()),
+  );
+  const catalogOk =
+    ctx.catalogIdentityStatus === "confirmed" || ctx.catalogIdentityStatus === "likely";
+  const verifyOk =
+    ctx.verificationStatus === "verified" ||
+    (ctx.catalogConfidence >= 0.72 && ctx.verificationStatus !== "failed");
+  return hasBasics && catalogOk && verifyOk;
+}
+
+function identityCollapsedStorageKey(specimenId: string): string {
+  return `pgt-liquid-identity-collapsed:${specimenId}`;
 }
 
 function IdentityDetailRows({
@@ -142,9 +160,59 @@ export function EvidenceRail({
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
   const [zoomCaption, setZoomCaption] = useState<string | null>(null);
+  const [identityCollapsed, setIdentityCollapsed] = useState(false);
+  const userToggledIdentityRef = useRef(false);
   const zoomSession = useRef(0);
   const specimenRef = useRef(specimen);
   specimenRef.current = specimen;
+
+  useEffect(() => {
+    userToggledIdentityRef.current = false;
+    if (!specimen?.id) {
+      setIdentityCollapsed(false);
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(identityCollapsedStorageKey(specimen.id));
+      if (stored === "0") {
+        setIdentityCollapsed(false);
+        return;
+      }
+      if (stored === "1") {
+        setIdentityCollapsed(true);
+        return;
+      }
+    } catch {
+      /* private mode */
+    }
+    setIdentityCollapsed(identityLooksSettled(specimen));
+  }, [specimen?.id]);
+
+  useEffect(() => {
+    if (!specimen?.id || userToggledIdentityRef.current) return;
+    if (identityLooksSettled(specimen)) {
+      setIdentityCollapsed(true);
+    }
+  }, [
+    specimen?.id,
+    specimen?.context.catalogIdentityStatus,
+    specimen?.context.verificationStatus,
+    specimen?.context.catalogConfidence,
+    specimen?.context.name,
+    specimen?.context.setName,
+    specimen?.context.cardNumber,
+  ]);
+
+  const setIdentityCollapsedPersisted = useCallback((next: boolean) => {
+    userToggledIdentityRef.current = true;
+    setIdentityCollapsed(next);
+    if (!specimen?.id) return;
+    try {
+      localStorage.setItem(identityCollapsedStorageKey(specimen.id), next ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [specimen?.id]);
 
   const graded = specimen?.context.lane === "graded";
   const { displaySrc, cropping, hasFullSrc } = useSpecimenCropPreview({
@@ -270,46 +338,98 @@ export function EvidenceRail({
   );
 
   if (variant === "liquid") {
+    const settled = identityLooksSettled(specimen);
+    const identitySummary = [
+      specimen.context.setName,
+      specimen.context.cardNumber,
+      formatGradedSlabTag(specimen.card, specimen.context.lane),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
     return (
       <>
         <div className="sc-identity-panel sc-glow-border overflow-hidden rounded-xl sc-glass-raised">
-          <div className="flex items-start gap-2.5 border-b border-white/8 bg-white/[0.02] px-2.5 py-2">
-            {cropBlock}
+          <div
+            className={cn(
+              "flex items-start gap-2.5",
+              identityCollapsed ? "px-2.5 py-2" : "border-b border-white/8 bg-white/[0.02] px-2.5 py-2",
+            )}
+          >
+            {!identityCollapsed ? cropBlock : null}
             <div className="min-w-0 flex-1 pt-0.5">
-              <p className="text-[9px] font-semibold uppercase tracking-wider text-emerald-400/90">
-                Card identity
-              </p>
-              <p className="mt-0.5 line-clamp-2 text-[12px] font-semibold leading-snug text-slate-100">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[9px] font-semibold uppercase tracking-wider text-emerald-400/90">
+                  Card identity
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIdentityCollapsedPersisted(!identityCollapsed)}
+                  className="inline-flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[9px] font-medium text-slate-500 transition hover:bg-white/5 hover:text-slate-300"
+                  aria-expanded={!identityCollapsed}
+                  aria-label={identityCollapsed ? "Expand card identity" : "Collapse card identity"}
+                >
+                  {identityCollapsed ? "Show" : "Hide"}
+                  {identityCollapsed ? (
+                    <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                  ) : (
+                    <ChevronUp className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                </button>
+              </div>
+              <p
+                className={cn(
+                  "mt-0.5 font-semibold leading-snug text-slate-100",
+                  identityCollapsed ? "truncate text-[11px]" : "line-clamp-2 text-[12px]",
+                )}
+              >
                 {getCardDisplayTitle(specimen.card)}
               </p>
+              {identityCollapsed && identitySummary ? (
+                <p className="mt-0.5 truncate text-[10px] text-slate-500">{identitySummary}</p>
+              ) : null}
               <div className="mt-1.5 flex flex-wrap items-center gap-1">
                 <VerificationPill status={specimen.context.verificationStatus} />
-                <GraderChip grader={specimen.card.grader} />
-              </div>
-            </div>
-          </div>
-          <div className="px-2.5 py-2">
-            <IdentityDetailRows specimen={specimen} dense />
-          </div>
-          {editable && onUpdate && onCommitEdit && onRescan ? (
-            <div className="border-t border-white/8 bg-black/15 px-2.5 py-2">
-              <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
-                Edit · resync to refresh comps
-              </p>
-              <div className="mt-1.5">
-                <SpecimenEditFields
-                  item={specimen}
-                  rowBusy={rowBusy}
-                  variant="sheet"
-                  onUpdate={onUpdate}
-                  onCommitEdit={onCommitEdit}
-                  onAdjustCrop={onRequestAdjustCrop ?? (() => {})}
-                  onRescan={onRescan}
-                  hideRemove
-                  onRemove={() => {}}
+                <GraderChip
+                  grader={specimen.card.grader}
+                  grade={specimen.card.grade}
+                  labelTitle={specimen.card.labelTitle}
                 />
+                {settled && identityCollapsed ? (
+                  <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-300/90">
+                    {catalogStatusLabel(specimen.context.catalogIdentityStatus)}
+                  </span>
+                ) : null}
               </div>
             </div>
+          </div>
+
+          {!identityCollapsed ? (
+            <>
+              <div className="px-2.5 py-2">
+                <IdentityDetailRows specimen={specimen} dense />
+              </div>
+              {editable && onUpdate && onCommitEdit && onRescan ? (
+                <div className="border-t border-white/8 bg-black/15 px-2.5 py-2">
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+                    Edit · resync to refresh comps
+                  </p>
+                  <div className="mt-1.5">
+                    <SpecimenEditFields
+                      item={specimen}
+                      rowBusy={rowBusy}
+                      variant="sheet"
+                      onUpdate={onUpdate}
+                      onCommitEdit={onCommitEdit}
+                      onAdjustCrop={onRequestAdjustCrop ?? (() => {})}
+                      onRescan={onRescan}
+                      hideRemove
+                      onRemove={() => {}}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </>
           ) : null}
         </div>
         <ImageLightbox
@@ -367,7 +487,11 @@ export function EvidenceRail({
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <VerificationPill status={specimen.context.verificationStatus} />
-        <GraderChip grader={specimen.card.grader} />
+        <GraderChip
+          grader={specimen.card.grader}
+          grade={specimen.card.grade}
+          labelTitle={specimen.card.labelTitle}
+        />
       </div>
       {editable && onUpdate && onCommitEdit && onRescan ? (
         <div className="mt-4 rounded-xl border border-white/8 bg-black/20 p-3">
@@ -475,7 +599,12 @@ export function EvidenceRail({
       </section>
       {specimen.context.catalogCandidates.length > 0 ? (
         <section className="mt-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-faint">Catalog candidates</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-faint">
+            Top catalog matches ({specimen.context.catalogCandidates.length})
+          </h3>
+          <p className="mt-0.5 text-[10px] text-muted">
+            Full pick list is in Catalog match below.
+          </p>
           <div className="mt-2 space-y-2 text-xs">
             {specimen.context.catalogCandidates.slice(0, 3).map((candidate) => (
               <div key={candidate.catalogId} className="rounded-lg border border-border-subtle px-3 py-2">

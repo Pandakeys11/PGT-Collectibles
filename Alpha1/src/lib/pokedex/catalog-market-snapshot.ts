@@ -228,13 +228,17 @@ function buildHighlight(
   };
 }
 
-export function tcgDetailToExtracted(card: TcgCardDetail): ExtractedCard {
+export function tcgDetailToExtracted(
+  card: TcgCardDetail,
+  options?: { printStamps?: string | null },
+): ExtractedCard {
   return {
     name: card.name,
     set: card.set?.name,
     number: card.number,
     rarity: card.rarity,
     year: card.set?.releaseDate?.slice(0, 4),
+    printStamps: options?.printStamps?.trim() || undefined,
   };
 }
 

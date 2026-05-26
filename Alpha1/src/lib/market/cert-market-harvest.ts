@@ -1,7 +1,9 @@
 import { withTimeout } from "@/lib/async-timeout";
 import { ebayGradedQueryCandidates } from "@/lib/market/graded-sales-harvest";
+import { fetchEbayFindingCompletedSold } from "@/lib/market/ebay-finding-completed";
 import { searchWeb } from "@/lib/market/web-search";
 import { hasReadableCertNumber } from "@/lib/scan/graded-slab";
+import { ebaySearchCategoryIdForCard } from "@/lib/market/ebay-sold-common";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 
 function snippetToCertEvidence(
@@ -43,11 +45,38 @@ export async function harvestCertSpecificMarketEvidence(
   const queries = ebayGradedQueryCandidates(card).slice(0, 4);
   const evidence: MarketEvidence[] = [];
 
+  // Tier 1 (best effort): eBay Finding completed sold where the query includes the cert digits.
+  // This usually gives us real dates/price and a stable URL.
+  const categoryId = ebaySearchCategoryIdForCard(card);
+  const findingQuery = queries[0] ?? "";
+  if (findingQuery) {
+    try {
+      const findingSold = await withTimeout(
+        fetchEbayFindingCompletedSold(findingQuery, 8, categoryId),
+        14_000,
+        "eBay cert sold finding",
+      );
+      const filtered = findingSold.filter((it) => {
+        const hay = `${it.title} ${it.slab ?? ""}`.replace(/\D/g, "");
+        // Only keep if the evidence title includes the cert digits (avoid unrelated PSA10 sales).
+        return hay.includes(certDigits);
+      });
+      evidence.push(...filtered);
+    } catch {
+      /* optional — fall back to web snippets */
+    }
+  }
+
+  // Tier 2 (fallback): web snippets containing the exact cert digits.
+  // Dates may be missing for snippet-only results (observedAt null).
+  const webQueries = evidence.length > 0 ? queries.slice(0, 2) : queries.slice(0, 4);
   const settled = await Promise.allSettled(
-    queries.map((q) =>
-      withTimeout(searchWeb(`${q} site:ebay.com`, 6), 8_000, "cert ebay snippet").then(
-        (results) => ({ q, results }),
-      ),
+    webQueries.map((q) =>
+      withTimeout(
+        searchWeb(`${q} site:ebay.com`, 6),
+        8_000,
+        "cert ebay snippet",
+      ).then((results) => ({ q, results })),
     ),
   );
 

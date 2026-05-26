@@ -29,6 +29,8 @@ export function ScanIntelligencePanel({
   onSelectSpecimen,
   onConfirmCandidate,
   onRejectCandidate,
+  onRefreshCatalogCandidates,
+  refreshingCatalogCandidates,
   onExport,
   onNewScan,
   onReviewUncertain,
@@ -40,6 +42,7 @@ export function ScanIntelligencePanel({
   rescanningId,
   saveStatus,
   saving,
+  loadedSessionId,
   historyRefreshKey,
   compsSectionRef,
   isPro,
@@ -55,6 +58,8 @@ export function ScanIntelligencePanel({
   onSelectSpecimen: (id: string) => void;
   onConfirmCandidate: (candidate: CatalogCandidate) => void;
   onRejectCandidate: (catalogId: string) => void;
+  onRefreshCatalogCandidates?: () => void;
+  refreshingCatalogCandidates?: boolean;
   onExport: (format: string) => void;
   onNewScan: () => void;
   onReviewUncertain: () => void;
@@ -66,6 +71,7 @@ export function ScanIntelligencePanel({
   rescanningId?: string | null;
   saveStatus: string | null;
   saving?: boolean;
+  loadedSessionId?: string | null;
   historyRefreshKey?: number;
   compsSectionRef?: React.RefObject<HTMLDivElement>;
   isPro?: boolean;
@@ -117,7 +123,7 @@ export function ScanIntelligencePanel({
           <h2 className="text-sm font-semibold text-slate-100">Market intelligence</h2>
           <p className="text-[10px] text-slate-500">
             {selectedSpecimen
-              ? "Card identity first · then catalog match & comps"
+              ? "Identity collapses when confirmed · expand to edit"
               : "Select a card from the feed"}
           </p>
         </div>
@@ -192,8 +198,10 @@ export function ScanIntelligencePanel({
                 variant="liquid"
                 specimen={selectedSpecimen}
                 busy={enriching}
+                refreshingCandidates={refreshingCatalogCandidates}
                 onConfirmCandidate={onConfirmCandidate}
                 onRejectCandidate={onRejectCandidate}
+                onRefreshCandidates={onRefreshCatalogCandidates}
                 onOpenMasterCatalog={onOpenMasterCatalog}
                 panelClassName="rounded-xl border border-amber-500/15 bg-black/20 p-2.5"
               />
@@ -269,7 +277,7 @@ export function ScanIntelligencePanel({
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500/15 py-2 text-xs font-medium text-sky-100 ring-1 ring-sky-500/25 transition hover:bg-sky-500/25 disabled:opacity-40"
         >
           <Bookmark className="h-3.5 w-3.5" />
-          {saving ? "Saving…" : "Save to collection"}
+          {saving ? "Saving…" : loadedSessionId ? "Update saved scan" : "Save scan"}
         </button>
         {review > 0 ? (
           <button

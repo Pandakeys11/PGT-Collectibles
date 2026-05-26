@@ -61,6 +61,13 @@ export type TcgDexAlias = {
   imageUrl: string | null;
 };
 
+export type TcgDexLocalizedCard = {
+  id: string;
+  name: string | null;
+  imageUrl: string | null;
+  setName: string | null;
+};
+
 type TcgDexBrief = {
   id?: string;
   localId?: string;
@@ -77,6 +84,12 @@ type TcgDexCard = TcgDexBrief & {
 };
 
 const cache = new Map<string, { storedAt: number; value: TcgDexAlias[] }>();
+
+const setNameMaps = new Map<string, { storedAt: number; value: Map<string, string> }>();
+const localizedCardCache = new Map<
+  string,
+  { storedAt: number; value: TcgDexLocalizedCard | null }
+>();
 
 function enabled(): boolean {
   return process.env.TCGDEX_MULTILINGUAL_RESOLVER !== "0";
@@ -260,8 +273,172 @@ export async function resolveTcgDexAliases(
   return aliases;
 }
 
+async function fetchTcgDexSetNameMap(language: string): Promise<Map<string, string> | null> {
+  const lang = tcgDexLanguageCode(language) ?? null;
+  if (!lang) return null;
+
+  const cacheKey = lang;
+  const cached = setNameMaps.get(cacheKey);
+  if (cached && Date.now() - cached.storedAt <= ttlMs()) return cached.value;
+
+  let page = 1;
+  const itemsPerPage = 100;
+  const out = new Map<string, string>();
+
+  for (;;) {
+    const rows = await fetchTcgdexJson<Array<{ id?: string; name?: string }>>(
+      `/${encodeURIComponent(lang)}/sets`,
+      {
+        "pagination:page": String(page),
+        "pagination:itemsPerPage": String(itemsPerPage),
+      },
+    );
+    if (!rows || rows.length === 0) break;
+    for (const row of rows) {
+      const id = row.id?.trim();
+      const name = row.name?.trim();
+      if (id && name) out.set(id, name);
+    }
+    page += 1;
+    // Safety stop.
+    if (page > 50) break;
+  }
+
+  setNameMaps.set(cacheKey, { storedAt: Date.now(), value: out });
+  return out;
+}
+
+export async function getTcgDexSetNameMapForLanguage(
+  language: string,
+): Promise<Map<string, string> | null> {
+  return fetchTcgDexSetNameMap(language);
+}
+
+/** Candidate TCGdex ids for a pokemontcg.io card id (e.g. sv1-1 → sv01-001). */
+export function tcgDexCandidateCardIds(pokemonCardId: string): string[] {
+  const id = pokemonCardId.trim();
+  const dash = id.lastIndexOf("-");
+  if (dash <= 0) return [id];
+
+  const setPart = id.slice(0, dash);
+  const numRaw = id.slice(dash + 1);
+  const numStripped = numRaw.replace(/^0+/, "") || numRaw;
+  const num3 = numStripped.padStart(3, "0");
+
+  const out = new Set<string>([id, `${setPart}-${num3}`]);
+
+  const sv = setPart.match(/^sv(\d+(?:\.\d+[a-z])?)$/i);
+  if (sv) {
+    const n = sv[1]!;
+    const setDex = /^\d$/.test(n) ? `sv0${n}` : `sv${n}`;
+    out.add(`${setDex}-${num3}`);
+  }
+
+  return [...out];
+}
+
+export function tcgDexImageUrls(imageBase: string): { small: string; large: string } {
+  const base = imageBase.trim().replace(/\/$/, "");
+  return { small: `${base}/low.webp`, large: `${base}/high.webp` };
+}
+
+async function fetchTcgDexCardByCandidates(
+  language: string,
+  candidates: string[],
+): Promise<TcgDexCard | null> {
+  for (const candidate of candidates) {
+    const row = await fetchCard(language, candidate);
+    if (row?.image?.trim()) return row;
+  }
+  return null;
+}
+
+export async function fetchTcgDexCardImageByPokemonId(
+  language: string,
+  pokemonCardId: string,
+): Promise<{ small: string; large: string } | null> {
+  const lang = tcgDexLanguageCode(language) ?? "en";
+  const row = await fetchTcgDexCardByCandidates(lang, tcgDexCandidateCardIds(pokemonCardId));
+  if (!row?.image?.trim()) return null;
+  return tcgDexImageUrls(row.image);
+}
+
+export async function enrichCardSummariesWithTcgDexImages<
+  T extends { id: string; images?: { small?: string; large?: string } },
+>(cards: T[], language = "en"): Promise<T[]> {
+  if (cards.length === 0) return cards;
+  const out = [...cards];
+  let idx = 0;
+  const workers = Math.min(10, cards.length);
+
+  async function worker() {
+    for (;;) {
+      const i = idx;
+      idx += 1;
+      if (i >= cards.length) break;
+      const card = cards[i]!;
+      if (card.images?.small || card.images?.large) {
+        out[i] = card;
+        continue;
+      }
+      const urls = await fetchTcgDexCardImageByPokemonId(language, card.id);
+      out[i] = urls ? { ...card, images: urls } : card;
+    }
+  }
+
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return out;
+}
+
+export async function fetchTcgDexCardLocalizedById(
+  language: string,
+  id: string,
+): Promise<TcgDexLocalizedCard | null> {
+  const lang = tcgDexLanguageCode(language) ?? null;
+  const cardId = id.trim();
+  if (!lang || !cardId) return null;
+
+  const key = `${lang}|${cardId}`.toLowerCase();
+  const cached = localizedCardCache.get(key);
+  if (cached && Date.now() - cached.storedAt <= ttlMs()) return cached.value;
+
+  const row = await fetchTcgDexCardByCandidates(lang, tcgDexCandidateCardIds(cardId));
+  const imageBase = row?.image?.trim();
+  const out: TcgDexLocalizedCard | null = row
+    ? {
+        id: row.id ?? cardId,
+        name: row.name?.trim() ?? null,
+        imageUrl: imageBase ? tcgDexImageUrls(imageBase).large : null,
+        setName: row.set?.name?.trim() ?? null,
+      }
+    : null;
+
+  while (localizedCardCache.size >= maxEntries()) {
+    const first = localizedCardCache.keys().next().value;
+    if (first) localizedCardCache.delete(first);
+    else break;
+  }
+  localizedCardCache.set(key, { storedAt: Date.now(), value: out });
+  return out;
+}
+
+export async function getTcgDexSetNameForLanguage(
+  language: string,
+  setId: string,
+): Promise<string | null> {
+  const lang = tcgDexLanguageCode(language) ?? null;
+  const sid = setId.trim();
+  if (!lang || !sid) return null;
+
+  const map = await fetchTcgDexSetNameMap(lang);
+  if (!map) return null;
+  return map.get(sid) ?? null;
+}
+
 export function clearTcgDexCache(): void {
   cache.clear();
+  setNameMaps.clear();
+  localizedCardCache.clear();
 }
 
 registerRuntimeCacheClear(clearTcgDexCache);

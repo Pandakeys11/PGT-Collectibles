@@ -1,6 +1,7 @@
 "use client";
 
-import { BookOpen, Check, Search, X } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { BookOpen, Check, RefreshCw, Search, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { getCardDisplayTitle } from "@/lib/scan/card-display";
 import type { CatalogCandidate, ExtractedCard, ScanCardContext } from "@/lib/scan/schemas";
@@ -194,16 +195,21 @@ function CandidateRow({
 export function CatalogMatchPanel({
   specimen,
   busy = false,
+  refreshingCandidates = false,
   onConfirmCandidate,
   onRejectCandidate,
+  onRefreshCandidates,
   onOpenMasterCatalog,
   panelClassName,
   variant = "default",
 }: {
   specimen: CatalogMatchSpecimen | null;
   busy?: boolean;
+  refreshingCandidates?: boolean;
   onConfirmCandidate: (candidate: CatalogCandidate) => void;
   onRejectCandidate: (catalogId: string) => void;
+  /** Deep search against master catalog / Pokédex API for more pick options. */
+  onRefreshCandidates?: () => void;
   onOpenMasterCatalog?: () => void;
   panelClassName?: string;
   variant?: "default" | "liquid";
@@ -212,6 +218,35 @@ export function CatalogMatchPanel({
   const candidates = specimen?.context.catalogCandidates ?? [];
   const activeCatalogId = specimen?.context.catalogId ?? null;
   const userSelected = specimen?.context.catalogConfidence === 1 && activeCatalogId != null;
+  const catalogBusy = busy || refreshingCandidates;
+  const autoRefreshKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!specimen || !onRefreshCandidates || catalogBusy || userSelected) return;
+    const key = [
+      specimen.context.specimenId,
+      specimen.card.name,
+      specimen.card.set,
+      specimen.card.number,
+      specimen.context.catalogIdentityStatus,
+      String(candidates.length),
+    ].join("|");
+    if (autoRefreshKeyRef.current === key) return;
+    const shouldAuto =
+      candidates.length === 0 &&
+      (specimen.context.catalogIdentityStatus === "failed" ||
+        specimen.context.catalogIdentityStatus === "ambiguous");
+    if (!shouldAuto) return;
+    autoRefreshKeyRef.current = key;
+    const timer = window.setTimeout(() => onRefreshCandidates(), 700);
+    return () => window.clearTimeout(timer);
+  }, [
+    specimen,
+    onRefreshCandidates,
+    catalogBusy,
+    userSelected,
+    candidates.length,
+  ]);
 
   return (
     <section id="catalog" className={panelClassName}>
@@ -229,19 +264,41 @@ export function CatalogMatchPanel({
             <h2 className="mt-1 text-base font-semibold text-white">Identity match</h2>
           ) : null}
         </div>
-        {onOpenMasterCatalog ? (
-          <button
-            type="button"
-            onClick={onOpenMasterCatalog}
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] font-semibold text-slate-200 transition hover:border-amber-500/30 hover:bg-amber-500/10 touch-manipulation",
-              compact ? "h-7 px-2 text-[10px]" : "h-9 px-3 text-sm",
-            )}
-          >
-            <BookOpen className={cn(compact ? "h-3 w-3" : "h-4 w-4")} />
-            Browse
-          </button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-1">
+          {onRefreshCandidates ? (
+            <button
+              type="button"
+              disabled={catalogBusy || !specimen}
+              onClick={onRefreshCandidates}
+              title="Search master catalog for closest matches"
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] font-semibold text-slate-200 transition hover:border-cyan-500/30 hover:bg-cyan-500/10 disabled:opacity-40 touch-manipulation",
+                compact ? "h-7 px-2 text-[10px]" : "h-9 px-2.5 text-sm",
+              )}
+            >
+              <RefreshCw
+                className={cn(
+                  compact ? "h-3 w-3" : "h-4 w-4",
+                  refreshingCandidates && "animate-spin",
+                )}
+              />
+              {compact ? null : "More"}
+            </button>
+          ) : null}
+          {onOpenMasterCatalog ? (
+            <button
+              type="button"
+              onClick={onOpenMasterCatalog}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] font-semibold text-slate-200 transition hover:border-amber-500/30 hover:bg-amber-500/10 touch-manipulation",
+                compact ? "h-7 px-2 text-[10px]" : "h-9 px-3 text-sm",
+              )}
+            >
+              <BookOpen className={cn(compact ? "h-3 w-3" : "h-4 w-4")} />
+              Browse
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div
@@ -295,8 +352,8 @@ export function CatalogMatchPanel({
             <>
               <p className={cn("text-slate-400", compact ? "text-[10px] leading-snug" : "text-xs")}>
                 {candidates.length === 1
-                  ? "One match — confirm or edit identity and resync."
-                  : `${candidates.length} options — pick the correct catalog card.`}
+                  ? "One close match from master catalog — confirm or tap More for alternates."
+                  : `${candidates.length} closest options from master catalog — pick the correct card.`}
               </p>
               <div
                 className={cn(
@@ -311,7 +368,7 @@ export function CatalogMatchPanel({
                     rank={index + 1}
                     active={activeCatalogId === candidate.catalogId}
                     userSelected={userSelected && activeCatalogId === candidate.catalogId}
-                    busy={busy}
+                    busy={catalogBusy}
                     compact={compact}
                     onSelect={() => onConfirmCandidate(candidate)}
                     onReject={() => onRejectCandidate(candidate.catalogId)}
@@ -326,9 +383,11 @@ export function CatalogMatchPanel({
                 compact ? "px-2 py-3 text-[10px]" : "px-3 py-5 text-sm",
               )}
             >
-              {specimen.context.catalogId
-                ? "Match active — resync to refresh alternate options."
-                : "Options appear after enrichment — edit identity and resync if needed."}
+              {refreshingCandidates
+                ? "Searching master catalog…"
+                : specimen.context.catalogId
+                  ? "Match active — tap More to load alternate catalog rows."
+                  : "No close matches yet — edit name/set/number or tap More to search Pokédex."}
             </p>
           )}
 

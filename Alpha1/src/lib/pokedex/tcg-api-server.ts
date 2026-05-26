@@ -5,12 +5,71 @@ import { applyCatalogFinishClause, type CatalogFinishBucketId } from "@/lib/poke
 import { setMatchesEra, type SetEraId } from "@/lib/pokedex/set-era";
 
 const BASE = "https://api.pokemontcg.io/v2";
+const ALL_SETS_CACHE_TTL_MS = 30 * 60 * 1000;
+
+/** One download per search query — Vintage/Mid/Modern filter in-memory (era tabs were re-hitting the API). */
+type AllSetsCacheEntry = { at: number; sets: TcgSetSummary[] };
+const allSetsCache = new Map<string, AllSetsCacheEntry>();
+const allSetsInFlight = new Map<string, Promise<TcgSetSummary[]>>();
 
 function headers(): HeadersInit {
   const key = process.env.POKEMON_TCG_API_KEY?.trim();
   const h: HeadersInit = { Accept: "application/json" };
   if (key) (h as Record<string, string>)["X-Api-Key"] = key;
   return h;
+}
+
+async function fetchAllSetsFromApi(q?: string): Promise<TcgSetSummary[]> {
+  const apiPageSize = 250;
+  const aggregated: TcgSetSummary[] = [];
+  let apiPage = 1;
+  let totalFromApi = 0;
+
+  do {
+    const u = new URL(`${BASE}/sets`);
+    u.searchParams.set("page", String(apiPage));
+    u.searchParams.set("pageSize", String(apiPageSize));
+    if (q) u.searchParams.set("q", q);
+    u.searchParams.set("orderBy", "-releaseDate");
+
+    const res = await fetch(u.toString(), { headers: headers(), next: { revalidate: 3600 } });
+    if (!res.ok) {
+      throw new Error(`TCG sets failed (${res.status})`);
+    }
+    const payload = (await res.json()) as TcgPaginated<TcgSetSummary>;
+    totalFromApi = payload.totalCount;
+    aggregated.push(...payload.data);
+    if (payload.data.length === 0) break;
+    apiPage += 1;
+  } while (aggregated.length < totalFromApi);
+
+  return aggregated;
+}
+
+async function getAllSetsCached(q?: string): Promise<TcgSetSummary[]> {
+  const cacheKey = q?.trim() || "";
+  const hit = allSetsCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < ALL_SETS_CACHE_TTL_MS) {
+    return hit.sets;
+  }
+
+  let pending = allSetsInFlight.get(cacheKey);
+  if (!pending) {
+    pending = fetchAllSetsFromApi(cacheKey || undefined)
+      .then((sets) => {
+        allSetsCache.set(cacheKey, { at: Date.now(), sets });
+        allSetsInFlight.delete(cacheKey);
+        return sets;
+      })
+      .catch((err) => {
+        allSetsInFlight.delete(cacheKey);
+        if (hit) return hit.sets;
+        throw err;
+      });
+    allSetsInFlight.set(cacheKey, pending);
+  }
+
+  return pending;
 }
 
 export async function fetchSetsPage(params: {
@@ -24,32 +83,10 @@ export async function fetchSetsPage(params: {
   era: SetEraId;
 }): Promise<TcgPaginated<TcgSetSummary>> {
   const orderBy = params.orderBy?.trim() || "-releaseDate";
-  const apiPageSize = 250;
   const outPageSize = Math.min(250, Math.max(1, params.pageSize));
   const outPage = Math.max(1, params.page);
-  const q = params.q?.trim();
 
-  const aggregated: TcgSetSummary[] = [];
-  let apiPage = 1;
-  let totalFromApi = 0;
-  do {
-    const u = new URL(`${BASE}/sets`);
-    u.searchParams.set("page", String(apiPage));
-    u.searchParams.set("pageSize", String(apiPageSize));
-    if (q) u.searchParams.set("q", q);
-    u.searchParams.set("orderBy", orderBy);
-
-    const res = await fetch(u.toString(), { headers: headers(), next: { revalidate: 3600 } });
-    if (!res.ok) {
-      throw new Error(`TCG sets failed (${res.status})`);
-    }
-    const payload = (await res.json()) as TcgPaginated<TcgSetSummary>;
-    totalFromApi = payload.totalCount;
-    aggregated.push(...payload.data);
-    if (payload.data.length === 0) break;
-    apiPage += 1;
-  } while (aggregated.length < totalFromApi);
-
+  const aggregated = await getAllSetsCached(params.q);
   const filtered = aggregated.filter((s) => setMatchesEra(s.releaseDate, params.era));
 
   filtered.sort((a, b) => {

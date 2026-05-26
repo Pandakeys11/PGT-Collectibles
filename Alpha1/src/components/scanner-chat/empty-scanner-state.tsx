@@ -86,7 +86,10 @@ export function EmptyScannerState({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className={cn("mx-auto flex max-w-3xl flex-col items-center px-4 py-8 text-center", className)}
+      className={cn(
+        "mx-auto flex w-full max-w-3xl flex-col items-center px-4 py-8 text-center lg:max-w-none lg:px-2 xl:px-4",
+        className,
+      )}
     >
       {/* Upgraded Branding Logo Mark */}
       <div className="sc-glow-border mb-5 flex h-14 w-14 items-center justify-center rounded-2xl sc-glass shadow-[0_0_15px_rgba(34,211,238,0.15)] border-cyan-500/25">

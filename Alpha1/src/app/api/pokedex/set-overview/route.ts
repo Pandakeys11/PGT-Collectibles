@@ -13,6 +13,7 @@ import type {
 } from "@/lib/pokedex/set-overview-payload";
 import { rollupCatalogSetPricing } from "@/lib/pokedex/set-pricing-aggregate";
 import {
+  CATALOG_SET_PRICING_SELECT,
   fetchAllCardsForSet,
   fetchSetById,
 } from "@/lib/pokedex/tcg-api-server";
@@ -66,7 +67,10 @@ export async function GET(req: NextRequest) {
   const overlay = getCatalogSetOverlay(setId)!;
   const displayName = setName ?? setId;
 
-  const cards = await fetchAllCardsForSet({ setId });
+  const cards = await fetchAllCardsForSet({
+    setId,
+    select: CATALOG_SET_PRICING_SELECT,
+  });
   const rollup = rollupCatalogSetPricing(cards);
 
   const sealedProducts: SetOverviewSealedRow[] = overlay.sealedProducts.map(

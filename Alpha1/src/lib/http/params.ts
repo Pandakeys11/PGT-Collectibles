@@ -23,3 +23,13 @@ export function cleanPositiveInt(
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(1, Math.floor(parsed)));
 }
+
+/** Master catalog language — `ja` for Japanese TCGdex overlay, else English API default. */
+export function parseCatalogLanguage(
+  value: string | null | undefined,
+): "en" | "ja" | undefined {
+  const v = value?.trim().toLowerCase();
+  if (!v || v === "en" || v === "english") return undefined;
+  if (v === "ja" || v === "jp" || v === "jpn" || v === "japanese") return "ja";
+  return undefined;
+}

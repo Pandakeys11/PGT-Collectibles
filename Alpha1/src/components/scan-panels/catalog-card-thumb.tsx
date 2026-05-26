@@ -42,6 +42,7 @@ export function CatalogCardThumb({ specimenId, card, catalogImageUrl, className 
       const q = new URLSearchParams({ name });
       if (card.set?.trim()) q.set("set", card.set.trim());
       if (card.number?.trim()) q.set("number", card.number.trim());
+      if (card.printStamps?.trim()) q.set("printStamps", card.printStamps.trim());
       const printed = localizedPrintedName(card);
       if (printed) q.set("printedName", printed);
       if (card.language?.trim()) q.set("language", card.language.trim());
@@ -53,12 +54,12 @@ export function CatalogCardThumb({ specimenId, card, catalogImageUrl, className 
           if (typeof u === "string" && u.trim()) setUrl(u.trim());
         })
         .catch(() => {});
-    }, 450);
+    }, catalogImageUrl ? 0 : 180);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [url, card, specimenId]);
+  }, [url, card, specimenId, catalogImageUrl]);
 
   const frame = cn(
     "pointer-events-none flex h-11 w-[2.125rem] shrink-0 select-none items-center justify-center overflow-hidden rounded-md border border-border-subtle bg-panel-raised/90 sm:h-12 sm:w-9",
@@ -85,8 +86,9 @@ export function CatalogCardThumb({ specimenId, card, catalogImageUrl, className 
       <img
         src={url}
         alt=""
-        className="h-full w-full object-contain p-px"
-        loading="lazy"
+        className="h-full w-full object-contain p-px [image-rendering:-webkit-optimize-contrast]"
+        loading={catalogImageUrl ? "eager" : "lazy"}
+        fetchPriority={catalogImageUrl ? "high" : "auto"}
         decoding="async"
         onError={() => setFailed(true)}
       />

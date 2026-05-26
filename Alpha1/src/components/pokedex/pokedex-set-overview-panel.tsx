@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ExternalLink, Loader2, Package } from "lucide-react";
+import { ChevronDown, ExternalLink, Loader2, Package } from "lucide-react";
 import type { MarketSourceLink } from "@/lib/market/sources";
 import type { SetOverviewPayload } from "@/lib/pokedex/set-overview-payload";
 import { cn } from "@/lib/cn";
@@ -18,13 +18,20 @@ function hubUrl(links: MarketSourceLink[], source: MarketSourceLink["source"], l
   return links.find((l) => l.source === source && l.lane === lane)?.url ?? null;
 }
 
-export function PokedexSetOverviewPanel(props: { setId: string; setName: string }) {
-  const { setId } = props;
+export function PokedexSetOverviewPanel(props: {
+  setId: string;
+  setName: string;
+  /** When true, user expands before the heavy set-overview fetch runs. */
+  lazy?: boolean;
+}) {
+  const { setId, lazy = true } = props;
+  const [expanded, setExpanded] = useState(!lazy);
   const [data, setData] = useState<SetOverviewPayload | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!expanded) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -47,7 +54,23 @@ export function PokedexSetOverviewPanel(props: { setId: string; setName: string 
     return () => {
       cancelled = true;
     };
-  }, [setId]);
+  }, [setId, expanded]);
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-border-subtle bg-panel-raised/30 px-3 py-2.5 text-left text-xs font-medium text-primary transition hover:border-accent/30 hover:bg-panel-raised/50 touch-manipulation"
+      >
+        <span className="inline-flex items-center gap-2">
+          <Package className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
+          Set value & sealed references
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+      </button>
+    );
+  }
 
   if (loading) {
     return (
@@ -59,7 +82,21 @@ export function PokedexSetOverviewPanel(props: { setId: string; setName: string 
   }
 
   if (error) {
-    return <p className="rounded-xl border border-border-subtle bg-panel-raised/30 px-3 py-2 text-xs text-danger">{error}</p>;
+    return (
+      <div className="space-y-2">
+        <p className="rounded-xl border border-border-subtle bg-panel-raised/30 px-3 py-2 text-xs text-danger">{error}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setData(null);
+          }}
+          className="text-xs font-medium text-accent hover:underline touch-manipulation"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   if (!data?.supported) return null;
