@@ -16,6 +16,7 @@
     "smoke:cert-registry": "node scripts/smoke-cert-registry.mjs",
     "verify:card-display": "node scripts/verify-card-display.mjs",
     "smoke:stack": "node scripts/smoke-stack.mjs",
+    "verify:clerk-live": "node scripts/verify-clerk-live.mjs",
     "audit:catalog-coverage": "node scripts/audit-catalog-coverage.mjs",
     "ngrok:setup": "node scripts/ngrok-setup.mjs",
     "tunnel": "node scripts/ngrok-tunnel.mjs",
