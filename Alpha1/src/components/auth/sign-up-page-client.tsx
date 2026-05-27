@@ -1,14 +1,14 @@
 "use client";
 
-import { SignIn } from "@clerk/nextjs";
+import { SignUp } from "@clerk/nextjs";
 import { Play } from "lucide-react";
 import { useState } from "react";
 import { LiquidScanOnboardingDemo } from "@/components/scanner-chat/liquid-scan-onboarding-demo";
 import { APP_HOME_PATH } from "@/lib/app-routes";
 import { Button } from "@/components/ui/button";
 
-/** Sign-in form + optional tour (user opens tour manually — never blocks Clerk). */
-export function SignInPageClient() {
+/** Sign-up form + optional tour (user opens tour manually — never blocks Clerk). */
+export function SignUpPageClient() {
   const [tourOpen, setTourOpen] = useState(false);
 
   return (
@@ -18,7 +18,7 @@ export function SignInPageClient() {
           PGT Liquid Scan
         </p>
         <p className="text-sm text-slate-400">
-          AI card scan, catalog match, and grade-aware market comps — one workspace after you sign in.
+          Create an account to scan, match catalog rows, and run grade-aware market comps.
         </p>
         <Button
           type="button"
@@ -32,10 +32,10 @@ export function SignInPageClient() {
         </Button>
       </div>
 
-      <SignIn
+      <SignUp
         routing="path"
-        path="/sign-in"
-        signUpUrl="/sign-up"
+        path="/sign-up"
+        signInUrl="/sign-in"
         fallbackRedirectUrl={APP_HOME_PATH}
         appearance={{
           elements: {

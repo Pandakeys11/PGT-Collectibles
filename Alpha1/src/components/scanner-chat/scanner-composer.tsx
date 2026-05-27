@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, ChevronDown, Loader2, Scan, Upload, Zap } from "lucide-react";
+import { Calculator, Camera, ChevronDown, Loader2, Scan, Upload, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SCAN_MODE_OPTIONS } from "@/lib/scanner-chat/scan-mode-labels";
 import type { ScanMode, UploadedImage } from "@/lib/scanner-chat/types";
@@ -33,6 +33,7 @@ export function ScannerComposer({
   speedOn,
   onSpeedOnChange,
   onOpenLiveCamera,
+  onOpenCalculator,
   supportsLiveCamera,
   className,
 }: {
@@ -52,6 +53,7 @@ export function ScannerComposer({
   speedOn: boolean;
   onSpeedOnChange: (on: boolean) => void;
   onOpenLiveCamera: () => void;
+  onOpenCalculator?: () => void;
   supportsLiveCamera?: boolean;
   className?: string;
 }) {
@@ -164,6 +166,18 @@ export function ScannerComposer({
               }}
             />
 
+            {onOpenCalculator ? (
+              <button
+                type="button"
+                onClick={onOpenCalculator}
+                disabled={isBusy}
+                className="sc-composer-icon-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/5 hover:text-emerald-200 disabled:opacity-40 touch-manipulation lg:h-9 lg:w-9"
+                aria-label="Open deal calculator"
+                title="Collector / vendor calculator"
+              >
+                <Calculator className="h-4 w-4" />
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => fileRef.current?.click()}

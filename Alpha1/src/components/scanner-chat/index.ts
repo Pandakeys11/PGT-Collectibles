@@ -13,6 +13,8 @@ export { ScanResultsSheet } from "./scan-results-sheet";
 export { ScanResultsViewToggle } from "./scan-results-view-toggle";
 export { ScanResultsMobileList } from "./scan-results-sheet";
 export { ScanSummaryPanel, ScanSummaryInline } from "./scan-summary-panel";
+export { CollectorVendorCalculator } from "./collector-vendor-calculator";
+export { CollectorCalculatorDialog } from "./collector-calculator-dialog";
 export { ScanIntelligencePanel } from "./scan-intelligence-panel";
 export { MarketPriceChart, MarketPriceHeatmap } from "./market-price-chart";
 export { MarketEvidenceFeed, MarketEvidenceRow } from "./market-evidence-row";

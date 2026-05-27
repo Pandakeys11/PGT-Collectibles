@@ -6,6 +6,7 @@ import {
   Bookmark,
   BookOpen,
   ChevronDown,
+  Calculator,
   CreditCard,
   Download,
   History,
@@ -25,6 +26,7 @@ import { cn } from "@/lib/cn";
 
 export type SidebarNavId =
   | "new"
+  | "calculator"
   | "catalog"
   | "companion"
   | "history"
@@ -40,6 +42,7 @@ const NAV: {
   href?: string;
 }[] = [
   { id: "new", label: "New Scan", icon: Plus },
+  { id: "calculator", label: "Deal calculator", icon: Calculator },
   { id: "catalog", label: "Master catalog", icon: BookOpen },
   { id: "companion", label: "Companion", icon: Sparkles },
   { id: "history", label: "Recent scans", icon: History },

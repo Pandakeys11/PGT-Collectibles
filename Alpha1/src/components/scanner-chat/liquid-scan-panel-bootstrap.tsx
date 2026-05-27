@@ -9,10 +9,12 @@ import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
 export function LiquidScanPanelBootstrap({
   onOpenCatalog,
   onOpenCompanion,
+  onOpenCalculator,
   onCatalogPrefill,
 }: {
   onOpenCatalog: () => void;
   onOpenCompanion: () => void;
+  onOpenCalculator: () => void;
   onCatalogPrefill: (prefill: CatalogScanPrefill) => void;
 }) {
   const searchParams = useSearchParams();
@@ -36,8 +38,9 @@ export function LiquidScanPanelBootstrap({
     consumedRef.current = true;
     if (panel === "catalog") onOpenCatalog();
     else if (panel === "companion") onOpenCompanion();
+    else if (panel === "calculator") onOpenCalculator();
     router.replace(LIQUID_SCAN_PATH, { scroll: false });
-  }, [searchParams, router, onOpenCatalog, onOpenCompanion, onCatalogPrefill]);
+  }, [searchParams, router, onOpenCatalog, onOpenCompanion, onOpenCalculator, onCatalogPrefill]);
 
   return null;
 }

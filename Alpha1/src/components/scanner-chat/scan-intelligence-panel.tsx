@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import { EvidenceRail } from "@/components/scan-panels/evidence-rail";
 import { CatalogMatchPanel } from "@/components/scan-panels/catalog-match-panel";
+import { CollectorCalculatorCollapsible } from "@/components/scanner-chat/collector-calculator-collapsible";
 import { SpecimenMarketHub } from "@/components/scanner-chat/specimen-market-hub";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { ExtractedCard } from "@/lib/scan/schemas";
@@ -180,6 +181,12 @@ export function ScanIntelligencePanel({
         {!summary ? (
           <p className="text-sm text-slate-600">Run a scan to unlock market intelligence.</p>
         ) : null}
+
+        <CollectorCalculatorCollapsible
+          baseAmount={summary?.estimatedTotal ?? 0}
+          cardCount={summary?.totalDetected ?? cards.length}
+          baseLabel={summary ? "Session FMV" : "Total value"}
+        />
 
         <AnimatePresence mode="wait">
           {selectedSpecimen ? (

@@ -43,7 +43,7 @@ export function ScanSummaryInline({
         ) : null}
       </ul>
       <p className={cn("text-emerald-400/80", compact ? "mt-1.5 text-[10px]" : "mt-2 text-xs")}>
-        Export ready · open Sheet tab for Excel-style list
+        Export ready · open Sheet tab for Excel-style list · Deal calculator in sidebar
       </p>
     </motion.div>
   );

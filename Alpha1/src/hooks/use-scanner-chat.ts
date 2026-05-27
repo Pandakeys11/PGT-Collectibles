@@ -829,6 +829,18 @@ export function useScannerChat() {
     );
   }, [pushChatOutput]);
 
+  const openCalculatorOutput = useCallback(() => {
+    const fmv = specimens.length > 0 ? buildScanSummaryFromSpecimens(specimens).estimatedTotal : 0;
+    const count = specimens.length;
+    pushChatOutput(
+      "calculator",
+      "Open deal calculator",
+      count > 0
+        ? `Deal calculator loaded with **$${fmv.toLocaleString()}** session FMV across **${count}** cards. Adjust buy %, cash offer, and trade tiers.`
+        : "Deal calculator ready — enter a total or run a scan to pull session FMV automatically.",
+    );
+  }, [pushChatOutput, specimens]);
+
   const loadCatalogPrefill = useCallback(
     async (prefill: CatalogScanPrefill) => {
       if (isBusy) return;
@@ -986,6 +998,10 @@ export function useScannerChat() {
         openCompanionOutput();
         return;
       }
+      if (lower.includes("calculator") || lower.includes("vendor") || lower.includes("deal calc")) {
+        openCalculatorOutput();
+        return;
+      }
       if (lower.includes("export") && lower.includes("csv")) {
         if (specimens.length === 0) {
           setMessages((prev) => [
@@ -1011,7 +1027,7 @@ export function useScannerChat() {
       setPrompt(chip);
       await sendLiquidAsk(chip);
     },
-    [openCatalogOutput, openCompanionOutput, sendLiquidAsk, specimens],
+    [openCalculatorOutput, openCatalogOutput, openCompanionOutput, sendLiquidAsk, specimens],
   );
 
   const runLiveScan = useCallback(async () => {
@@ -1147,6 +1163,7 @@ export function useScannerChat() {
     dismissMessage,
     openCatalogOutput,
     openCompanionOutput,
+    openCalculatorOutput,
     loadCatalogPrefill,
     rescanSpecimen,
     setUserEvidenceCrop,

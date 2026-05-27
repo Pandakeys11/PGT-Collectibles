@@ -4,7 +4,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { Loader2, Sparkles } from "lucide-react";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
-import type { AssistantChatMessage } from "@/lib/scanner-chat/types";
+import type { AssistantChatMessage, ScanSummary } from "@/lib/scanner-chat/types";
 import type { CompanionController } from "@/hooks/use-companion";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
 import {
@@ -43,6 +43,7 @@ function getMobileResultsServerSnapshot() {
 export function AIStreamingScanMessage({
   message,
   specimens = [],
+  sessionSummary = null,
   cardHandlers,
   companion,
   onCatalogScanPrefill,
@@ -50,6 +51,7 @@ export function AIStreamingScanMessage({
 }: {
   message: AssistantChatMessage;
   specimens?: ScanSpecimen[];
+  sessionSummary?: ScanSummary | null;
   cardHandlers?: CardInteractionHandlers;
   companion?: CompanionController;
   onCatalogScanPrefill?: (prefill: CatalogScanPrefill) => void;
@@ -88,7 +90,20 @@ export function AIStreamingScanMessage({
   const showDoneNarrative =
     !message.scanReport && !showAskSpinner && message.text.trim().length > 0 && !isLiveScan;
   const wideEmbed =
-    message.output?.kind === "catalog" || message.output?.kind === "companion";
+    message.output?.kind === "catalog" ||
+    message.output?.kind === "companion" ||
+    message.output?.kind === "calculator";
+
+  const calculatorFmv =
+    sessionSummary?.estimatedTotal ??
+    liveSummary?.estimatedTotal ??
+    message.summary?.estimatedTotal ??
+    0;
+  const calculatorCards =
+    sessionSummary?.totalDetected ??
+    liveSummary?.totalDetected ??
+    message.summary?.totalDetected ??
+    specimens.length;
 
   return (
     <motion.article
@@ -197,6 +212,13 @@ export function AIStreamingScanMessage({
             <LiquidChatOutputPanel
               kind="catalog"
               onCatalogScanPrefill={onCatalogScanPrefill}
+              onDismiss={onDismissOutput}
+            />
+          ) : message.output.kind === "calculator" ? (
+            <LiquidChatOutputPanel
+              kind="calculator"
+              calculatorBaseAmount={calculatorFmv}
+              calculatorCardCount={calculatorCards}
               onDismiss={onDismissOutput}
             />
           ) : null

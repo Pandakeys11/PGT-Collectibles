@@ -6,7 +6,7 @@ import { ExpandableImageThumb, ImageLightbox } from "@/components/ui/image-light
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { CompanionController } from "@/hooks/use-companion";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
-import type { ChatMessage, SystemChatMessage } from "@/lib/scanner-chat/types";
+import type { ChatMessage, ScanSummary, SystemChatMessage } from "@/lib/scanner-chat/types";
 import { scanModeLabel } from "@/lib/scanner-chat/scan-mode-labels";
 import { AIStreamingScanMessage } from "./ai-streaming-scan-message";
 import { ScanProgressTimeline } from "./scan-progress-timeline";
@@ -85,6 +85,7 @@ export type CardInteractionHandlers = {
 export function ChatMessageList({
   messages,
   specimens = [],
+  sessionSummary = null,
   cardHandlers,
   companion,
   onCatalogScanPrefill,
@@ -93,6 +94,7 @@ export function ChatMessageList({
 }: {
   messages: ChatMessage[];
   specimens?: ScanSpecimen[];
+  sessionSummary?: ScanSummary | null;
   cardHandlers?: CardInteractionHandlers;
   companion?: CompanionController;
   onCatalogScanPrefill?: (prefill: CatalogScanPrefill) => void;
@@ -114,6 +116,7 @@ export function ChatMessageList({
               key={msg.id}
               message={msg}
               specimens={specimens}
+              sessionSummary={sessionSummary}
               cardHandlers={cardHandlers}
               companion={companion}
               onCatalogScanPrefill={onCatalogScanPrefill}

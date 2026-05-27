@@ -1,6 +1,7 @@
 "use client";
 
-import { BookOpen, Sparkles, X } from "lucide-react";
+import { BookOpen, Calculator, Sparkles, X } from "lucide-react";
+import { CollectorVendorCalculator } from "@/components/scanner-chat/collector-vendor-calculator";
 import { CompanionPanel } from "@/components/companion/companion-panel";
 import { MasterCatalogBrowser } from "@/components/catalog/master-catalog-browser";
 import type { CompanionController } from "@/hooks/use-companion";
@@ -13,15 +14,57 @@ export function LiquidChatOutputPanel({
   kind,
   companion,
   onCatalogScanPrefill,
+  calculatorBaseAmount = 0,
+  calculatorCardCount = 0,
   onDismiss,
   className,
 }: {
   kind: ChatOutputKind;
   companion?: CompanionController;
   onCatalogScanPrefill?: (prefill: CatalogScanPrefill) => void;
+  calculatorBaseAmount?: number;
+  calculatorCardCount?: number;
   onDismiss?: () => void;
   className?: string;
 }) {
+  if (kind === "calculator") {
+    return (
+      <div
+        className={cn(
+          "sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(85dvh,560px)] flex-col overflow-hidden rounded-xl border border-emerald-500/20 sc-glass-raised lg:min-h-[min(40vh,420px)] lg:max-h-[min(calc(100dvh-11rem),640px)]",
+          className,
+        )}
+      >
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/8 bg-white/[0.02] px-3 py-2">
+          <div className="flex items-center gap-2">
+            <Calculator className="h-4 w-4 text-emerald-300" aria-hidden />
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-200/90">
+              Deal calculator
+            </p>
+          </div>
+          {onDismiss ? (
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5"
+              aria-label="Close calculator"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-2.5 sm:p-3 scanner-chat-scrollbar">
+          <CollectorVendorCalculator
+            embedded
+            baseAmount={calculatorBaseAmount}
+            cardCount={calculatorCardCount}
+            baseLabel={calculatorBaseAmount > 0 ? "Session FMV" : "Total value"}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (kind === "companion") {
     if (!companion) return null;
     return (

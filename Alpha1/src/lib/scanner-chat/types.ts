@@ -87,7 +87,7 @@ export interface UserChatMessage extends ChatMessageBase {
 }
 
 /** Embedded workspace panels rendered inside the Liquid Scan chat feed. */
-export type ChatOutputKind = "catalog" | "companion";
+export type ChatOutputKind = "catalog" | "companion" | "calculator";
 
 export type ChatOutputPanel = {
   kind: ChatOutputKind;

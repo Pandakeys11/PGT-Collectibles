@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Droplets, Play } from "lucide-react";
 import { BrandLogo } from "@/components/branding/brand-logo";
 import { Button } from "@/components/ui/button";
 import {
-  LIQUID_SCAN_ONBOARDING_STORAGE_KEY,
   LIQUID_SCAN_ONBOARDING_STEPS,
   LiquidScanOnboardingDemo,
 } from "@/components/scanner-chat/liquid-scan-onboarding-demo";
@@ -14,18 +13,6 @@ import { cn } from "@/lib/cn";
 /** Left rail on sign-in — Liquid Scan infographic (matches live workspace tokens). */
 export function LiquidScanAuthShowcase() {
   const [tourOpen, setTourOpen] = useState(false);
-
-  useEffect(() => {
-    const wide = window.matchMedia("(min-width: 1024px)");
-    if (!wide.matches) return;
-    try {
-      if (localStorage.getItem(LIQUID_SCAN_ONBOARDING_STORAGE_KEY) === "1") return;
-    } catch {
-      /* private mode */
-    }
-    const timer = window.setTimeout(() => setTourOpen(true), 600);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   return (
     <aside className="scanner-chat-root relative hidden overflow-hidden rounded-2xl lg:flex lg:flex-col">

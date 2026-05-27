@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fraunces } from "next/font/google";
 import localFont from "next/font/local";
@@ -56,6 +57,7 @@ export default function RootLayout({
         <ClerkProvider>
           <MotionProvider>{children}</MotionProvider>
         </ClerkProvider>
+        <Analytics />
       </body>
     </html>
   );

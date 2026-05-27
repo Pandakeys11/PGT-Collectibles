@@ -23,7 +23,6 @@ import { ScannerSidebar, type SidebarNavId } from "./scanner-sidebar";
 import { LiquidScanPanelBootstrap } from "./liquid-scan-panel-bootstrap";
 import { UploadDropzoneOverlay } from "./upload-dropzone";
 import { LiquidScanLiveCamera } from "./liquid-scan-live-camera";
-
 export function ScannerChatShell() {
   const chat = useScannerChat();
   const [liveCameraOpen, setLiveCameraOpen] = useState(false);
@@ -150,6 +149,7 @@ export function ScannerChatShell() {
         <LiquidScanPanelBootstrap
           onOpenCatalog={chat.openCatalogOutput}
           onOpenCompanion={chat.openCompanionOutput}
+          onOpenCalculator={chat.openCalculatorOutput}
           onCatalogPrefill={(prefill) => void chat.loadCatalogPrefill(prefill)}
         />
       </Suspense>
@@ -188,6 +188,7 @@ export function ScannerChatShell() {
           onNav={(id: SidebarNavId) => {
             if (id === "catalog") chat.openCatalogOutput();
             else if (id === "companion") chat.openCompanionOutput();
+            else if (id === "calculator") chat.openCalculatorOutput();
             else if (id === "exports") handleExport("csv");
             else if (id === "history") chat.setHistoryExpanded((v) => !v);
             else if (id === "watchlist") {
@@ -227,6 +228,7 @@ export function ScannerChatShell() {
               <ChatMessageList
                 messages={chat.messages}
                 specimens={chat.specimens}
+                sessionSummary={chat.summary}
                 cardHandlers={cardHandlers}
                 companion={companion}
                 onCatalogScanPrefill={(prefill) => void chat.loadCatalogPrefill(prefill)}
@@ -259,6 +261,7 @@ export function ScannerChatShell() {
             speedOn={chat.speedOn}
             onSpeedOnChange={chat.setLiquidScanSpeedOn}
             onOpenLiveCamera={() => setLiveCameraOpen(true)}
+            onOpenCalculator={() => chat.openCalculatorOutput()}
           />
         </main>
         <div className="hidden w-[min(100%,380px)] min-w-0 shrink-0 flex-col border-l border-white/6 lg:flex xl:w-[420px]">

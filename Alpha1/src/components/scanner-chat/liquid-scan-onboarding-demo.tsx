@@ -163,7 +163,6 @@ export function LiquidScanOnboardingDemo({
       }}
     >
       <DialogContent
-        hideClose
         className={cn(
           "scanner-chat-root flex flex-col overflow-hidden border-white/8 bg-[rgb(var(--sc-panel))] p-0",
           "shadow-[0_24px_80px_-20px_rgba(0,0,0,0.85)]",
@@ -265,7 +264,7 @@ export function LiquidScanOnboardingDemo({
                     className="bg-cyan-500/90 text-slate-950 hover:bg-cyan-400"
                     onClick={close}
                   >
-                    Start scanning
+                    Got it
                   </Button>
                 ) : (
                   <Button

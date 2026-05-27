@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 
 const PROMPT_CHIPS = [
   "Scan binder page",
+  "Vendor calculator",
   "Open master catalog",
   "Open companion",
   "Identify graded cards",
