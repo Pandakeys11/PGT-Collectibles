@@ -14,6 +14,7 @@ import { useSpecimenCropPreview } from "@/hooks/use-specimen-crop-preview";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import { getEffectiveEvidenceCenter, getEffectiveEvidenceRadiusMultiplier } from "@/hooks/use-scan-session";
 import { cropImageWithVisionLocation } from "@/lib/scan/specimen-crop";
+import { normalizeVisionBboxGrid } from "@/lib/scan/spatial-grid";
 import { SpecimenEditFields } from "@/components/scan-panels/specimen-edit-fields";
 import { GradedRegistryPanel } from "@/components/scan-panels/graded-registry-panel";
 import { SpecimenMarketSummary } from "@/components/scan-panels/specimen-market-summary";
@@ -215,10 +216,12 @@ export function EvidenceRail({
   }, [specimen?.id]);
 
   const graded = specimen?.context.lane === "graded";
+  const cardBbox = specimen ? normalizeVisionBboxGrid(specimen.card.bbox) : null;
   const { displaySrc, cropping, hasFullSrc } = useSpecimenCropPreview({
     fullSrc: specimen?.previewUrl ?? null,
     location: specimen?.card.location,
     evidenceCropLocation: specimen ? getEffectiveEvidenceCenter(specimen) : null,
+    bbox: cardBbox,
     radiusMultiplier: specimen ? getEffectiveEvidenceRadiusMultiplier(specimen) : undefined,
     gradedSlab: Boolean(graded),
     maxOutputSide: 640,
@@ -253,6 +256,7 @@ export function EvidenceRail({
     const hi = await cropImageWithVisionLocation(s.previewUrl, loc, {
       gradedSlab: slab,
       radiusMultiplier: getEffectiveEvidenceRadiusMultiplier(s),
+      bbox: normalizeVisionBboxGrid(s.card.bbox),
       maxOutputSide: 1680,
       quality: 0.94,
     });

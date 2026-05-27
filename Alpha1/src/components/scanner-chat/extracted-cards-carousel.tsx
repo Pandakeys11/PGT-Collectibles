@@ -25,7 +25,10 @@ import {
   GradedSlabBadgeFromCard,
 } from "@/components/ui/graded-slab-badge";
 import { resolveGraderBadgeFromCardMatch } from "@/lib/scan/grader-badge-styles";
+import type { ScanSpecimen } from "@/hooks/use-scan-session";
+import type { CatalogCandidate } from "@/lib/scan/schemas";
 import type { CardMatch } from "@/lib/scanner-chat/types";
+import { CatalogMatchQuickPick } from "./catalog-match-quick-pick";
 import { cn } from "@/lib/cn";
 
 const SWIPE_THRESHOLD = 56;
@@ -259,6 +262,7 @@ function ExtractedCardInfoPanel({
 
 export function ExtractedCardsCarousel({
   cards,
+  specimens = [],
   scannedAt,
   selectedSpecimenId,
   onSelectSpecimen,
@@ -267,9 +271,16 @@ export function ExtractedCardsCarousel({
   onViewComps,
   onAddToCollection,
   onExclude,
+  onConfirmCatalogCandidate,
+  onRejectCatalogCandidate,
+  onRefreshCatalogCandidates,
+  onOpenMasterCatalog,
+  catalogRefreshingId,
+  catalogBusy,
   className,
 }: {
   cards: CardMatch[];
+  specimens?: ScanSpecimen[];
   scannedAt?: number;
   selectedSpecimenId?: string | null;
   onSelectSpecimen?: (specimenId: string) => void;
@@ -278,6 +289,12 @@ export function ExtractedCardsCarousel({
   onViewComps?: (specimenId: string) => void;
   onAddToCollection?: (specimenId: string) => void;
   onExclude?: (specimenId: string) => void;
+  onConfirmCatalogCandidate?: (specimenId: string, candidate: CatalogCandidate) => void;
+  onRejectCatalogCandidate?: (specimenId: string, catalogId: string) => void;
+  onRefreshCatalogCandidates?: (specimenId: string) => void;
+  onOpenMasterCatalog?: () => void;
+  catalogRefreshingId?: string | null;
+  catalogBusy?: boolean;
   className?: string;
 }) {
   const selectedIndex = useMemo(() => {
@@ -295,6 +312,10 @@ export function ExtractedCardsCarousel({
   }, [selectedIndex]);
 
   const active = cards[index];
+  const activeSpecimen = useMemo(
+    () => specimens.find((s) => s.id === active?.specimenId) ?? null,
+    [specimens, active?.specimenId],
+  );
   const canPrev = index > 0;
   const canNext = index < cards.length - 1;
 
@@ -446,6 +467,19 @@ export function ExtractedCardsCarousel({
         <span className="text-[10px] text-slate-600">·</span>
         <span className="text-[10px] tabular-nums text-slate-500">{active.confidence}% match</span>
       </div>
+
+        {onConfirmCatalogCandidate && onRejectCatalogCandidate ? (
+          <CatalogMatchQuickPick
+            className="mt-3"
+            specimen={activeSpecimen}
+            busy={catalogBusy}
+            refreshing={catalogRefreshingId === active.specimenId}
+            onConfirm={onConfirmCatalogCandidate}
+            onReject={onRejectCatalogCandidate}
+            onRefreshCandidates={onRefreshCatalogCandidates}
+            onOpenMasterCatalog={onOpenMasterCatalog}
+          />
+        ) : null}
 
         <div className="mt-3 flex flex-wrap justify-center gap-1 border-t border-white/6 pt-3 xl:justify-start">
         <button

@@ -187,6 +187,7 @@ export function AIStreamingScanMessage({
             ) : (
               <ExtractedCardsCarousel
                 cards={liveCards}
+                specimens={liveSpecimens}
                 scannedAt={message.createdAt}
                 selectedSpecimenId={cardHandlers?.selectedSpecimenId}
                 onSelectSpecimen={cardHandlers?.onSelectSpecimen}
@@ -195,6 +196,12 @@ export function AIStreamingScanMessage({
                 onViewComps={cardHandlers?.onViewComps}
                 onAddToCollection={cardHandlers?.onAddToCollection}
                 onExclude={cardHandlers?.onExclude}
+                onConfirmCatalogCandidate={cardHandlers?.onConfirmCatalogCandidate}
+                onRejectCatalogCandidate={cardHandlers?.onRejectCatalogCandidate}
+                onRefreshCatalogCandidates={cardHandlers?.onRefreshCatalogCandidates}
+                onOpenMasterCatalog={cardHandlers?.onOpenMasterCatalog}
+                catalogRefreshingId={cardHandlers?.catalogRefreshingId}
+                catalogBusy={cardHandlers?.catalogBusy}
               />
             )}
           </div>

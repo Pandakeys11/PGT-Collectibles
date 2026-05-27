@@ -83,7 +83,13 @@ export function MasterCatalogBrowser({
           aria-label="Catalog franchise"
           className="flex gap-1 overflow-x-auto rounded-lg border border-white/10 bg-black/35 p-1 scanner-chat-scrollbar [scrollbar-width:thin]"
         >
-          {TAB_ORDER.map((id) => {
+          {TAB_ORDER.filter((id) => {
+            if (id === "dragonball") {
+              const count = metas.find((m) => m.id === id)?.cardCountEstimate;
+              return count != null && count > 0;
+            }
+            return true;
+          }).map((id) => {
             const meta = metas.find((m) => m.id === id) ?? defaultFranchiseMeta(id);
             const active = franchise === id;
             const short = TAB_SHORT[id] ?? meta.label.split(" ")[0];
@@ -96,6 +102,7 @@ export function MasterCatalogBrowser({
                 onClick={() => setFranchise(id)}
                 className={cn(
                   "shrink-0 rounded-md px-2.5 py-1.5 text-[10px] font-semibold transition touch-manipulation sm:px-3 sm:text-[11px]",
+                  embedded && "lg:px-3.5 lg:py-2 lg:text-xs",
                   active
                     ? "bg-amber-400/95 text-black shadow-sm"
                     : "text-slate-400 hover:bg-white/5 hover:text-slate-200",

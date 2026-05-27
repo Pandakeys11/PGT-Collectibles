@@ -1,4 +1,9 @@
-/** Client preference: Speed on = faster pipeline; off = cost control (fewer API calls). */
+/**
+ * Client preference:
+ * - Speed ON — balanced parallelism (fewer vision/catalog timeouts than max blast).
+ * - Speed OFF — gentler API pacing + skips registry only for raw/binder bulk rows.
+ * Graded slabs with certs always hydrate registry during enrich regardless of mode.
+ */
 
 export const LIQUID_SCAN_SPEED_STORAGE_KEY = "pgt-liquid-scan-speed-on";
 
@@ -35,23 +40,23 @@ export function getLiquidScanSpeedProfile(speedOn: boolean): LiquidScanSpeedProf
   if (speedOn) {
     return {
       visionConcurrency: 3,
-      catalogConcurrency: 8,
-      marketConcurrency: 6,
-      precisionConcurrency: 3,
+      catalogConcurrency: 6,
+      marketConcurrency: 4,
+      precisionConcurrency: 2,
       skipRegistryOnBulkEnrich: false,
       precisionCropEnabled: true,
-      precisionCropMax: 6,
+      precisionCropMax: 5,
       autoSessionReport: true,
     };
   }
   return {
     visionConcurrency: 2,
-    catalogConcurrency: 5,
-    marketConcurrency: 4,
+    catalogConcurrency: 4,
+    marketConcurrency: 3,
     precisionConcurrency: 2,
-    skipRegistryOnBulkEnrich: true,
+    skipRegistryOnBulkEnrich: false,
     precisionCropEnabled: true,
-    precisionCropMax: 5,
+    precisionCropMax: 6,
     autoSessionReport: false,
   };
 }

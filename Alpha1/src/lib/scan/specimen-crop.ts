@@ -1,4 +1,9 @@
 import type { VisionGridLocation } from "@/lib/scan/spatial";
+import {
+  bboxGridToCropRectFloat,
+  normalizeVisionBboxGrid,
+  type VisionBboxGrid,
+} from "@/lib/scan/spatial-grid";
 
 export type VisionCropRectPx = { sx: number; sy: number; sw: number; sh: number };
 
@@ -16,7 +21,7 @@ export type VisionCropRectFloat = {
  * and mapping a vision hit inside that crop back onto the full upload — all must match.
  * Lower = tighter on-card framing (legacy paths used ~1.38–1.45 and were often too loose vs the UI).
  */
-export const CARD_EVIDENCE_VISION_RADIUS_MULTIPLIER = 0.94;
+export const CARD_EVIDENCE_VISION_RADIUS_MULTIPLIER = 0.88;
 
 /** User-adjustable frame size range (multiplier on base card window). */
 export const CROP_RADIUS_MULT_MIN = 0.55;
@@ -52,8 +57,8 @@ export function visionLocationToCropRectFloat(
   const mult = opts?.radiusMultiplier ?? 1;
 
   if (opts?.gradedSlab) {
-    let halfW = 0.2 * minDim * mult;
-    let halfH = 0.37 * minDim * mult;
+    let halfW = 0.19 * minDim * mult;
+    let halfH = 0.4 * minDim * mult;
     halfW = Math.min(halfW, cx - 1, naturalWidth - cx - 1);
     halfH = Math.min(halfH, cy - 1, naturalHeight - cy - 1);
     halfW = Math.max(24, halfW);
@@ -67,7 +72,7 @@ export function visionLocationToCropRectFloat(
     return { sx, sy, sw, sh };
   }
 
-  const normRadius = 0.22 * mult;
+  const normRadius = 0.2 * mult;
   let half = normRadius * minDim;
   half = Math.min(half, cx - 1, naturalWidth - cx - 1, cy - 1, naturalHeight - cy - 1);
   half = Math.max(28, half);
@@ -109,6 +114,36 @@ function loadImageElement(imageSrc: string): Promise<HTMLImageElement> {
 /**
  * Returns a data URL (JPEG) of the card region for crisp UI previews.
  */
+function resolveCropRectPx(
+  nw: number,
+  nh: number,
+  location: VisionGridLocation | undefined,
+  options: {
+    gradedSlab?: boolean;
+    radiusMultiplier?: number;
+    bbox?: VisionBboxGrid | null;
+  },
+): VisionCropRectPx {
+  const gridBbox = options.bbox ?? null;
+  if (gridBbox) {
+    const rect = bboxGridToCropRectFloat(nw, nh, gridBbox, {
+      gradedSlab: options.gradedSlab,
+    });
+    const sw = Math.max(1, Math.round(rect.sw));
+    const sh = Math.max(1, Math.round(rect.sh));
+    let sx = Math.round(rect.sx);
+    let sy = Math.round(rect.sy);
+    sx = Math.max(0, Math.min(sx, nw - sw));
+    sy = Math.max(0, Math.min(sy, nh - sh));
+    return { sx, sy, sw, sh };
+  }
+  const loc: VisionGridLocation = location ?? ([500, 500] as const);
+  return visionLocationToCropRectPx(nw, nh, loc, {
+    gradedSlab: options.gradedSlab,
+    radiusMultiplier: options.radiusMultiplier ?? CARD_EVIDENCE_VISION_RADIUS_MULTIPLIER,
+  });
+}
+
 export async function cropImageWithVisionLocation(
   imageSrc: string,
   location: VisionGridLocation | undefined,
@@ -117,18 +152,19 @@ export async function cropImageWithVisionLocation(
     maxOutputSide: number;
     quality?: number;
     radiusMultiplier?: number;
+    bbox?: VisionBboxGrid | null;
   },
 ): Promise<string | null> {
-  const loc: VisionGridLocation = location ?? ([500, 500] as const);
   try {
     const img = await loadImageElement(imageSrc);
     const nw = img.naturalWidth || img.width;
     const nh = img.naturalHeight || img.height;
     if (nw < 2 || nh < 2) return null;
 
-    const { sx, sy, sw, sh } = visionLocationToCropRectPx(nw, nh, loc, {
+    const { sx, sy, sw, sh } = resolveCropRectPx(nw, nh, location, {
       gradedSlab: options.gradedSlab,
-      radiusMultiplier: options.radiusMultiplier ?? CARD_EVIDENCE_VISION_RADIUS_MULTIPLIER,
+      radiusMultiplier: options.radiusMultiplier,
+      bbox: options.bbox ?? null,
     });
     const cap = Math.max(64, options.maxOutputSide);
     const scale = Math.min(1, cap / Math.max(sw, sh));
@@ -188,6 +224,7 @@ export async function extractCardRegionDataUrl(
     radiusMultiplier?: number;
     maxOutputSide?: number;
     quality?: number;
+    bbox?: VisionBboxGrid | null;
   } = {},
 ): Promise<string | null> {
   const mult = options.radiusMultiplier ?? CARD_EVIDENCE_VISION_RADIUS_MULTIPLIER;
@@ -199,9 +236,10 @@ export async function extractCardRegionDataUrl(
     const nh = img.naturalHeight || img.height;
     if (nw < 2 || nh < 2) return null;
 
-    const { sx, sy, sw, sh } = visionLocationToCropRectPx(nw, nh, location, {
+    const { sx, sy, sw, sh } = resolveCropRectPx(nw, nh, location, {
       gradedSlab: options.gradedSlab,
       radiusMultiplier: mult,
+      bbox: options.bbox ?? null,
     });
     const scale = Math.min(1, maxSide / Math.max(sw, sh));
     const outW = Math.max(1, Math.round(sw * scale));

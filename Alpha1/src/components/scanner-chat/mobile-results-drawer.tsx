@@ -272,6 +272,7 @@ export function MobileResultsDrawer({
                 <div className="border-b border-white/6 px-3 py-3">
                   <ExtractedCardsCarousel
                     cards={cards}
+                    specimens={specimens}
                     selectedSpecimenId={selectedSpecimenId}
                     onSelectSpecimen={onSelectSpecimen}
                     onCorrectMatch={cardHandlers?.onCorrectMatch}
@@ -279,6 +280,12 @@ export function MobileResultsDrawer({
                     onViewComps={cardHandlers?.onViewComps}
                     onAddToCollection={cardHandlers?.onAddToCollection}
                     onExclude={cardHandlers?.onExclude}
+                    onConfirmCatalogCandidate={cardHandlers?.onConfirmCatalogCandidate}
+                    onRejectCatalogCandidate={cardHandlers?.onRejectCatalogCandidate}
+                    onRefreshCatalogCandidates={cardHandlers?.onRefreshCatalogCandidates}
+                    onOpenMasterCatalog={cardHandlers?.onOpenMasterCatalog}
+                    catalogRefreshingId={cardHandlers?.catalogRefreshingId}
+                    catalogBusy={cardHandlers?.catalogBusy}
                     className="max-w-none"
                   />
                 </div>

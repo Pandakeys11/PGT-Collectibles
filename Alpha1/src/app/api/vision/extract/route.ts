@@ -12,8 +12,11 @@ import {
   formatVisionProviderError,
   listEnabledVisionProviders,
   listEnabledVisionProvidersForBinderGrid,
+  isProviderInCooldown,
+  isVisionProviderConfigured,
   noteProviderFailure,
   runVisionProviderOnce,
+  getGeminiVisionVerifyModel,
 } from "@/lib/ai/vision-providers";
 import { withTimeout } from "@/lib/async-timeout";
 import {
@@ -67,8 +70,78 @@ function summarizeVisionFailure(errors: string[]): string {
   return hints.length > 0 ? `${joined} — ${hints.join(" ")}` : joined;
 }
 
+type VerifyRun = {
+  cards: unknown[];
+  provider: string;
+  salvaged?: boolean;
+  compactRetry?: boolean;
+  finishReason?: string | null;
+};
+
+async function runVerifyPassWithFallback(args: {
+  prompt: string;
+  compactPrompt: string;
+  imageBase64: string;
+  imageMimeType: string;
+  skippedProviders: Set<string>;
+  timeoutMs: number;
+}): Promise<{ result: VerifyRun | null; warnings: string[] }> {
+  const providers = ["gemini", "openrouter", "openai", "xai"] as const;
+  const warnings: string[] = [];
+  for (const id of providers) {
+    if (args.skippedProviders.has(id)) continue;
+    if (!isVisionProviderConfigured(id)) continue;
+    if (isProviderInCooldown(id)) continue;
+    try {
+      const verified = await withTimeout(
+        runVisionProviderOnce(
+          id,
+          args.prompt,
+          args.compactPrompt,
+          [args.imageBase64],
+          [args.imageMimeType],
+          id === "gemini"
+            ? {
+                allowCompactRetry: true,
+                geminiModelOverride: getGeminiVisionVerifyModel(),
+              }
+            : { allowCompactRetry: true },
+        ),
+        Math.min(args.timeoutMs, 90_000),
+        `verify_${id}`,
+      );
+      if (verified.cards.length > 0) {
+        return {
+          result: {
+            cards: verified.cards,
+            provider: id,
+            salvaged: verified.salvaged,
+            compactRetry: verified.compactRetry,
+            finishReason: verified.finishReason,
+          },
+          warnings,
+        };
+      }
+      warnings.push(`${id}: verify empty extraction`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(`${id}: verify failed (${msg})`);
+    }
+  }
+  return { result: null, warnings };
+}
+
 export async function POST(req: NextRequest) {
-  await auth.protect();
+  const bypassToken = process.env.DEV_VISION_BYPASS_TOKEN?.trim();
+  const bypassHeader = req.headers.get("x-pgt-dev-bypass")?.trim();
+  const canBypass =
+    process.env.NODE_ENV !== "production" &&
+    bypassToken &&
+    bypassHeader &&
+    bypassHeader === bypassToken;
+  if (!canBypass) {
+    await auth.protect();
+  }
 
   let body: {
     imageBase64s?: string[];
@@ -76,6 +149,8 @@ export async function POST(req: NextRequest) {
     singleCardCrop?: boolean;
     gradedFocus?: boolean;
     binderGrid?: boolean;
+    /** Optional second pass using Gemini to verify/fix extraction. */
+    visionVerify?: boolean;
     /** Bill one scan when sending multiple tile images for a single binder page. */
     scanCreditCount?: number;
   };
@@ -88,6 +163,7 @@ export async function POST(req: NextRequest) {
   const singleCardCrop = body.singleCardCrop === true;
   const gradedFocus = body.gradedFocus === true;
   const binderGrid = body.binderGrid === true && !singleCardCrop;
+  const visionVerify = body.visionVerify === true;
   const prompt = buildVisionPrompt({
     singleCardCrop,
     compact: false,
@@ -227,27 +303,138 @@ export async function POST(req: NextRequest) {
   if (skipped.length > 0) {
     errors.push(`skipped by config: ${skipped.join(", ")}`);
   }
+  const skippedSet = new Set(skipped);
+
+  const verifyEligible =
+    imageBase64s.length === 1;
+
+  const verifyPrompt = verifyEligible
+    ? `${prompt}
+
+VERIFY PASS (Gemini):
+- Re-read the image carefully and correct any obvious mistakes in name/set/number/year/grader/grade/cert.
+- Do not invent cert numbers on raw cards or when cert is not legible in-frame.
+- Keep the JSON schema identical. Return JSON only.`
+    : null;
+
+  const verifyCompactPrompt = verifyEligible
+    ? `${compactPrompt}
+
+VERIFY PASS (Gemini):
+- Re-read the image carefully and correct mistakes.
+- Return JSON only.`
+    : null;
 
   for (const providerId of enabled) {
     try {
       const result = await withTimeout(
         binderGrid && imageBase64s.length > 1
           ? (async () => {
+              const verifyCap = visionVerify
+                ? Math.min(imageBase64s.length, 8)
+                : 3;
+
               const tileResults = await Promise.all(
-                imageBase64s.map((b64, tileIndex) =>
-                  runVisionProviderOnce(
+                imageBase64s.map(async (b64, tileIndex) => {
+                  const tileMime = imageMimeTypes[tileIndex] ?? "image/jpeg";
+                  const tileResult = await runVisionProviderOnce(
                     providerId,
                     prompt,
                     compactPrompt,
                     [b64],
-                    [imageMimeTypes[tileIndex] ?? "image/jpeg"],
+                    [tileMime],
                     {
                       allowCompactRetry: true,
                       compactDensePrompt,
                     },
-                  ).then((tileResult) => ({ tileIndex, tileResult })),
-                ),
+                  );
+                  return { tileIndex, tileResult, b64, tileMime };
+                }),
               );
+
+              const tileNeedsVerify = (
+                tile: (typeof tileResults)[number],
+              ): boolean =>
+                Boolean(
+                  visionVerify ||
+                    tile.tileResult.salvaged ||
+                    tile.tileResult.compactRetry ||
+                    tile.tileResult.finishReason === "length" ||
+                    tile.tileResult.cards.length === 0 ||
+                    tile.tileResult.cards.some((raw) => {
+                      if (!raw || typeof raw !== "object") return true;
+                      const row = raw as Record<string, unknown>;
+                      const set = String(row.set ?? "").trim();
+                      const number = String(row.number ?? "").trim();
+                      const name = String(row.name ?? "").trim();
+                      return !name || (!set && !number);
+                    }),
+                );
+
+              const verifyPriority = (tile: (typeof tileResults)[number]): number => {
+                let score = 0;
+                if (tile.tileResult.cards.length === 0) score += 100;
+                if (tile.tileResult.salvaged) score += 80;
+                if (tile.tileResult.compactRetry) score += 60;
+                if (tile.tileResult.finishReason === "length") score += 50;
+                for (const raw of tile.tileResult.cards) {
+                  if (!raw || typeof raw !== "object") {
+                    score += 40;
+                    continue;
+                  }
+                  const row = raw as Record<string, unknown>;
+                  if (!String(row.name ?? "").trim()) score += 30;
+                  if (!String(row.set ?? "").trim()) score += 20;
+                  if (!String(row.number ?? "").trim()) score += 20;
+                }
+                return score;
+              };
+
+              const verifyTargets = tileResults
+                .filter(tileNeedsVerify)
+                .sort((a, b) => verifyPriority(b) - verifyPriority(a))
+                .slice(0, verifyCap);
+
+              if (verifyPrompt && verifyCompactPrompt) {
+                for (const tile of verifyTargets) {
+                  const { result: verified, warnings: verifyWarnings } =
+                    await runVerifyPassWithFallback({
+                      prompt: verifyPrompt,
+                      compactPrompt: verifyCompactPrompt,
+                      imageBase64: tile.b64,
+                      imageMimeType: tile.tileMime,
+                      skippedProviders: skippedSet,
+                      timeoutMs,
+                    });
+
+                  if (!verified) continue;
+
+                  if (verifyWarnings.length > 0) {
+                    errors.push(`verify:${verified.provider}: ${verifyWarnings[0]}`);
+                  }
+
+                  const preferVerified =
+                    Boolean(
+                      tile.tileResult.salvaged ||
+                        tile.tileResult.compactRetry ||
+                        tile.tileResult.finishReason === "length",
+                    ) ||
+                    verified.cards.length >= tile.tileResult.cards.length ||
+                    visionVerify;
+
+                  if (preferVerified) {
+                    tile.tileResult = {
+                      ...tile.tileResult,
+                      cards: verified.cards,
+                      provider: tile.tileResult.provider,
+                      salvaged: verified.salvaged || tile.tileResult.salvaged,
+                      compactRetry: verified.compactRetry ?? tile.tileResult.compactRetry,
+                      finishReason: verified.finishReason ?? tile.tileResult.finishReason,
+                    };
+                  }
+                }
+              }
+
               const merged: unknown[] = [];
               let salvaged = false;
               let compactRetry = false;
@@ -292,7 +479,7 @@ export async function POST(req: NextRequest) {
       }
 
       const normalized = normalizeCards(result.cards);
-      const out =
+      let out =
         singleCardCrop && normalized.length > 1
           ? normalized.slice(0, 1)
           : normalized;
@@ -306,6 +493,65 @@ export async function POST(req: NextRequest) {
         warnings.push(
           `${providerId}: output hit token limit — some cards may be missing`,
         );
+      }
+
+      const shouldRunVerify =
+        verifyEligible &&
+        Boolean(
+          // User explicitly requests the extra verify pass (UI/global).
+          visionVerify ||
+            // Server-side auto-trigger when primary pass looks suspicious/truncated.
+            result.salvaged ||
+            result.compactRetry ||
+            result.finishReason === "length",
+        );
+
+      if (shouldRunVerify && verifyPrompt && verifyCompactPrompt) {
+        try {
+          const verifyTimeout = Math.min(timeoutMs, 90_000);
+          const { result: verified, warnings: verifyWarnings } =
+            await runVerifyPassWithFallback({
+              prompt: verifyPrompt,
+              compactPrompt: verifyCompactPrompt,
+              imageBase64: imageBase64s[0]!,
+              imageMimeType: imageMimeTypes[0] ?? "image/jpeg",
+              skippedProviders: skippedSet,
+              timeoutMs: verifyTimeout,
+            });
+
+          if (verifyWarnings.length > 0) {
+            warnings.push(...verifyWarnings.slice(0, 2));
+          }
+
+          if (verified?.cards?.length) {
+            const verifiedNormalized = normalizeCards(verified.cards);
+            const verifiedOut =
+              singleCardCrop && verifiedNormalized.length > 1
+                ? verifiedNormalized.slice(0, 1)
+                : verifiedNormalized;
+
+            // Prefer verify pass when the initial output was truncated/salvaged,
+            // or when verified returns at least as many cards.
+            const preferVerified =
+              Boolean(result.salvaged || result.compactRetry || result.finishReason === "length") ||
+              verifiedOut.length >= out.length;
+
+            if (preferVerified) {
+              out = verifiedOut;
+              warnings.push(`${verified.provider}: verify pass applied`);
+              if (verified.salvaged || verified.compactRetry) {
+                warnings.push(
+                  `${verified.provider}: verify ${verified.compactRetry ? "compact retry" : "salvaged"} — ${verifiedOut.length} card(s)`,
+                );
+              }
+            } else {
+              warnings.push(`${verified.provider}: verify pass ran (kept initial result)`);
+            }
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          warnings.push(`verify: failed (${msg})`);
+        }
       }
 
       return NextResponse.json({

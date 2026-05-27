@@ -6,6 +6,7 @@ import { ExpandableImageThumb, ImageLightbox } from "@/components/ui/image-light
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { CompanionController } from "@/hooks/use-companion";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import type { CatalogCandidate } from "@/lib/scan/schemas";
 import type { ChatMessage, ScanSummary, SystemChatMessage } from "@/lib/scanner-chat/types";
 import { scanModeLabel } from "@/lib/scanner-chat/scan-mode-labels";
 import { AIStreamingScanMessage } from "./ai-streaming-scan-message";
@@ -80,6 +81,12 @@ export type CardInteractionHandlers = {
   onViewComps?: (id: string) => void;
   onAddToCollection?: (specimenId: string) => void;
   onExclude?: (id: string) => void;
+  onConfirmCatalogCandidate?: (specimenId: string, candidate: CatalogCandidate) => void;
+  onRejectCatalogCandidate?: (specimenId: string, catalogId: string) => void;
+  onRefreshCatalogCandidates?: (specimenId: string) => void;
+  onOpenMasterCatalog?: () => void;
+  catalogRefreshingId?: string | null;
+  catalogBusy?: boolean;
 };
 
 export function ChatMessageList({

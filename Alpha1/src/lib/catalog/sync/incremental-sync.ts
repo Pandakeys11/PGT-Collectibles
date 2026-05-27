@@ -26,6 +26,33 @@ function isRecentRelease(releaseDate: string | null | undefined, days = 120): bo
   return Date.now() - t < days * 24 * 60 * 60 * 1000;
 }
 
+async function fetchJsonWithRetry<T>(
+  url: string,
+  init: RequestInit = {},
+  options: { attempts?: number; timeoutMs?: number; label?: string } = {},
+): Promise<T> {
+  const attempts = options.attempts ?? 4;
+  const label = options.label ?? url;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: init.signal ?? AbortSignal.timeout(options.timeoutMs ?? 45_000),
+      });
+      if (res.ok) return (await res.json()) as T;
+      lastError = new Error(`${label} ${res.status}`);
+      if (![408, 429, 500, 502, 503, 504].includes(res.status)) throw lastError;
+    } catch (e) {
+      lastError = e;
+    }
+    if (attempt < attempts - 1) {
+      await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
+}
+
 async function syncMagicSetsAndRecentCards(): Promise<SyncResult> {
   const result: SyncResult = { franchise: "magic", setsUpserted: 0, cardsUpserted: 0 };
   try {
@@ -213,18 +240,14 @@ async function syncOnepieceSets(): Promise<SyncResult> {
 
 async function syncPokemonRecentSets(): Promise<SyncResult> {
   const result: SyncResult = { franchise: "pokemon", setsUpserted: 0, cardsUpserted: 0 };
-  const key = process.env.POKEMON_TCG_API_KEY?.trim();
-  const headers: HeadersInit = { Accept: "application/json" };
-  if (key) (headers as Record<string, string>)["X-Api-Key"] = key;
+  const githubHeaders: HeadersInit = {
+    Accept: "application/json",
+    "User-Agent": USER_AGENT,
+  };
 
   try {
-    const setsRes = await fetch(
-      "https://api.pokemontcg.io/v2/sets?pageSize=250&orderBy=-releaseDate",
-      { headers },
-    );
-    if (!setsRes.ok) throw new Error(`Pokemon sets ${setsRes.status}`);
-    const setsPayload = (await setsRes.json()) as {
-      data?: Array<{
+    const allSets = await fetchJsonWithRetry<
+      Array<{
         id: string;
         name: string;
         series: string;
@@ -232,9 +255,11 @@ async function syncPokemonRecentSets(): Promise<SyncResult> {
         total: number;
         printedTotal: number;
         images?: { symbol?: string; logo?: string };
-      }>;
-    };
-    const allSets = setsPayload.data ?? [];
+      }>
+    >("https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master/sets/en.json", { headers: githubHeaders }, {
+      label: "PokemonTCG data sets",
+      timeoutMs: 60_000,
+    });
     const setRows: CatalogSetUpsert[] = allSets.map((s) => ({
       franchise: "pokemon",
       externalSetId: s.id,
@@ -250,44 +275,28 @@ async function syncPokemonRecentSets(): Promise<SyncResult> {
     const recentSets = allSets.filter((s) => isRecentRelease(s.releaseDate?.replace(/\//g, "-")));
     const cardRows: CatalogCardUpsert[] = [];
     for (const set of recentSets.slice(0, 12)) {
-      let page = 1;
-      let cardsInSet = 0;
-      for (;;) {
-        const u = new URL("https://api.pokemontcg.io/v2/cards");
-        u.searchParams.set("q", `set.id:${set.id}`);
-        u.searchParams.set("page", String(page));
-        u.searchParams.set("pageSize", "250");
-        const res = await fetch(u.toString(), { headers });
-        if (!res.ok) break;
-        const body = (await res.json()) as { data?: unknown[]; totalCount?: number };
-        const pageCards = (body.data ?? []) as Array<Record<string, unknown>>;
-        for (const card of pageCards) {
-          const images = card.images as { small?: string; large?: string } | undefined;
-          const setEmbed = card.set as { name?: string } | undefined;
-          cardRows.push({
-            franchise: "pokemon",
-            catalogId: `pokemon:${String(card.id)}`,
-            name: String(card.name ?? "Unknown"),
-            setName: setEmbed?.name ?? set.name,
-            setCode: set.id,
-            cardNumber: String(card.number ?? ""),
-            year: set.releaseDate?.slice(0, 4) ?? null,
-            rarity: String(card.rarity ?? "") || null,
-            imageSmallUrl: images?.small ?? null,
-            imageLargeUrl: images?.large ?? null,
-            pricesJson: {
-              tcgPlayerUrl:
-                (card.tcgplayer as { url?: string } | undefined)?.url ?? null,
-            },
-            rawJson: { pokemonId: card.id },
-            sourceId: "pokemontcg.io",
-          });
-        }
-        cardsInSet += pageCards.length;
-        const setTotal = body.totalCount ?? cardsInSet;
-        if (!pageCards.length || cardsInSet >= setTotal) break;
-        page += 1;
-        await new Promise((r) => setTimeout(r, 80));
+      const pageCards = await fetchJsonWithRetry<Array<Record<string, unknown>>>(
+        `https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master/cards/en/${set.id}.json`,
+        { headers: githubHeaders },
+        { label: `PokemonTCG data ${set.id}`, timeoutMs: 60_000 },
+      ).catch(() => []);
+      for (const card of pageCards) {
+        const images = card.images as { small?: string; large?: string } | undefined;
+        cardRows.push({
+          franchise: "pokemon",
+          catalogId: String(card.id),
+          name: String(card.name ?? "Unknown"),
+          setName: set.name,
+          setCode: set.id,
+          cardNumber: String(card.number ?? ""),
+          year: set.releaseDate?.slice(0, 4) ?? null,
+          rarity: String(card.rarity ?? "") || null,
+          imageSmallUrl: images?.small ?? null,
+          imageLargeUrl: images?.large ?? null,
+          pricesJson: {},
+          rawJson: { pokemonId: card.id },
+          sourceId: "pokemontcg.io",
+        });
       }
     }
     result.cardsUpserted = await upsertCatalogCards(cardRows);

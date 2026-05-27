@@ -53,6 +53,9 @@ export type TcgCardSummary = {
    * display row (same official image) — used for grid keys and reverse holo market bias.
    */
   catalogFinish?: "reverse_holo";
+  catalogVariantKey?: string | null;
+  catalogVariantLabel?: string | null;
+  sourceCatalogId?: string | null;
 };
 
 /** Full card payload from `GET /v2/cards/:id` (pricing fields used in catalog detail). */

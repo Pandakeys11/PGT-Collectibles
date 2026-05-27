@@ -28,6 +28,10 @@ export type CatalogCardSummary = {
   number: string | null;
   rarity: string | null;
   supertype: string | null;
+  catalogFinish?: "reverse_holo";
+  catalogVariantKey?: string | null;
+  catalogVariantLabel?: string | null;
+  sourceCatalogId?: string | null;
   images?: { small?: string; large?: string };
   set?: {
     id: string;

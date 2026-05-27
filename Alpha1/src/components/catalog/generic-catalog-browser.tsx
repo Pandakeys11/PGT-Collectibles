@@ -162,19 +162,14 @@ export function GenericCatalogBrowser({
   }, [franchise, selectedSet, cardsPage, debouncedCardQ]);
 
   const syncHint = useMemo(() => {
-    const liveFranchises = new Set(["magic", "yugioh", "onepiece", "lorcana"]);
-    if (liveFranchises.has(franchise)) {
-      const cache =
-        meta.cardCountEstimate && meta.cardCountEstimate > 0
-          ? `${meta.cardCountEstimate.toLocaleString()} cached · `
-          : "";
-      return `${cache}Live ${meta.sourceLabel} · nightly sync keeps DB fresh`;
-    }
     if (meta.cardCountEstimate && meta.cardCountEstimate > 0) {
-      return `${meta.cardCountEstimate.toLocaleString()} cards cached · ${meta.sourceLabel}`;
+      const synced = meta.lastSyncedAt
+        ? ` · last sync ${new Date(meta.lastSyncedAt).toLocaleDateString()}`
+        : "";
+      return `${meta.cardCountEstimate.toLocaleString()} cards in master catalog${synced}`;
     }
-    return `Run npm run catalog:sync:all to populate ${meta.label}`;
-  }, [meta, franchise]);
+    return `No cached data yet — run npm run catalog:sync:all for ${meta.label}`;
+  }, [meta]);
 
   const selectSet = useCallback((set: CatalogSetSummary) => {
     setSelectedSet(set);
@@ -280,7 +275,7 @@ export function GenericCatalogBrowser({
               ))}
             </ul>
           )}
-          {setsMeta.totalCount > sets.length ? (
+          {setsMeta.totalCount > setsPage * setsMeta.pageSize ? (
             <div className="flex justify-center gap-2 pt-1">
               <Button
                 type="button"
@@ -346,6 +341,13 @@ export function GenericCatalogBrowser({
             </p>
           ) : cardsError ? (
             <p className="text-xs text-danger">{cardsError}</p>
+          ) : cards.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-white/10 px-3 py-6 text-center text-xs text-muted">
+              No cards loaded for this set yet.
+              {selectedSet.total != null && selectedSet.total > 0
+                ? " The nightly catalog sync may still be catching up — try again soon or run npm run catalog:sync:all."
+                : " This set may be unreleased or empty in the catalog source."}
+            </p>
           ) : (
             <>
               <CatalogFocusGrid
@@ -395,7 +397,7 @@ export function GenericCatalogBrowser({
                   </button>
                 )}
               />
-              {cardsMeta.totalCount > cards.length ? (
+              {cardsMeta.totalCount > cardsPage * cardsMeta.pageSize ? (
                 <div className="flex justify-center gap-2">
                   <Button
                     type="button"
@@ -422,7 +424,6 @@ export function GenericCatalogBrowser({
               ) : null}
             </>
           )}
-
         </div>
       )}
 

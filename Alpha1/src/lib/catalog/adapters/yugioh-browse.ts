@@ -61,13 +61,29 @@ export async function listYugiohSets(params: {
   };
 }
 
+async function resolveYgoCardsetName(setCode: string): Promise<string> {
+  const code = setCode.trim();
+  if (!code) return code;
+
+  // YGOPRODeck cardinfo.php expects the *set name* in the `cardset` param, not the short code.
+  // We map the short code returned by cardsets.php → set_name for reliable lookups.
+  const res = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php", {
+    next: { revalidate: 86400 },
+  });
+  if (!res.ok) return code;
+  const sets = (await res.json()) as YgoCardSet[];
+  const hit = sets.find((s) => s.set_code?.trim().toLowerCase() === code.toLowerCase());
+  return hit?.set_name?.trim() || code;
+}
+
 export async function listYugiohCards(
   setCode: string,
   params: { page: number; pageSize: number; q?: string },
 ): Promise<CatalogPaginated<CatalogCardSummary>> {
   const code = setCode.trim();
+  const cardsetName = await resolveYgoCardsetName(code);
   const url = new URL("https://db.ygoprodeck.com/api/v7/cardinfo.php");
-  url.searchParams.set("cardset", code);
+  url.searchParams.set("cardset", cardsetName);
   if (params.q?.trim()) url.searchParams.set("fname", params.q.trim());
 
   const res = await fetch(url.toString(), { next: { revalidate: 3600 } });

@@ -69,6 +69,8 @@ export type HydrateRegistryOptions = {
   /** Persist slab + observation (server routes only). */
   persist?: boolean;
   userId?: string | null;
+  /** When known, links slab + identity to master catalog (Phase B). */
+  catalogId?: string | null;
 };
 
 /**
@@ -108,7 +110,7 @@ export async function hydrateRegistryFromCard(
     try {
       hit = await lookupCertViaProviders(ref);
       if (hit && options.persist !== false) {
-        pgtCardIdentityId = await upsertPgtCardIdentity(card);
+        pgtCardIdentityId = await upsertPgtCardIdentity(card, options.catalogId ?? null);
         await upsertPgtSlabRegistry({
           grader: ref.grader,
           cert: ref.cert,
@@ -124,7 +126,7 @@ export async function hydrateRegistryFromCard(
   if (!hit) return empty;
 
   if (!pgtCardIdentityId) {
-    pgtCardIdentityId = await upsertPgtCardIdentity(card);
+    pgtCardIdentityId = await upsertPgtCardIdentity(card, options.catalogId ?? null);
   }
 
   let certMarketEvidence: MarketEvidence[] = [];

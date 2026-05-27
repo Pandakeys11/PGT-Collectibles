@@ -11,6 +11,7 @@ import { mergeCatalogMatches } from "@/lib/market/catalog-candidate-merge";
 import { matchScryfallCatalog } from "@/lib/market/scryfall-catalog";
 import { matchYugiohCatalog } from "@/lib/market/yugioh-catalog";
 import { inferCardFranchise, type CardFranchise } from "@/lib/scan/franchise";
+import { isNonTcgPokemonCollectible } from "@/lib/scan/non-tcg-pokemon";
 import type { ExtractedCard } from "@/lib/scan/schemas";
 
 function pickStronger(a: CatalogMatch | null, b: CatalogMatch | null): CatalogMatch | null {
@@ -54,9 +55,26 @@ async function matchFranchiseLive(
   }
 }
 
-function cacheMatchIsStrongEnough(match: CatalogMatch | null): boolean {
+function cacheMatchIsStrongEnough(
+  match: CatalogMatch | null,
+  franchise?: CardFranchise,
+): boolean {
   if (!match) return false;
   if (match.catalogIdentityStatus === "confirmed") return true;
+  if (match.candidates[0]?.conflicts?.includes("name conflict")) return false;
+  const fractionEvidence = match.identityEvidence.some(
+    (row) => row.field === "set total" && row.status === "match",
+  );
+  if (fractionEvidence && match.score >= 78 && match.catalogIdentityStatus === "likely") {
+    return true;
+  }
+  if (
+    franchise === "pokemon" &&
+    match.catalogIdentityStatus === "likely" &&
+    match.score >= 70
+  ) {
+    return true;
+  }
   return match.score >= 82 && match.catalogIdentityStatus === "likely";
 }
 
@@ -67,9 +85,10 @@ function cacheMatchIsStrongEnough(match: CatalogMatch | null): boolean {
  * 3) Generic web fallback via matchCatalogWithFallback
  */
 export async function matchDedicatedCatalog(card: ExtractedCard): Promise<CatalogMatch | null> {
+  if (isNonTcgPokemonCollectible(card)) return null;
   const franchise = inferCardFranchise(card).id;
   const cached = await searchDbCatalog(card, franchise);
-  if (cacheMatchIsStrongEnough(cached)) return cached;
+  if (cacheMatchIsStrongEnough(cached, franchise)) return cached;
 
   const live = await matchFranchiseLive(card, franchise);
   const merged = pickStronger(live, cached);
@@ -79,24 +98,49 @@ export async function matchDedicatedCatalog(card: ExtractedCard): Promise<Catalo
 }
 
 export async function matchCatalogWithFallback(card: ExtractedCard): Promise<CatalogMatch | null> {
+  if (isNonTcgPokemonCollectible(card)) return null;
   const dedicated = await matchDedicatedCatalog(card);
   if (dedicated?.catalogIdentityStatus === "confirmed") return dedicated;
   const generic = await matchGenericCatalog(card);
-  return pickStronger(dedicated, generic);
+  let merged = pickStronger(dedicated, generic);
+  if (merged && merged.candidates.length > 0) return merged;
+
+  const franchise = inferCardFranchise(card).id;
+  const cached = await searchDbCatalog(card, franchise);
+  if (cached) merged = pickStronger(merged, cached);
+  if (merged && merged.candidates.length > 0) return merged;
+
+  if (franchise === "pokemon") {
+    const wide = await suggestPokemonCatalogCandidates(card);
+    if (wide) return wide;
+  }
+  return merged ?? cached;
 }
 
 function needsMoreCatalogOptions(match: CatalogMatch | null): boolean {
   if (!match) return true;
-  if (match.catalogIdentityStatus !== "confirmed") return true;
-  return match.candidates.length < 5;
+  if (match.candidates.length === 0) return true;
+  // If we already have a confirmed identity, avoid expensive deep widen (live API + web).
+  // Users can still manually request more candidates from the UI when needed.
+  if (match.catalogIdentityStatus === "confirmed") return false;
+  return true;
+}
+
+function confirmedPrintVariantMatch(match: CatalogMatch | null): boolean {
+  return Boolean(
+    match?.catalogIdentityStatus === "confirmed" &&
+      match.candidates[0]?.reasons?.includes("print_variant"),
+  );
 }
 
 /** Enrich + manual-pick: widen candidate list from master catalog / cache. */
 export async function suggestCatalogCandidates(
   card: ExtractedCard,
 ): Promise<CatalogMatch | null> {
+  if (isNonTcgPokemonCollectible(card)) return null;
   const franchise = inferCardFranchise(card).id;
   const cached = await searchDbCatalog(card, franchise);
+  if (confirmedPrintVariantMatch(cached)) return cached;
 
   let live: CatalogMatch | null = null;
   if (franchise === "pokemon") {
@@ -106,7 +150,10 @@ export async function suggestCatalogCandidates(
   }
 
   let merged = mergeCatalogMatches(live, cached);
-  if (needsMoreCatalogOptions(merged) && franchise !== "pokemon") {
+  if ((!merged || merged.candidates.length < 3) && cached) {
+    merged = mergeCatalogMatches(merged, cached);
+  }
+  if (needsMoreCatalogOptions(merged)) {
     const generic = await matchGenericCatalog(card);
     merged = mergeCatalogMatches(merged, generic);
   }
@@ -115,7 +162,17 @@ export async function suggestCatalogCandidates(
 
 /** Fast match, then deep suggestion pass when identity is weak or options are thin. */
 export async function matchCatalogForEnrich(card: ExtractedCard): Promise<CatalogMatch | null> {
+  const franchise = inferCardFranchise(card).id;
   const base = await matchCatalogWithFallback(card);
+  if (
+    franchise === "pokemon" &&
+    base &&
+    base.candidates.length > 0 &&
+    base.score >= 65 &&
+    base.catalogIdentityStatus !== "failed"
+  ) {
+    return base;
+  }
   if (!needsMoreCatalogOptions(base)) return base;
 
   const wider = await suggestCatalogCandidates(card);

@@ -1,3 +1,9 @@
+import {
+  locationFromBboxGrid,
+  normalizeVisionBboxGrid,
+  scaleVisionGridCoord,
+} from "@/lib/scan/spatial-grid";
+
 export type VisionGridLocation = readonly [number, number];
 
 export type OmniVisionSpatialCard = {
@@ -37,23 +43,15 @@ export function isMissingVisionLocation(location: unknown): boolean {
 
 export function normalizeVisionGridLocation(location: unknown): VisionGridLocation | undefined {
   if (isMissingVisionLocation(location)) return undefined;
-  const y = Math.round(Number((location as number[])[0]));
-  const x = Math.round(Number((location as number[])[1]));
+  const y = scaleVisionGridCoord(Number((location as number[])[0]));
+  const x = scaleVisionGridCoord(Number((location as number[])[1]));
   return [y, x] as const;
 }
 
 function normalizeVisionBboxCenter(bbox: unknown): VisionGridLocation | undefined {
-  if (!bbox || typeof bbox !== "object") return undefined;
-  const box = bbox as Record<string, unknown>;
-  const top = Number(box.top);
-  const left = Number(box.left);
-  const width = Number(box.width);
-  const height = Number(box.height);
-  if (![top, left, width, height].every(Number.isFinite)) return undefined;
-  if (width <= 0 || height <= 0) return undefined;
-  const y = Math.max(0, Math.min(1000, Math.round(top + height / 2)));
-  const x = Math.max(0, Math.min(1000, Math.round(left + width / 2)));
-  return [y, x] as const;
+  const grid = normalizeVisionBboxGrid(bbox);
+  if (!grid) return undefined;
+  return locationFromBboxGrid(grid);
 }
 
 /**

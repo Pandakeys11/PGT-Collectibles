@@ -29,6 +29,7 @@ type ManifestFile = {
 const manifest = manifestRoot as ManifestFile;
 
 const VINTAGE_PRINT_KEYS = ["unlimited", "first_edition", "shadowless"] as const;
+const CATALOG_VARIANT_SUFFIX_RE = /__(?:reverse_holo|unlimited|first_edition|shadowless)$/;
 
 /** Per-card rows from PGT Market bulk export (`variant-artwork-overlay` API). */
 export type CatalogVariantOverlayByCardId = Record<string, CardArtworkRow>;
@@ -100,7 +101,7 @@ export function resolveCatalogCardImages(params: {
   overlay?: CatalogVariantOverlayByCardId | null;
 }): CatalogResolvedCardImages {
   const sid = params.setId?.trim();
-  const cid = params.card.id.trim();
+  const cid = params.card.id.trim().replace(CATALOG_VARIANT_SUFFIX_RE, "");
   const apiSmall = params.card.images?.small;
   const apiLarge = params.card.images?.large ?? apiSmall;
 

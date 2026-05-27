@@ -1,4 +1,5 @@
 import type { ExtractedCard } from "@/lib/scan/schemas";
+import { isNonTcgPokemonCollectible } from "@/lib/scan/non-tcg-pokemon";
 
 export type CardFranchise =
   | "pokemon"
@@ -102,6 +103,7 @@ function haystack(card: ExtractedCard): string {
 
 export function inferCardFranchise(card: ExtractedCard): FranchiseProfile {
   const explicit = normalize(card.franchise);
+  if (isNonTcgPokemonCollectible(card)) return PROFILES.other;
   if (/pokemon|pocket monsters/.test(explicit)) return PROFILES.pokemon;
   if (/one\s*piece/.test(explicit)) return PROFILES.onepiece;
   if (/dragon\s*ball|dragonball|dbz|dbs/.test(explicit)) return PROFILES.dragonball;

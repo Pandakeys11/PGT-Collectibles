@@ -1,5 +1,6 @@
 import {
   countCardsInDb,
+  countSetsInDb,
   getCardFromDb,
   listCardsFromDb,
   listSetsFromDb,
@@ -97,11 +98,25 @@ export async function listCatalogFranchises(): Promise<CatalogFranchiseMeta[]> {
   return sortFranchiseMetas(metas);
 }
 
+async function dbCachePopulated(franchise: CatalogFranchiseId): Promise<boolean> {
+  const cardCount = await countCardsInDb(franchise).catch(() => null);
+  if (cardCount != null && cardCount > 0) return true;
+  const setCount = await countSetsInDb(franchise).catch(() => null);
+  return setCount != null && setCount > 0;
+}
+
 export async function listCatalogSets(
   franchise: CatalogFranchiseId,
   params: { page: number; pageSize: number; q?: string },
 ): Promise<CatalogPaginated<CatalogSetSummary>> {
   const live = LIVE_SETS[franchise];
+  const useDbFirst = await dbCachePopulated(franchise);
+
+  if (useDbFirst) {
+    const db = await listSetsFromDb(franchise, params);
+    if (db && db.totalCount > 0 && db.data.length > 0) return db;
+  }
+
   if (live) {
     try {
       return await live(params);
@@ -124,6 +139,13 @@ export async function listCatalogCards(
   params: { page: number; pageSize: number; q?: string },
 ): Promise<CatalogPaginated<CatalogCardSummary>> {
   const live = LIVE_CARDS[franchise];
+  const useDbFirst = await dbCachePopulated(franchise);
+
+  if (useDbFirst) {
+    const db = await listCardsFromDb(franchise, setId, params);
+    if (db && db.totalCount > 0 && db.data.length > 0) return db;
+  }
+
   if (live) {
     try {
       return await live(setId, params);
@@ -144,19 +166,19 @@ export async function getCatalogCard(
   franchise: CatalogFranchiseId,
   catalogId: string,
 ): Promise<CatalogCardSummary | null> {
+  const fromDb = await getCardFromDb(franchise, catalogId);
+  if (fromDb) return fromDb;
+
   if (franchise === "magic") {
-    const live = await getMagicCard(catalogId);
-    if (live) return live;
+    return getMagicCard(catalogId);
   }
   if (franchise === "yugioh") {
-    const live = await getYugiohCard(catalogId);
-    if (live) return live;
+    return getYugiohCard(catalogId);
   }
   if (franchise === "onepiece") {
-    const live = await getOnepieceCard(catalogId);
-    if (live) return live;
+    return getOnepieceCard(catalogId);
   }
-  return getCardFromDb(franchise, catalogId);
+  return null;
 }
 
 function emptyPage<T>(params: { page: number; pageSize: number }): CatalogPaginated<T> {

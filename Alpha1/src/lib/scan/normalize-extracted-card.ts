@@ -8,6 +8,8 @@ import { applyResolvedPrintEdition } from "@/lib/scan/print-edition";
 import { isDexLikeCardNumberOnly } from "@/lib/scan/collector-fraction";
 import { inferCardFranchise } from "@/lib/scan/franchise";
 import { applySetFromCollectorFraction, applyWizardsTitleAndFractionHeuristics } from "@/lib/scan/set-identification";
+import { normalizeVisionBboxGrid, scaleVisionGridCoord } from "@/lib/scan/spatial-grid";
+import { isNonTcgPokemonCollectible } from "@/lib/scan/non-tcg-pokemon";
 import { extractedCardSchema, type ExtractedCard } from "@/lib/scan/schemas";
 
 function asString(value: unknown): string | undefined {
@@ -30,24 +32,13 @@ function asLocation(value: unknown): [number, number] | undefined {
   const y = Number(value[0]);
   const x = Number(value[1]);
   if (!Number.isFinite(y) || !Number.isFinite(x)) return undefined;
-  return [y, x];
+  return [scaleVisionGridCoord(y), scaleVisionGridCoord(x)];
 }
 
-function asBbox(value: unknown): { top: number; left: number; width: number; height: number } | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const box = value as Record<string, unknown>;
-  const top = Number(box.top);
-  const left = Number(box.left);
-  const width = Number(box.width);
-  const height = Number(box.height);
-  if (![top, left, width, height].every(Number.isFinite)) return undefined;
-  if (width <= 0 || height <= 0) return undefined;
-  return {
-    top: Math.max(0, Math.min(1000, Math.round(top))),
-    left: Math.max(0, Math.min(1000, Math.round(left))),
-    width: Math.max(1, Math.min(1000, Math.round(width))),
-    height: Math.max(1, Math.min(1000, Math.round(height))),
-  };
+function asBbox(
+  value: unknown,
+): { top: number; left: number; width: number; height: number } | undefined {
+  return normalizeVisionBboxGrid(value);
 }
 
 function locationFromBbox(
@@ -229,6 +220,9 @@ export function normalizeVisionCard(raw: unknown): ExtractedCard | null {
   if (!parsed.success) return null;
   const graded = normalizeGradedSlabFields(parsed.data, lane.lane);
   const profile = inferCardFranchise(graded);
-  const withFranchise = { ...graded, franchise: graded.franchise ?? profile.id };
+  const withFranchise = {
+    ...graded,
+    franchise: isNonTcgPokemonCollectible(graded) ? "other" : (graded.franchise ?? profile.id),
+  };
   return applyResolvedPrintEdition(withFranchise);
 }

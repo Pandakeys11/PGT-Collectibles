@@ -132,7 +132,7 @@ export function LiquidChatOutputPanel({
           </button>
         ) : null}
       </div>
-      <div className="liquid-catalog-embed min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-2.5 sm:px-3 sm:py-3 scanner-chat-scrollbar max-lg:px-3 max-lg:py-3">
+      <div className="liquid-catalog-embed min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-2.5 sm:px-3 sm:py-3 scanner-chat-scrollbar max-lg:px-3 max-lg:py-3 lg:px-4 lg:py-3.5">
         <MasterCatalogBrowser
           embedded
           scanTargetPath={LIQUID_SCAN_PATH}

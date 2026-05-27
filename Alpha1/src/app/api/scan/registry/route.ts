@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { syncCurrentAppUser } from "@/lib/auth/app-user";
 import { hydrateRegistryFromCard } from "@/lib/market/hydrate-registry-from-card";
+import { persistMarketIntelFromEnrich } from "@/lib/pgt-registry/pgt-market-intel-persist";
 import { buildScanCardContext } from "@/lib/scan/context-builder";
 import { mergeRegistrySlabIntoCard, normalizeGradedSlabFields } from "@/lib/scan/graded-slab";
 import { extractedCardSchema } from "@/lib/scan/schemas";
@@ -12,7 +13,7 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   await auth.protect();
 
-  let body: { card?: unknown; specimenId?: string };
+  let body: { card?: unknown; specimenId?: string; catalogId?: string | null };
   try {
     body = await req.json();
   } catch {
@@ -26,12 +27,26 @@ export async function POST(req: NextRequest) {
 
   const appUser = await syncCurrentAppUser();
   const card = normalizeGradedSlabFields(parsed.data);
+  const catalogId =
+    typeof body.catalogId === "string" && body.catalogId.trim() ? body.catalogId.trim() : null;
+
   const reg = await hydrateRegistryFromCard(card, {
     includeCertMarket: true,
     persist: true,
     userId: appUser?.id ?? null,
+    catalogId,
   });
   const cardOut = mergeRegistrySlabIntoCard(card, reg.registry);
+
+  if (catalogId && reg.pgtCardIdentityId) {
+    const marketEvidence = [...reg.certMarketEvidence];
+    void persistMarketIntelFromEnrich({
+      catalogId,
+      card: cardOut,
+      marketEvidence,
+      pgtCardIdentityId: reg.pgtCardIdentityId,
+    }).catch(() => null);
+  }
 
   const specimenId = String(body.specimenId ?? "registry").trim() || "registry";
   const context = buildScanCardContext({

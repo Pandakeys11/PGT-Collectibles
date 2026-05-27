@@ -1,7 +1,20 @@
 import type { TcgCardDetail, TcgCardSummary, TcgPaginated, TcgSetSummary } from "@/lib/pokedex/tcg-api-types";
+import { countCardsInDb, listAllSetsFromDb, listCardsFromDb } from "@/lib/catalog/db-catalog-browse";
+import type { CatalogSetSummary } from "@/lib/catalog/catalog-types";
 import { expandLegendaryCollectionRows, isLegendaryCollectionCatalogExpand } from "@/lib/pokedex/legendary-collection-catalog";
-import { buildSetCardsQuery, type RarityBucketId } from "@/lib/pokedex/rarity-buckets";
-import { applyCatalogFinishClause, type CatalogFinishBucketId } from "@/lib/pokedex/set-catalog-config";
+import {
+  buildSetCardsQuery,
+  cardMatchesRarityBucket,
+  countCardsByRarityBucket,
+  rarityMatchesTerm,
+  type RarityBucketId,
+} from "@/lib/pokedex/rarity-buckets";
+import {
+  applyCatalogFinishClause,
+  supportsFinishTabs,
+  type CatalogFinishBucketId,
+} from "@/lib/pokedex/set-catalog-config";
+import type { PrintingPresetId } from "@/lib/pokedex/printing-presets";
 import { setMatchesEra, type SetEraId } from "@/lib/pokedex/set-era";
 
 const BASE = "https://api.pokemontcg.io/v2";
@@ -72,6 +85,155 @@ async function getAllSetsCached(q?: string): Promise<TcgSetSummary[]> {
   return pending;
 }
 
+function catalogSetToTcgSet(row: CatalogSetSummary): TcgSetSummary {
+  return {
+    id: row.id,
+    name: row.name,
+    series: row.series ?? "",
+    printedTotal: row.printedTotal ?? row.total ?? 0,
+    total: row.total ?? row.printedTotal ?? 0,
+    releaseDate: row.releaseDate ?? "",
+    images: row.images,
+  };
+}
+
+async function fetchSetsPageFromDb(params: {
+  page: number;
+  pageSize: number;
+  q?: string;
+  orderBy?: string;
+  era: SetEraId;
+}): Promise<TcgPaginated<TcgSetSummary> | null> {
+  const populated = await countCardsInDb("pokemon");
+  if (!populated || populated <= 0) return null;
+
+  const orderBy = params.orderBy?.trim() || "-releaseDate";
+  const outPageSize = Math.min(250, Math.max(1, params.pageSize));
+  const outPage = Math.max(1, params.page);
+
+  const aggregated = (await listAllSetsFromDb("pokemon", params.q)).map(catalogSetToTcgSet);
+  const filtered = aggregated.filter((s) => setMatchesEra(s.releaseDate, params.era));
+
+  filtered.sort((a, b) => {
+    const cmp = a.releaseDate.localeCompare(b.releaseDate);
+    return orderBy.startsWith("-") ? -cmp : cmp;
+  });
+
+  const totalCount = filtered.length;
+  const start = (outPage - 1) * outPageSize;
+  const data = filtered.slice(start, start + outPageSize);
+
+  if (totalCount === 0) return null;
+
+  return {
+    data,
+    page: outPage,
+    pageSize: outPageSize,
+    count: data.length,
+    totalCount,
+  };
+}
+
+async function loadSetCardsFromDb(setId: string, variantKey?: string | null): Promise<TcgCardSummary[] | null> {
+  const populated = await countCardsInDb("pokemon");
+  if (!populated || populated <= 0) return null;
+
+  const db = await listCardsFromDb("pokemon", setId, {
+    page: 1,
+    pageSize: 5000,
+    variantKey: variantKey ?? null,
+    includeVariants: true,
+  });
+  if (!db || db.totalCount === 0) return null;
+
+  return db.data.map((row) => ({
+    id: row.id,
+    name: row.name,
+    number: row.number ?? "",
+    rarity: row.rarity ?? undefined,
+    catalogFinish: row.catalogFinish,
+    catalogVariantKey: row.catalogVariantKey,
+    catalogVariantLabel: row.catalogVariantLabel,
+    sourceCatalogId: row.sourceCatalogId,
+    images: row.images,
+    set: row.set
+      ? {
+          id: row.set.id,
+          name: row.set.name,
+          releaseDate: row.set.releaseDate ?? undefined,
+        }
+      : undefined,
+    tcgplayer: row.tcgplayer?.url ? { url: row.tcgplayer.url } : undefined,
+  }));
+}
+
+export async function fetchRarityCountsForSet(setId: string): Promise<Record<RarityBucketId, number> | null> {
+  const cards = await loadSetCardsFromDb(setId.trim());
+  if (!cards) return null;
+  return countCardsByRarityBucket(cards);
+}
+
+function filterCardsByFinish(
+  cards: TcgCardSummary[],
+  setId: string,
+  finish: CatalogFinishBucketId,
+): TcgCardSummary[] {
+  if (finish === "all") return cards;
+  if (finish === "reverse_holo") {
+    return cards.filter(
+      (c) => c.catalogFinish === "reverse_holo" || c.catalogVariantKey === "reverse_holo",
+    );
+  }
+  if (!supportsFinishTabs(setId)) return cards;
+  if (finish === "rare_holo") {
+    return cards.filter((c) => {
+      const r = c.rarity ?? "";
+      return (
+        rarityMatchesTerm(r, "Rare Holo") ||
+        r.startsWith("Rare Holo") ||
+        /^Rare Holo\b/i.test(r)
+      );
+    });
+  }
+  if (finish === "rare_non_holo") {
+    return cards.filter((c) => rarityMatchesTerm(c.rarity ?? "", "Rare"));
+  }
+  return cards;
+}
+
+async function fetchCardsForSetPageFromDb(params: {
+  setId: string;
+  page: number;
+  pageSize: number;
+  variantKey?: string | null;
+  rarityBucket?: RarityBucketId;
+  finishBucket?: CatalogFinishBucketId;
+}): Promise<TcgPaginated<TcgCardSummary> | null> {
+  const cards = await loadSetCardsFromDb(params.setId, params.variantKey);
+  if (!cards) return null;
+
+  const bucket = params.rarityBucket ?? "all";
+  const finish = params.finishBucket ?? "all";
+  let filtered =
+    bucket === "all"
+      ? cards
+      : cards.filter((c) => cardMatchesRarityBucket(c.rarity, bucket));
+  filtered = filterCardsByFinish(filtered, params.setId, finish);
+
+  const page = Math.max(1, params.page);
+  const pageSize = Math.max(1, params.pageSize);
+  const start = (page - 1) * pageSize;
+  const data = filtered.slice(start, start + pageSize);
+
+  return {
+    data,
+    page,
+    pageSize,
+    count: data.length,
+    totalCount: filtered.length,
+  };
+}
+
 export async function fetchSetsPage(params: {
   page: number;
   pageSize: number;
@@ -86,30 +248,47 @@ export async function fetchSetsPage(params: {
   const outPageSize = Math.min(250, Math.max(1, params.pageSize));
   const outPage = Math.max(1, params.page);
 
-  const aggregated = await getAllSetsCached(params.q);
-  const filtered = aggregated.filter((s) => setMatchesEra(s.releaseDate, params.era));
+  const fromDb = await fetchSetsPageFromDb(params);
+  if (fromDb) return fromDb;
 
-  filtered.sort((a, b) => {
-    const cmp = a.releaseDate.localeCompare(b.releaseDate);
-    return orderBy.startsWith("-") ? -cmp : cmp;
-  });
+  try {
+    const aggregated = await getAllSetsCached(params.q);
+    const filtered = aggregated.filter((s) => setMatchesEra(s.releaseDate, params.era));
 
-  const totalCount = filtered.length;
-  const start = (outPage - 1) * outPageSize;
-  const data = filtered.slice(start, start + outPageSize);
+    filtered.sort((a, b) => {
+      const cmp = a.releaseDate.localeCompare(b.releaseDate);
+      return orderBy.startsWith("-") ? -cmp : cmp;
+    });
 
-  return {
-    data,
-    page: outPage,
-    pageSize: outPageSize,
-    count: data.length,
-    totalCount,
-  };
+    const totalCount = filtered.length;
+    const start = (outPage - 1) * outPageSize;
+    const data = filtered.slice(start, start + outPageSize);
+
+    return {
+      data,
+      page: outPage,
+      pageSize: outPageSize,
+      count: data.length,
+      totalCount,
+    };
+  } catch {
+    const fallback = await fetchSetsPageFromDb(params);
+    if (fallback) return fallback;
+    throw new Error("Unable to load Pokémon sets");
+  }
 }
 
 export async function fetchSetById(setId: string): Promise<TcgSetSummary | null> {
   const id = setId.trim();
   if (!id) return null;
+
+  const populated = await countCardsInDb("pokemon");
+  if (populated && populated > 0) {
+    const sets = await listAllSetsFromDb("pokemon");
+    const hit = sets.find((s) => s.id === id || s.code === id);
+    if (hit) return catalogSetToTcgSet(hit);
+  }
+
   const res = await fetch(`${BASE}/sets/${encodeURIComponent(id)}`, {
     headers: headers(),
     next: { revalidate: 3600 },
@@ -187,16 +366,48 @@ export async function fetchCardsForSetPage(params: {
   pageSize: number;
   rarityBucket?: RarityBucketId;
   finishBucket?: CatalogFinishBucketId;
+  printingPreset?: PrintingPresetId;
 }): Promise<TcgPaginated<TcgCardSummary>> {
   const setId = params.setId.trim();
   if (!setId) throw new Error("setId required");
   const bucket = params.rarityBucket ?? "all";
   const finish = params.finishBucket ?? "all";
+  const printingPreset = params.printingPreset ?? "catalog";
   let q = buildSetCardsQuery(setId, bucket);
   q = applyCatalogFinishClause(q, setId, finish);
 
+  const dbVariantKey =
+    finish === "reverse_holo"
+      ? "reverse_holo"
+      : printingPreset !== "catalog"
+        ? printingPreset
+        : null;
+
+  const fromDb = await fetchCardsForSetPageFromDb({
+    setId,
+    page: params.page,
+    pageSize: params.pageSize,
+    variantKey: dbVariantKey,
+    rarityBucket: bucket,
+    finishBucket: finish,
+  });
+  if (fromDb) return fromDb;
+
   if (!isLegendaryCollectionCatalogExpand(setId)) {
-    return fetchCardsByQuery({ q, page: params.page, pageSize: params.pageSize });
+    try {
+      return await fetchCardsByQuery({ q, page: params.page, pageSize: params.pageSize });
+    } catch {
+      const fallback = await fetchCardsForSetPageFromDb({
+        setId,
+        page: params.page,
+        pageSize: params.pageSize,
+        rarityBucket: bucket,
+        finishBucket: finish,
+        variantKey: dbVariantKey,
+      });
+      if (fallback) return fallback;
+      throw new Error(`TCG cards failed for set ${setId}`);
+    }
   }
 
   const all: TcgCardSummary[] = [];

@@ -46,6 +46,29 @@ function dedupeRows(rows, keyFn) {
   return [...map.values()];
 }
 
+async function fetchJsonWithRetry(url, init = {}, options = {}) {
+  const attempts = options.attempts ?? 4;
+  const label = options.label ?? url;
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: init.signal ?? AbortSignal.timeout(options.timeoutMs ?? 45_000),
+      });
+      if (res.ok) return res.json();
+      lastError = new Error(`${label} ${res.status}`);
+      if (![408, 429, 500, 502, 503, 504].includes(res.status)) throw lastError;
+    } catch (err) {
+      lastError = err;
+    }
+    if (attempt < attempts - 1) {
+      await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+    }
+  }
+  throw lastError ?? new Error(`${label} failed`);
+}
+
 async function upsertBatch(rows) {
   if (rows.length === 0) return 0;
   rows = dedupeRows(rows, (row) => `${row.franchise}|${row.catalog_id}`);
@@ -80,6 +103,16 @@ async function upsertSetsBatch(rows) {
   return total;
 }
 
+async function countCardsForSet(franchise, setCode) {
+  const { count, error } = await supabase
+    .from("tcg_catalog_cards")
+    .select("id", { count: "exact", head: true })
+    .eq("franchise", franchise)
+    .eq("set_code", setCode);
+  if (error) return 0;
+  return count ?? 0;
+}
+
 function setRow(franchise, externalSetId, name, code, releaseDate, cardCount, sourceId, rawJson = {}) {
   return {
     franchise,
@@ -102,9 +135,13 @@ async function touchSource(sourceId) {
 }
 
 async function syncMagic() {
-  console.log("Sync Magic (Scryfall sets → cards, paper expansions)...");
+  console.log("Sync Magic (Scryfall bulk data, paper expansions)...");
   const headers = { "User-Agent": "PGTVision/1.0 catalog-sync" };
-  const setsPayload = await fetch("https://api.scryfall.com/sets", { headers }).then((r) => r.json());
+  const setsPayload = await fetchJsonWithRetry(
+    "https://api.scryfall.com/sets",
+    { headers },
+    { label: "Scryfall sets", timeoutMs: 45_000 },
+  );
   const sets = (setsPayload?.data ?? []).filter(
     (s) => s.digital === false && (s.set_type === "expansion" || s.set_type === "core" || s.set_type === "masters"),
   );
@@ -117,36 +154,42 @@ async function syncMagic() {
   const setsUpserted = await upsertSetsBatch(setRows);
   console.log(`  Magic sets indexed: ${setsUpserted}`);
 
-  const rows = [];
-  for (const set of sets) {
-    let next = `https://api.scryfall.com/cards/search?order=set&q=e:${encodeURIComponent(set.code)}&unique=prints`;
-    while (next) {
-      const page = await fetch(next, { headers }).then((r) => r.json());
-      for (const card of page?.data ?? []) {
-        rows.push({
-          franchise: "magic",
-          catalog_id: `scryfall:${card.id}`,
-          name: card.name,
-          printed_name: card.printed_name ?? null,
-          set_name: card.set_name ?? set.name ?? null,
-          set_code: set.code ?? null,
-          card_number: card.collector_number ?? null,
-          year: card.released_at?.slice(0, 4) ?? null,
-          rarity: card.rarity ?? null,
-          image_small_url: card.image_uris?.small ?? card.card_faces?.[0]?.image_uris?.small ?? null,
-          image_large_url: card.image_uris?.large ?? card.card_faces?.[0]?.image_uris?.large ?? null,
-          search_text: searchText([card.name, card.set_name, card.collector_number]),
-          prices_json: { tcgPlayerUrl: card.purchase_uris?.tcgplayer ?? null },
-          raw_json: { scryfallId: card.id, setCode: set.code },
-          source_id: "scryfall.com",
-          synced_at: new Date().toISOString(),
-        });
-      }
-      next = page?.has_more ? page.next_page : null;
-      await new Promise((r) => setTimeout(r, 120));
-    }
-    process.stdout.write(`  ${set.code}: ${rows.length} cards\r`);
-  }
+  const bulkPayload = await fetchJsonWithRetry(
+    "https://api.scryfall.com/bulk-data",
+    { headers },
+    { label: "Scryfall bulk index", timeoutMs: 45_000 },
+  );
+  const bulkType = process.env.MAGIC_SYNC_BULK_TYPE?.trim() || "unique_artwork";
+  const bulk = (bulkPayload?.data ?? []).find((row) => row.type === bulkType);
+  if (!bulk?.download_uri) throw new Error(`Scryfall bulk ${bulkType} unavailable`);
+  console.log(`  Magic bulk source: ${bulkType} (${Math.round((bulk.size ?? 0) / 1024 / 1024)} MB)`);
+
+  const cards = await fetchJsonWithRetry(
+    bulk.download_uri,
+    { headers },
+    { label: `Scryfall bulk ${bulkType}`, timeoutMs: 300_000 },
+  );
+  const setCodes = new Set(sets.map((set) => set.code));
+  const rows = (Array.isArray(cards) ? cards : [])
+    .filter((card) => setCodes.has(card.set) && (card.games ?? []).includes("paper"))
+    .map((card) => ({
+      franchise: "magic",
+      catalog_id: `scryfall:${card.id}`,
+      name: card.name,
+      printed_name: card.printed_name ?? null,
+      set_name: card.set_name ?? null,
+      set_code: card.set ?? null,
+      card_number: card.collector_number ?? null,
+      year: card.released_at?.slice(0, 4) ?? null,
+      rarity: card.rarity ?? null,
+      image_small_url: card.image_uris?.small ?? card.card_faces?.[0]?.image_uris?.small ?? null,
+      image_large_url: card.image_uris?.large ?? card.card_faces?.[0]?.image_uris?.large ?? null,
+      search_text: searchText([card.name, card.set_name, card.collector_number]),
+      prices_json: { tcgPlayerUrl: card.purchase_uris?.tcgplayer ?? null },
+      raw_json: { scryfallId: card.id, setCode: card.set },
+      source_id: "scryfall.com",
+      synced_at: new Date().toISOString(),
+    }));
   const count = await upsertBatch(rows);
   await touchSource("scryfall.com");
   console.log(`Magic: ${count} cards`);
@@ -319,13 +362,13 @@ async function syncPokemon() {
     ? { Accept: "application/json", "X-Api-Key": key }
     : { Accept: "application/json" };
 
-  const setsRes = await fetch(
+  const setsPayload = await fetchJsonWithRetry(
     "https://api.pokemontcg.io/v2/sets?pageSize=250&orderBy=-releaseDate",
     { headers },
+    { label: "Pokemon sets", timeoutMs: 60_000 },
   );
-  if (!setsRes.ok) throw new Error(`Pokemon sets ${setsRes.status}`);
-  const setsPayload = await setsRes.json();
   const allSets = setsPayload.data ?? [];
+  const pokemonSetsById = new Map(allSets.map((set) => [set.id, set]));
   const setRows = allSets.map((s) =>
     setRow(
       "pokemon",
@@ -340,48 +383,43 @@ async function syncPokemon() {
   );
   console.log(`  Pokémon sets indexed: ${await upsertSetsBatch(setRows)}`);
 
-  const rows = [];
-  for (const set of allSets) {
-    let page = 1;
-    let cardsInSet = 0;
-    for (;;) {
-      const u = new URL("https://api.pokemontcg.io/v2/cards");
-      u.searchParams.set("q", `set.id:${set.id}`);
-      u.searchParams.set("page", String(page));
-      u.searchParams.set("pageSize", "250");
-      const res = await fetch(u.toString(), { headers });
-      if (!res.ok) break;
-      const body = await res.json();
-      const pageCards = body.data ?? [];
-      for (const card of pageCards) {
-        rows.push({
-          franchise: "pokemon",
-          catalog_id: `pokemon:${card.id}`,
-          name: card.name,
-          printed_name: null,
-          set_name: card.set?.name ?? set.name,
-          set_code: set.id,
-          card_number: String(card.number ?? ""),
-          year: set.releaseDate?.slice(0, 4) ?? null,
-          rarity: card.rarity ?? null,
-          image_small_url: card.images?.small ?? null,
-          image_large_url: card.images?.large ?? null,
-          search_text: searchText([card.name, set.name, card.number]),
-          prices_json: { tcgPlayerUrl: card.tcgplayer?.url ?? null },
-          raw_json: { pokemonId: card.id },
-          source_id: "pokemontcg.io",
-          synced_at: new Date().toISOString(),
-        });
-      }
-      cardsInSet += pageCards.length;
-      const setTotal = body.totalCount ?? cardsInSet;
-      if (!pageCards.length || cardsInSet >= setTotal) break;
-      page += 1;
-      await new Promise((r) => setTimeout(r, 80));
-    }
-    process.stdout.write(`  ${set.id}: ${cardsInSet} cards (${rows.length} total)\r`);
+  const files = await fetchJsonWithRetry(
+    "https://api.github.com/repos/PokemonTCG/pokemon-tcg-data/contents/cards/en?ref=master",
+    { headers: { "User-Agent": "PGTVision/1.0 catalog-sync" } },
+    { label: "PokemonTCG data file list", timeoutMs: 60_000 },
+  );
+  let count = 0;
+  for (const file of files ?? []) {
+    if (!file?.download_url || !String(file.name ?? "").endsWith(".json")) continue;
+    const cards = await fetchJsonWithRetry(
+      file.download_url,
+      { headers: { "User-Agent": "PGTVision/1.0 catalog-sync" } },
+      { label: `PokemonTCG data ${file.name}`, timeoutMs: 60_000 },
+    );
+    if (!Array.isArray(cards) || cards.length === 0) continue;
+    const setCode = String(file.name).replace(/\.json$/i, "");
+    const setInfo = pokemonSetsById.get(setCode);
+    const rows = cards.map((card) => ({
+      franchise: "pokemon",
+      catalog_id: card.id,
+      name: card.name,
+      printed_name: null,
+      set_name: card.set?.name ?? setInfo?.name ?? null,
+      set_code: card.set?.id ?? setCode,
+      card_number: String(card.number ?? ""),
+      year: card.set?.releaseDate?.slice(0, 4) ?? setInfo?.releaseDate?.slice(0, 4) ?? null,
+      rarity: card.rarity ?? null,
+      image_small_url: card.images?.small ?? null,
+      image_large_url: card.images?.large ?? null,
+      search_text: searchText([card.name, card.set?.name, card.number]),
+      prices_json: { tcgPlayerUrl: card.tcgplayer?.url ?? null },
+      raw_json: { pokemonId: card.id },
+      source_id: "pokemontcg.io",
+      synced_at: new Date().toISOString(),
+    }));
+    count += await upsertBatch(rows);
+    process.stdout.write(`  ${setCode}: ${rows.length} cards (${count} total)\r`);
   }
-  const count = await upsertBatch(rows);
   await touchSource("pokemontcg.io");
   console.log(`Pokémon: ${count} cards`);
 }

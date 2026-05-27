@@ -385,6 +385,7 @@ function scoreCatalogCandidate(
     conflicts.push("name conflict");
   }
 
+  const frac = parseCollectorFraction(scoringCard.number);
   const extractedSet = scoringCard.set?.trim() ?? "";
   const catalogSet = hit.set?.name ?? null;
   const promoResolved = resolvePokemonPromoSet(extractedSet);
@@ -392,6 +393,7 @@ function scoreCatalogCandidate(
     promoResolved != null &&
     (hit.set?.id ?? "").trim().toLowerCase() === promoResolved.setId.toLowerCase();
   if (extractedSet && !isEditionOnlySetName(extractedSet)) {
+    const denomMatches = frac ? catalogHitMatchesPrintedTotal(hit, frac.den) : false;
     if (
       setNamesMatch(catalogSet ?? undefined, extractedSet) ||
       promoSetNamesMatch(catalogSet ?? undefined, extractedSet) ||
@@ -408,6 +410,16 @@ function scoreCatalogCandidate(
           : "Set name agrees with catalog.",
       });
       reasons.push(promoSetIdMatch ? "set.id" : "set");
+    } else if (denomMatches && nameA && nameB && (nameA === nameB || nameA.includes(nameB) || nameB.includes(nameA))) {
+      score += pushEvidence(evidence, {
+        field: "set",
+        extracted: extractedSet,
+        catalog: catalogSet,
+        status: "info",
+        weight: -6,
+        reason: "Vision set misread — printed total + name agree with catalog.",
+      });
+      reasons.push("set_misread");
     } else {
       score += pushEvidence(evidence, {
         field: "set",
@@ -420,8 +432,6 @@ function scoreCatalogCandidate(
       conflicts.push("set conflict");
     }
   }
-
-  const frac = parseCollectorFraction(scoringCard.number);
   const hitHead = cardNumberHead(hit.number);
   if (frac) {
     if (hitHead === frac.num.toLowerCase()) {
@@ -649,9 +659,19 @@ function resolveCatalogIdentityStatus(
     return true;
   };
 
-  if (canConfirm(90, 15)) return "confirmed";
+  if (canConfirm(85, 12)) return "confirmed";
   if (top.score >= 85 && scored.length === 1 && !nameConflict) {
     if (!expectsNumber || numberOk) return "confirmed";
+  }
+  if (numberOk && !nameConflict && canConfirm(80, 8)) return "confirmed";
+  if (
+    top.reasons.includes("denominator") &&
+    numberOk &&
+    !nameConflict &&
+    top.score >= 78 &&
+    gap >= 8
+  ) {
+    return "confirmed";
   }
   if (
     slabTrusted &&
@@ -728,7 +748,10 @@ function buildCatalogQueries(
   }
 
   if (frac) {
-    broad.push(
+    strict.push(
+      `name:"${escapeQueryValue(name)}" number:"${escapeQueryValue(frac.num)}"`,
+    );
+    broad.unshift(
       `name:"${escapeQueryValue(name)}" number:"${escapeQueryValue(frac.num)}"`,
     );
   } else if (number && looksLikeCollectorNumber(number)) {

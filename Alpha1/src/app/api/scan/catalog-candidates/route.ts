@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { suggestCatalogCandidates } from "@/lib/market/catalog-router";
 import { mergeCatalogMatches } from "@/lib/market/catalog-candidate-merge";
+import { ensureCatalogMatchOptions } from "@/lib/market/ensure-catalog-options";
 import type { CatalogMatch } from "@/lib/market/pokemon-catalog";
-import { catalogMatchIsAuthoritative, resolveCatalogImageUrl } from "@/lib/scan/catalog-merge";
+import {
+  resolveCatalogImageUrl,
+  resolveCatalogPreviewImageUrl,
+  trustedCatalogMatch,
+} from "@/lib/scan/catalog-merge";
 import { extractedCardSchema } from "@/lib/scan/schemas";
 
 export const dynamic = "force-dynamic";
@@ -12,15 +16,21 @@ function catalogPayload(
   catalog: CatalogMatch,
   card: ReturnType<typeof extractedCardSchema.parse>,
 ) {
-  const authoritative = catalogMatchIsAuthoritative(catalog, card);
+  const trusted = trustedCatalogMatch(catalog, card);
+  const catalogId = trusted
+    ? (catalog.catalogId ?? catalog.candidates[0]?.catalogId ?? null)
+    : null;
   return {
-    catalogId: authoritative ? catalog.catalogId : null,
+    catalogId,
     catalogIdentityStatus: catalog.catalogIdentityStatus,
     catalogConfidence: catalog.catalogConfidence,
+    candidates: catalog.candidates,
     catalogCandidates: catalog.candidates,
     identityEvidence: catalog.identityEvidence,
-    catalogImageUrl: resolveCatalogImageUrl(catalog, card),
-    catalogMatched: authoritative,
+    catalogImageUrl:
+      resolveCatalogImageUrl(catalog, card) ??
+      resolveCatalogPreviewImageUrl(catalog, card),
+    catalogMatched: trusted,
   };
 }
 
@@ -39,10 +49,11 @@ export async function POST(req: NextRequest) {
 
   const card = parsed.data;
   try {
-    const fresh = await suggestCatalogCandidates(card);
-    if (!fresh) {
+    const fresh = await ensureCatalogMatchOptions(card);
+    if (!fresh || fresh.candidates.length === 0) {
       return NextResponse.json({
         candidates: [],
+        catalogCandidates: [],
         catalogIdentityStatus: "failed" as const,
         catalogConfidence: 0,
         catalogId: null,

@@ -13,14 +13,20 @@ import type { PrintingPresetId, PrintingPresetOption } from "@/lib/pokedex/print
 export type { PrintingPresetId, PrintingPresetOption } from "@/lib/pokedex/printing-presets";
 
 /** Legendary Collection-style finish splits (set base6). */
-export type CatalogFinishBucketId = "all" | "rare_holo" | "rare_non_holo";
+export type CatalogFinishBucketId = "all" | "rare_holo" | "rare_non_holo" | "reverse_holo";
 
-export const CATALOG_FINISH_TAB_ORDER: CatalogFinishBucketId[] = ["all", "rare_holo", "rare_non_holo"];
+export const CATALOG_FINISH_TAB_ORDER: CatalogFinishBucketId[] = [
+  "all",
+  "rare_holo",
+  "rare_non_holo",
+  "reverse_holo",
+];
 
 export const CATALOG_FINISH_TAB_LABELS: Record<CatalogFinishBucketId, string> = {
   all: "All finishes",
   rare_holo: "Holo rares",
   rare_non_holo: "Non-holo rares",
+  reverse_holo: "Reverse holo",
 };
 
 /** Sets where Rare vs Rare Holo should be splittable via finish tabs. */
@@ -45,6 +51,9 @@ export function applyCatalogFinishClause(
   if (!supportsFinishTabs(sid)) return luceneQuery;
   if (finish === "rare_holo") {
     return `${luceneQuery} AND rarity:"Rare Holo"`;
+  }
+  if (finish === "reverse_holo") {
+    return luceneQuery;
   }
   return `${luceneQuery} AND (rarity:Rare AND -rarity:"Rare Holo")`;
 }

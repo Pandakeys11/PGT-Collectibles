@@ -498,6 +498,14 @@ export function useScannerChat() {
     [confirmCatalogCandidate, selectedSpecimenId],
   );
 
+  const handleConfirmCandidateForSpecimen = useCallback(
+    (specimenId: string, candidate: CatalogCandidate) => {
+      setSelectedSpecimenId(specimenId);
+      confirmCatalogCandidate(specimenId, candidate);
+    },
+    [confirmCatalogCandidate, setSelectedSpecimenId],
+  );
+
   const handleRejectCandidate = useCallback(
     (catalogId: string) => {
       if (!selectedSpecimenId) return;
@@ -506,10 +514,26 @@ export function useScannerChat() {
     [rejectCatalogCandidate, selectedSpecimenId],
   );
 
+  const handleRejectCandidateForSpecimen = useCallback(
+    (specimenId: string, catalogId: string) => {
+      setSelectedSpecimenId(specimenId);
+      rejectCatalogCandidate(specimenId, catalogId);
+    },
+    [rejectCatalogCandidate, setSelectedSpecimenId],
+  );
+
   const handleRefreshCatalogCandidates = useCallback(() => {
     if (!selectedSpecimenId) return;
     void refreshCatalogCandidates(selectedSpecimenId);
   }, [refreshCatalogCandidates, selectedSpecimenId]);
+
+  const handleRefreshCatalogCandidatesForSpecimen = useCallback(
+    (specimenId: string) => {
+      setSelectedSpecimenId(specimenId);
+      void refreshCatalogCandidates(specimenId);
+    },
+    [refreshCatalogCandidates, setSelectedSpecimenId],
+  );
 
   const refreshingCatalogCandidates =
     Boolean(selectedSpecimenId) && catalogRefreshingId === selectedSpecimenId;
@@ -1126,9 +1150,13 @@ export function useScannerChat() {
     setSelectedSpecimenId,
     enrichingSpecimenId,
     handleConfirmCandidate,
+    handleConfirmCandidateForSpecimen,
     handleRejectCandidate,
+    handleRejectCandidateForSpecimen,
     handleRefreshCatalogCandidates,
+    handleRefreshCatalogCandidatesForSpecimen,
     refreshingCatalogCandidates,
+    catalogRefreshingId,
     handleExcludeSpecimen,
     scrollToComps,
     compsSectionRef,

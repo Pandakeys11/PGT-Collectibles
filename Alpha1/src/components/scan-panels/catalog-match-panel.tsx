@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { BookOpen, Check, RefreshCw, Search, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { getCardDisplayTitle } from "@/lib/scan/card-display";
+import { MIN_CATALOG_PICK_OPTIONS } from "@/lib/market/ensure-catalog-options";
 import type { CatalogCandidate, ExtractedCard, ScanCardContext } from "@/lib/scan/schemas";
 
 type CatalogMatchSpecimen = {
@@ -233,9 +234,10 @@ export function CatalogMatchPanel({
     ].join("|");
     if (autoRefreshKeyRef.current === key) return;
     const shouldAuto =
-      candidates.length === 0 &&
+      candidates.length < MIN_CATALOG_PICK_OPTIONS &&
       (specimen.context.catalogIdentityStatus === "failed" ||
-        specimen.context.catalogIdentityStatus === "ambiguous");
+        specimen.context.catalogIdentityStatus === "ambiguous" ||
+        specimen.context.catalogIdentityStatus === "likely");
     if (!shouldAuto) return;
     autoRefreshKeyRef.current = key;
     const timer = window.setTimeout(() => onRefreshCandidates(), 700);

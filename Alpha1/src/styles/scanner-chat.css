@@ -544,6 +544,14 @@
     flex: 1;
   }
 
+  .scanner-chat-root .liquid-catalog-embed .sc-pokedex-catalog-grid {
+    min-height: min(56vh, 520px);
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel {
+    min-height: min(70vh, 680px);
+  }
+
   .scanner-chat-root .sc-scan-results-block {
     width: 100%;
   }

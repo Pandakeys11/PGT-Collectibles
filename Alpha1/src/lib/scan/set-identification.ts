@@ -299,8 +299,10 @@ export function applyWizardsTitleAndFractionHeuristics(
 
   const isDarkPokemonTitle =
     /^dark(\s+\S|$)/i.test(nameTrim) || /^dark$/i.test(nameTrim);
+  const setHintsRocket =
+    /\b(team\s*)?rocket\b|\bdark\s*champ|\brocket\s*champ/i.test(setTrim);
 
-  if (isDarkPokemonTitle) {
+  if (isDarkPokemonTitle || setHintsRocket) {
     const note =
       "Auto-correct: Dark Pokémon + /102 → Team Rocket /82 (common 82↔102 OCR).";
     return {
@@ -372,6 +374,16 @@ export function applySetFromCollectorFraction(
       return {
         set: setTrim || unique.name,
         details: detailsStr || undefined,
+        year: unique.year,
+      };
+    }
+
+    /** One English main set per /N — hallucinated set names (e.g. "Dark Champions") lose to the fraction. */
+    if (!editionOnly && setTrim && !setNamesMatch(setTrim, unique.name)) {
+      const note = `Auto-correct: /${frac.den} → ${unique.name} (vision set "${setTrim}" invalid for this denominator).`;
+      return {
+        set: unique.name,
+        details: [detailsStr, note].filter(Boolean).join(" ┃ "),
         year: unique.year,
       };
     }
@@ -707,6 +719,7 @@ export function batchLooksLikeSouthernIslandsVisionConfusion(
       acc + (southernIslandsRosterIndexForName(c.name) != null ? 1 : 0),
     0,
   );
+  if (n >= 12 && rosterHits >= Math.ceil(n * 0.85)) return true;
   if (n >= 16 && rosterHits >= n - 1) return true;
   if (n === 18 && rosterHits >= 14) return true;
   return false;

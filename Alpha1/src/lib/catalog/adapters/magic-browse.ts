@@ -77,30 +77,44 @@ export async function listMagicCards(
   url.searchParams.set("q", q);
   url.searchParams.set("unique", "prints");
   url.searchParams.set("order", "set");
-  url.searchParams.set("page", String(params.page));
 
-  const res = await fetch(url.toString(), {
-    headers: { "User-Agent": USER_AGENT },
-    next: { revalidate: 1800 },
-  });
-  if (!res.ok) {
-    if (res.status === 404) {
-      return { data: [], page: params.page, pageSize: params.pageSize, count: 0, totalCount: 0 };
+  const allCards: ScryfallCard[] = [];
+  let apiPage = 1;
+  let totalCards = 0;
+
+  for (;;) {
+    url.searchParams.set("page", String(apiPage));
+    const res = await fetch(url.toString(), {
+      headers: { "User-Agent": USER_AGENT },
+      next: { revalidate: 1800 },
+    });
+    if (!res.ok) {
+      if (res.status === 404 && allCards.length === 0) {
+        return { data: [], page: params.page, pageSize: params.pageSize, count: 0, totalCount: 0 };
+      }
+      throw new Error(`Scryfall cards failed (${res.status})`);
     }
-    throw new Error(`Scryfall cards failed (${res.status})`);
+    const payload = (await res.json()) as {
+      data?: ScryfallCard[];
+      total_cards?: number;
+      has_more?: boolean;
+    };
+    totalCards = payload.total_cards ?? totalCards;
+    const batch = payload.data ?? [];
+    allCards.push(...batch);
+    if (!payload.has_more || batch.length === 0) break;
+    apiPage += 1;
+    if (apiPage > 40) break;
   }
-  const payload = (await res.json()) as {
-    data?: ScryfallCard[];
-    total_cards?: number;
-    has_more?: boolean;
-  };
-  const cards = payload.data ?? [];
+
+  const start = (params.page - 1) * params.pageSize;
+  const slice = allCards.slice(start, start + params.pageSize);
   return {
-    data: cards.map((c) => scryfallCardToSummary(c, code)),
+    data: slice.map((c) => scryfallCardToSummary(c, code)),
     page: params.page,
     pageSize: params.pageSize,
-    count: cards.length,
-    totalCount: payload.total_cards ?? cards.length,
+    count: slice.length,
+    totalCount: totalCards || allCards.length,
   };
 }
 

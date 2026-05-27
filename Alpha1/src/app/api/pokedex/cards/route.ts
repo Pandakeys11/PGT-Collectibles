@@ -6,6 +6,7 @@ import {
   type RarityBucketId,
 } from "@/lib/pokedex/rarity-buckets";
 import type { CatalogFinishBucketId } from "@/lib/pokedex/set-catalog-config";
+import type { PrintingPresetId } from "@/lib/pokedex/printing-presets";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,15 @@ function parseFinishBucket(
 ): CatalogFinishBucketId | undefined {
   if (!raw?.trim()) return undefined;
   const v = raw.trim() as CatalogFinishBucketId;
-  return v === "all" || v === "rare_holo" || v === "rare_non_holo"
+  return v === "all" || v === "rare_holo" || v === "rare_non_holo" || v === "reverse_holo"
+    ? v
+    : undefined;
+}
+
+function parsePrintingPreset(raw: string | null): PrintingPresetId | undefined {
+  if (!raw?.trim()) return undefined;
+  const v = raw.trim() as PrintingPresetId;
+  return v === "catalog" || v === "unlimited" || v === "first_edition" || v === "shadowless"
     ? v
     : undefined;
 }
@@ -32,6 +41,7 @@ export async function GET(req: NextRequest) {
   const pageSize = cleanPositiveInt(searchParams.get("pageSize"), 50, 100);
   const rarityBucket = parseRarityBucket(searchParams.get("rarityBucket"));
   const finishBucket = parseFinishBucket(searchParams.get("finishBucket"));
+  const printingPreset = parsePrintingPreset(searchParams.get("printingPreset"));
 
   if (!setId) {
     return NextResponse.json(
@@ -47,6 +57,7 @@ export async function GET(req: NextRequest) {
       pageSize,
       rarityBucket,
       finishBucket,
+      printingPreset,
     });
     return NextResponse.json(data);
   } catch (e) {

@@ -1,5 +1,6 @@
 import type { CatalogMatch } from "@/lib/market/pokemon-catalog";
 import { hasCatalogIdentityFields } from "@/lib/scan/card-display";
+import { inferCardFranchise } from "@/lib/scan/franchise";
 import { hasReadableCertNumber } from "@/lib/scan/graded-slab";
 import { extractedCardSchema, type ExtractedCard } from "@/lib/scan/schemas";
 
@@ -49,6 +50,42 @@ function gradedSlabTrustsCatalog(card: ExtractedCard, catalog: CatalogMatch): bo
   return catalog.score >= 72 && gap >= 6;
 }
 
+function isPokemonRawCard(card: ExtractedCard): boolean {
+  if (!inferCardFranchise(card).isPokemon) return false;
+  const graded =
+    card.visionLane === "graded" ||
+    card.encapsulation === "graded_slab" ||
+    hasReadableCertNumber(card.cert);
+  return !graded;
+}
+
+/** Raw Pokémon binder scans: trust likely DB/live hits when name + collector evidence align. */
+function rawPokemonTrustsCatalog(card: ExtractedCard, catalog: CatalogMatch): boolean {
+  if (!isPokemonRawCard(card)) return false;
+  if (catalog.candidates[0]?.conflicts?.includes("name conflict")) return false;
+  if (catalog.catalogIdentityStatus === "confirmed") return true;
+  if (catalog.catalogIdentityStatus !== "likely") return false;
+  const gap = catalog.score - (catalog.candidates[1]?.score ?? 0);
+  if (catalog.score < 72 || gap < 6) return false;
+  const expectsNumber = Boolean(card.number?.trim());
+  if (!expectsNumber) return true;
+  if (catalogHasCollectorNumberAgreement(catalog)) return true;
+  return catalog.identityEvidence.some(
+    (row) => row.field === "set total" && row.status === "match",
+  );
+}
+
+/** Catalog identity strong enough to lock catalogId, merge fields, and show official art. */
+export function trustedCatalogMatch(
+  catalog: CatalogMatch | null,
+  card?: ExtractedCard,
+): boolean {
+  if (!catalog) return false;
+  if (catalogMatchIsAuthoritative(catalog, card)) return true;
+  if (card) return rawPokemonTrustsCatalog(card, catalog);
+  return false;
+}
+
 export function mergeExtractedCardWithCatalog(
   card: ExtractedCard,
   catalog: CatalogMatch | null,
@@ -57,9 +94,11 @@ export function mergeExtractedCardWithCatalog(
 
   const mayMerge =
     catalog.catalogIdentityStatus === "confirmed" ||
-    gradedSlabTrustsCatalog(card, catalog);
+    gradedSlabTrustsCatalog(card, catalog) ||
+    rawPokemonTrustsCatalog(card, catalog);
   if (!mayMerge) return card;
 
+  const slabMerge = gradedSlabTrustsCatalog(card, catalog);
   return extractedCardSchema.parse({
     ...card,
     name: catalog.name?.trim() ? catalog.name : card.name,
@@ -72,8 +111,8 @@ export function mergeExtractedCardWithCatalog(
     cert: card.cert,
     labelTitle: card.labelTitle,
     details: card.details,
-    encapsulation: card.encapsulation ?? "graded_slab",
-    visionLane: card.visionLane ?? "graded",
+    encapsulation: slabMerge ? (card.encapsulation ?? "graded_slab") : card.encapsulation,
+    visionLane: slabMerge ? (card.visionLane ?? "graded") : card.visionLane,
   });
 }
 
@@ -106,17 +145,43 @@ export function resolveCatalogImageUrl(
   const url =
     catalog.imageSmallUrl ?? catalog.imageLargeUrl ?? catalog.imageUrl ?? null;
   if (!url) return null;
-  if (catalogMatchIsAuthoritative(catalog, card)) return url;
+  if (trustedCatalogMatch(catalog, card)) return url;
 
   if (catalog.catalogIdentityStatus !== "likely") return null;
   if (catalog.candidates[0]?.conflicts?.includes("name conflict")) return null;
   const runnerScore = catalog.candidates[1]?.score ?? 0;
   const gap = catalog.score - runnerScore;
-  if (catalog.score < 86 || gap < 12) return null;
+  const pokemonLikely =
+    card && isPokemonRawCard(card) && catalog.score >= 72 && gap >= 6;
+  if (!pokemonLikely && (catalog.score < 86 || gap < 12)) return null;
 
   const expectsNumber = Boolean(card?.number?.trim());
   if (!expectsNumber) return url;
-  return catalogHasCollectorNumberAgreement(catalog) ? url : null;
+  if (catalogHasCollectorNumberAgreement(catalog)) return url;
+  if (pokemonLikely) {
+    return catalog.identityEvidence.some(
+      (row) => row.field === "set total" && row.status === "match",
+    )
+      ? url
+      : null;
+  }
+  return null;
+}
+
+/**
+ * UI preview art — show the best catalog candidate thumbnail while identity is
+ * still under review. Does not imply the match is verified.
+ */
+export function resolveCatalogPreviewImageUrl(
+  catalog: CatalogMatch | null,
+  card?: ExtractedCard,
+): string | null {
+  const authoritative = resolveCatalogImageUrl(catalog, card);
+  if (authoritative) return authoritative;
+  if (!catalog?.candidates.length) return null;
+  const top = catalog.candidates[0];
+  if (!top || top.conflicts.includes("name conflict")) return null;
+  return top.imageSmallUrl ?? top.imageLargeUrl ?? null;
 }
 
 /** User explicitly selected a catalog row (Select in catalog panel). */

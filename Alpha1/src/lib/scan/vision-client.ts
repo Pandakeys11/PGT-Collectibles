@@ -5,6 +5,7 @@ import {
   planBinderGridTiles,
   readImageNaturalSize,
   renderBinderGridTileDataUrl,
+  shouldTileBinderGridImage,
 } from "@/lib/scan/binder-grid-vision";
 import { ensureScanUploadDataUrl, prepareScanUploadDataUrl } from "@/lib/scan/prepare-upload-image";
 import { parseScanLimitFromResponse } from "@/lib/scan/scan-limit-error";
@@ -66,6 +67,7 @@ async function extractVisionForImage(
     singleCardCrop?: boolean;
     gradedFocus?: boolean;
     binderGrid?: boolean;
+    visionVerify?: boolean;
   },
 ): Promise<unknown[]> {
   const signal = AbortSignal.timeout(options.timeoutMs);
@@ -79,6 +81,7 @@ async function extractVisionForImage(
       singleCardCrop: options.singleCardCrop ?? false,
       gradedFocus: options.gradedFocus === true ? true : undefined,
       binderGrid: options.binderGrid === true ? true : undefined,
+      visionVerify: options.visionVerify === true ? true : undefined,
     }),
     signal,
   });
@@ -152,10 +155,21 @@ async function extractVisionForBinderGridImage(
   options: {
     timeoutMs: number;
     gradedFocus?: boolean;
+    visionVerify?: boolean;
   },
 ): Promise<unknown[]> {
   const prepared = await ensureScanUploadDataUrl(imageDataUrl);
   const { width, height } = await readImageNaturalSize(prepared);
+
+  if (!shouldTileBinderGridImage(width, height)) {
+    return extractVisionForImage(prepared, imageIndex, {
+      timeoutMs: options.timeoutMs,
+      gradedFocus: options.gradedFocus,
+      binderGrid: true,
+      visionVerify: options.visionVerify,
+    });
+  }
+
   const plan = planBinderGridTiles(width, height);
   const rendered: Array<{
     tile: import("@/lib/scan/binder-grid-vision").BinderGridTile;
@@ -169,9 +183,10 @@ async function extractVisionForBinderGridImage(
 
   if (rendered.length === 0) {
     return extractVisionForImage(prepared, imageIndex, {
-      ...options,
+      timeoutMs: options.timeoutMs,
+      gradedFocus: options.gradedFocus,
       binderGrid: true,
-      singleCardCrop: false,
+      visionVerify: options.visionVerify,
     });
   }
 
@@ -196,9 +211,10 @@ async function extractVisionForBinderGridImage(
   }
   if (!Array.isArray(data.cards) || data.cards.length === 0) {
     return extractVisionForImage(prepared, imageIndex, {
-      ...options,
+      timeoutMs: options.timeoutMs,
+      gradedFocus: options.gradedFocus,
       binderGrid: true,
-      singleCardCrop: false,
+      visionVerify: options.visionVerify,
     });
   }
 
@@ -229,6 +245,8 @@ export async function runVisionExtraction(
     gradedFocus?: boolean;
     /** Multi-card binder / grid screenshot — tiled vision + binder prompts. */
     binderGrid?: boolean;
+    /** Optional second pass using Gemini to verify/fix single-image extraction. */
+    visionVerify?: boolean;
     /** Parallel vision requests (default 3). Set 1 for strictly sequential. */
     concurrency?: number;
     onProgress?: (progress: VisionProgress) => void;
@@ -238,6 +256,7 @@ export async function runVisionExtraction(
 ): Promise<unknown[]> {
   const timeoutMs = options.timeoutMs ?? getVisionClientTimeoutMs();
   if (images.length === 0) return [];
+  const visionVerify = options.visionVerify !== false;
 
   const concurrency = Math.min(
     options.concurrency ?? getVisionConcurrency(),
@@ -264,12 +283,14 @@ export async function runVisionExtraction(
         ? await extractVisionForBinderGridImage(images[imageIndex], imageIndex, {
             timeoutMs,
             gradedFocus: options.gradedFocus,
+            visionVerify,
           })
         : await extractVisionForImage(images[imageIndex], imageIndex, {
             timeoutMs,
             singleCardCrop: options.singleCardCrop,
             gradedFocus: options.gradedFocus,
             binderGrid: options.binderGrid,
+            visionVerify,
           });
       results[imageIndex] = cards;
       imagesDone += 1;
@@ -303,6 +324,7 @@ export async function runVisionOnSingleCardCrop(
     timeoutMs: options.timeoutMs ?? getVisionClientTimeoutMs(),
     singleCardCrop: true,
     gradedFocus: options.gradedSlab === true,
+    visionVerify: true,
     concurrency: 1,
   });
 }

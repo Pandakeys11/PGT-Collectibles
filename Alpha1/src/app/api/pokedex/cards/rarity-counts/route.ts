@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cleanId } from "@/lib/http/params";
-import { fetchCardsForSetPage } from "@/lib/pokedex/tcg-api-server";
+import { fetchCardsForSetPage, fetchRarityCountsForSet } from "@/lib/pokedex/tcg-api-server";
 import {
   RARITY_TAB_ORDER,
   type RarityBucketId,
@@ -18,6 +18,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const fromDb = await fetchRarityCountsForSet(setId);
+    if (fromDb) {
+      return NextResponse.json({ counts: fromDb, source: "db" });
+    }
+
     const pairs = await Promise.all(
       RARITY_TAB_ORDER.map(async (bucket) => {
         const data = await fetchCardsForSetPage({
@@ -30,7 +35,7 @@ export async function GET(req: NextRequest) {
       }),
     );
     const counts = Object.fromEntries(pairs) as Record<RarityBucketId, number>;
-    return NextResponse.json({ counts });
+    return NextResponse.json({ counts, source: "api" });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 502 });

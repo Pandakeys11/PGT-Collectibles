@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Calculator, Camera, ChevronDown, Loader2, Scan, Upload, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SCAN_MODE_OPTIONS } from "@/lib/scanner-chat/scan-mode-labels";
+import type { ScanSpecimen } from "@/hooks/use-scan-session";
+import type { CatalogCandidate } from "@/lib/scan/schemas";
 import type { ScanMode, UploadedImage } from "@/lib/scanner-chat/types";
+import { CatalogMatchQuickPick } from "./catalog-match-quick-pick";
 import { ImagePreviewStrip } from "./image-preview-strip";
 import { cn } from "@/lib/cn";
 
@@ -35,6 +38,13 @@ export function ScannerComposer({
   onOpenLiveCamera,
   onOpenCalculator,
   supportsLiveCamera,
+  reviewSpecimen,
+  onConfirmCatalogCandidate,
+  onRejectCatalogCandidate,
+  onRefreshCatalogCandidates,
+  onOpenMasterCatalog,
+  catalogRefreshingId,
+  catalogBusy,
   className,
 }: {
   prompt: string;
@@ -55,6 +65,13 @@ export function ScannerComposer({
   onOpenLiveCamera: () => void;
   onOpenCalculator?: () => void;
   supportsLiveCamera?: boolean;
+  reviewSpecimen?: ScanSpecimen | null;
+  onConfirmCatalogCandidate?: (specimenId: string, candidate: CatalogCandidate) => void;
+  onRejectCatalogCandidate?: (specimenId: string, catalogId: string) => void;
+  onRefreshCatalogCandidates?: (specimenId: string) => void;
+  onOpenMasterCatalog?: () => void;
+  catalogRefreshingId?: string | null;
+  catalogBusy?: boolean;
   className?: string;
 }) {
   const [liveCameraOk, setLiveCameraOk] = useState(supportsLiveCamera ?? false);
@@ -108,6 +125,21 @@ export function ScannerComposer({
       )}
     >
       <div className="sc-mobile-composer-inner sc-desktop-composer-inner mx-auto w-full max-w-3xl px-0 pt-1.5 sm:pt-2 lg:max-w-none">
+        {hasScanResults &&
+        reviewSpecimen &&
+        onConfirmCatalogCandidate &&
+        onRejectCatalogCandidate ? (
+          <CatalogMatchQuickPick
+            className="mb-2"
+            specimen={reviewSpecimen}
+            busy={catalogBusy}
+            refreshing={catalogRefreshingId === reviewSpecimen.id}
+            onConfirm={onConfirmCatalogCandidate}
+            onReject={onRejectCatalogCandidate}
+            onRefreshCandidates={onRefreshCatalogCandidates}
+            onOpenMasterCatalog={onOpenMasterCatalog}
+          />
+        ) : null}
         {images.length > 0 ? (
           <ImagePreviewStrip
             images={images}
@@ -207,7 +239,11 @@ export function ScannerComposer({
             </button>
             <button
               type="button"
-              title={speedOn ? "Speed on — faster scan" : "Speed off — fewer API calls"}
+              title={
+                speedOn
+                  ? "Speed on — balanced parallel scan + registry on slabs"
+                  : "Speed off — slower pacing, deeper precision crops, registry on slabs only"
+              }
               onClick={() => onSpeedOnChange(!speedOn)}
               disabled={isBusy}
               aria-pressed={speedOn}

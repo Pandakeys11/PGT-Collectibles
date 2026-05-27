@@ -23,6 +23,7 @@ import {
   inferEvidenceGradeBucket,
   inferMarketVenueType,
 } from "@/lib/market/market-intelligence";
+import { filterMarketEvidenceForCardIdentity } from "@/lib/market/market-evidence-identity";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 
 const MARKET_SOURCES_LINE =
@@ -367,9 +368,11 @@ export async function researchCardMarket(card: ExtractedCard): Promise<{
     evidence.push(...chunk);
   }
 
-  const marketEvidence = decorateEvidence(
-    rankEvidence(dedupeEvidence(sanitizeEvidenceList(evidence))).slice(0, 48),
+  const identityScopedEvidence = filterMarketEvidenceForCardIdentity(
+    dedupeEvidence(sanitizeEvidenceList(evidence)),
+    card,
   );
+  const marketEvidence = decorateEvidence(rankEvidence(identityScopedEvidence).slice(0, 48));
   const { fairValueUsd, fairValueBasis } = deriveFairValueResult(marketEvidence, {
     card,
     gradeCard: card,

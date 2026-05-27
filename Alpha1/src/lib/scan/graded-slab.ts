@@ -199,6 +199,8 @@ export function normalizeGradedSlabFields(
   let set = cleanText(card.set);
   let number = cleanText(card.number);
   let year = cleanText(card.year);
+  let language = cleanText(card.language);
+  let printStamps = cleanText(card.printStamps);
 
   if (/^\d+(?:\.\d+)?\s+\d+(?:\.\d+)?$/.test(grade)) {
     const parts = grade.split(/\s+/);
@@ -206,16 +208,39 @@ export function normalizeGradedSlabFields(
   }
 
   const fromLabel = parseStructuredSlabLabel(labelTitle, labelBlob);
+  const labelAuthoritative = Boolean(labelTitle && labelTitle.length >= 16);
+
   if (!grader && fromLabel.grader) grader = fromLabel.grader;
   if (!grade && fromLabel.grade) grade = fromLabel.grade;
-  if (!year && fromLabel.year) year = fromLabel.year;
-  if (!set && fromLabel.set) set = fromLabel.set;
-  if (!number && fromLabel.number) number = fromLabel.number;
+  if (fromLabel.year) year = fromLabel.year;
+  if (fromLabel.set) set = fromLabel.set;
+  if (fromLabel.number) number = fromLabel.number;
+  if (fromLabel.language && !language) language = fromLabel.language;
+  if (fromLabel.printStamps && !printStamps) printStamps = fromLabel.printStamps;
+  if (fromLabel.details) details = appendUniqueDetails(details, fromLabel.details);
   if (
     fromLabel.name &&
-    (!name || /resolving|unknown|pending/i.test(name) || name.length < 3)
+    (labelTitle || !name || /resolving|unknown|pending/i.test(name) || name.length < 3)
   ) {
     name = fromLabel.name;
+  }
+
+  if (labelAuthoritative) {
+    if (fromLabel.set) set = fromLabel.set;
+    if (fromLabel.number) number = fromLabel.number;
+    if (fromLabel.name) name = fromLabel.name;
+    if (fromLabel.grader) grader = fromLabel.grader;
+    if (fromLabel.grade) grade = fromLabel.grade;
+  }
+
+  const labelGrader = extractGrader(labelTitle ?? labelBlob);
+  if (
+    labelGrader &&
+    grader &&
+    labelGrader !== grader.toUpperCase() &&
+    new RegExp(`\\b${labelGrader}\\b`, "i").test(labelTitle ?? labelBlob)
+  ) {
+    grader = labelGrader;
   }
 
   const subgrades = extractSlabSubgrades(combinedBlob);
@@ -231,7 +256,7 @@ export function normalizeGradedSlabFields(
       name,
       grader,
       grade,
-      printStamps: card.printStamps,
+      printStamps,
     });
     if (synthesized) labelTitle = synthesized;
   } else if (labelBlob.length > labelTitle.length + 8) {
@@ -297,6 +322,8 @@ export function normalizeGradedSlabFields(
     set: set || card.set,
     number: number || card.number,
     year: year || card.year,
+    language: language || card.language,
+    printStamps: printStamps || card.printStamps,
     grader: grader || undefined,
     grade: grade || undefined,
     cert,

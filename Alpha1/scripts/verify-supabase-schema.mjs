@@ -118,6 +118,15 @@ async function main() {
     else fail(`table:${table}`, "missing — run 202605230001_pgt_registry.sql");
   }
 
+  for (const table of [
+    "pgt_certifications",
+    "pgt_population_snapshots",
+    "pgt_market_comps",
+  ]) {
+    if (await tableExists(supabase, table)) pass(`table:${table}`, "present");
+    else fail(`table:${table}`, "missing — run 202605280001_pgt_market_intel.sql");
+  }
+
   if (await columnExists(supabase, "extracted_cards", "pgt_card_identity_id")) {
     pass("column:extracted_cards.pgt_card_identity_id", "present");
   } else {

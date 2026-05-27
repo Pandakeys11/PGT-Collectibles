@@ -12,6 +12,7 @@ import {
   stabilizeOmniVisionCards,
   type VisionGridLocation,
 } from "@/lib/scan/spatial";
+import { locationFromBboxGrid, normalizeVisionBboxGrid } from "@/lib/scan/spatial-grid";
 
 export type ScanLaneMode = "all" | "raw" | "graded";
 
@@ -101,7 +102,10 @@ export function buildSpecimensFromVisionCards(
     const positionInGroup = posByCapture.get(sourceIndex) ?? 0;
     posByCapture.set(sourceIndex, positionInGroup + 1);
 
-    const detectedLocation = normalizeVisionGridLocation(card.location);
+    const bboxGrid = normalizeVisionBboxGrid(card.bbox);
+    const detectedLocation =
+      normalizeVisionGridLocation(card.location) ??
+      (bboxGrid ? locationFromBboxGrid(bboxGrid) : undefined);
     const captureAspect = aspectMap.get(sourceIndex);
     const evidenceCropLocation: VisionGridLocation | null =
       detectedLocation ??

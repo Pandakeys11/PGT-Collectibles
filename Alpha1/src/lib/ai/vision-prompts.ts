@@ -25,6 +25,10 @@ const NAME_RULES = `
 - **Other TCG / sports**: **name** and **printedName** = best visible title on the card; preserve player names, set names, parallel names (Prizm, Optic, Select, rookie, auto, patch).
 - Do not put language in number; use language plus printedName/details.`;
 
+const NON_TCG_POKEMON_RULES = `
+- Pokemon-branded non-TCG collectibles (Topps Pokemon, Sealdass, Carddass, Topsun, Meiji, movie cards, Pocket Monsters sticker/card series) are **other**, not pokemon TCG catalog rows.
+- For those rows, keep the Pokemon character in **name**, put the collectible line in **set/details**, and do not force Pokemon TCG set/number rules.`;
+
 const POKEMON_SET_RULES = buildVisionSetIdentificationBlock();
 
 const GRADED_SLAB_LABEL_RULES = `
@@ -36,6 +40,11 @@ const GRADED_SLAB_LABEL_RULES = `
   - **set**: full English catalog set name (e.g. "Sun & Moon Promos", "Sword & Shield", "Team Rocket 1st Edition") — never shorten to "Promo" alone when the label names the set.
   - **grader** + **grade** from the grade badge on the label (large number / GEM MT / PRISTINE / Black Label).
   - **PSA** red label: lines are often YEAR · GAME/SET · # · NAME; grade in top-right; cert # only if printed on this face (often bottom — 8–10 digits).
+  - **PSA Pokémon examples** (label → fields):
+    - \`1999 POKEMON GAME #4 CHARIZARD\` → set **Base Set**, number **4/102**, name **Charizard**, year **1999**
+    - \`2000 POKEMON ROCKET #4 DARK CHARIZARD\` → set **Team Rocket**, number **4/82**, name **Dark Charizard**, year **2000**
+    - \`2000 POKEMON GYM 2 #2 BLAINE'S CHARIZARD\` → set **Gym Challenge**, number **2/132**, name **Blaine's Charizard**, year **2000**
+    - \`2023 POKEMON SVP EN-SV PROMO #045 PIKACHU\` → set **Scarlet & Violet Promos**, number **SVP045**, name **Pikachu**
   - **CGC** blue label: YEAR MANUFACTURER SET # NAME; sub-grades (Centering/Corners/Edges/Surface) → **details**; cert often on back → null + note.
   - **BGS/BVG** gold label: grade top-left; sub-grades in **details**; card line below; cert often on back.
   - **SGC/ACE/TAG**: read visible tag text; cert only when explicitly printed on front.
@@ -71,6 +80,7 @@ const POKEMON_PRINT_EDITION_RULES = `
 const SHARED_RULES = `
 - Never invent cert numbers on raw cards.
 ${FRANCHISE_RULES}
+${NON_TCG_POKEMON_RULES}
 ${NAME_RULES}
 - Apply Pokemon set/year/number rules below **only when franchise is pokemon**:
 ${POKEMON_SET_RULES}
@@ -88,6 +98,8 @@ const BINDER_GRID_RULES = `
 - **location** [y,x] is required per card (center of the card face on 0–1000). Include **bbox** when edges are visible.
 - For 8+ cards: keep **details** under 50 characters; omit stickerNote unless a price sticker is visible.
 - Read **set** + **number** from **that card's face** (set symbol + collector number) — never copy from a neighbor.
+- **Every card must have set + number** when the print is legible — missing set/number is a failure mode; re-read the symbol and fraction on that card.
+- **Pokémon binder grids:** /82 = Team Rocket (Dark Pokémon); /102 = Base Set; /130 = Base Set 2; /132 = Gym Heroes or Gym Challenge — read the tens digit carefully (82 vs 102).
 - **Japanese** cards: set **language** to Japanese; **printedName** = visible title; **name** = English catalog name when known.
 - Mixed Wizards/Neo sets on one photo are normal — each card keeps its own set name and fraction (e.g. 62/62 Fossil vs 64/64 Jungle).`;
 

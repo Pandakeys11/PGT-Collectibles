@@ -151,21 +151,30 @@ function gridSlotKey(
   return `${row}:${col}`;
 }
 
-function inferDedupeGridShape(count: number, aspectRatio?: number): { cols: number; rows: number } {
-  const cols =
-    aspectRatio != null && aspectRatio >= 1.15
-      ? count >= 18
-        ? 5
-        : count >= 12
-          ? 4
-          : 3
-      : count >= 20
-        ? 4
-        : count >= 12
-          ? 3
-          : 2;
-  const rows = Math.max(1, Math.ceil(count / cols));
-  return { cols, rows };
+/** Expected grid for dedupe — must match real binder layout, not raw detection count. */
+function inferDedupeGridShape(
+  count: number,
+  aspectRatio?: number,
+): { cols: number; rows: number } {
+  if (aspectRatio != null && aspectRatio >= 0.82 && aspectRatio <= 1.18) {
+    return { cols: 3, rows: 3 };
+  }
+  if (aspectRatio != null && aspectRatio >= 1.15) {
+    if (count >= 18) return { cols: 5, rows: 4 };
+    if (count >= 12) return { cols: 4, rows: 3 };
+    return { cols: 4, rows: 2 };
+  }
+  if (count >= 20) return { cols: 4, rows: 5 };
+  if (count >= 12) return { cols: 3, rows: 4 };
+  if (count >= 9) return { cols: 3, rows: 3 };
+  if (count >= 6) return { cols: 3, rows: 2 };
+  return { cols: 2, rows: Math.max(1, Math.ceil(count / 2)) };
+}
+
+/** Classic binder pages (≤9 cards) should use one vision pass — not client tiling. */
+export function shouldTileBinderGridImage(width: number, height: number): boolean {
+  const plan = planBinderGridTiles(width, height);
+  return plan.tiles.length > 9;
 }
 
 /**
@@ -176,7 +185,11 @@ export function dedupeBinderGridVisionCards<T extends Record<string, unknown>>(
   cards: T[],
   aspectRatio?: number,
 ): T[] {
-  const { cols, rows } = inferDedupeGridShape(Math.max(cards.length, 12), aspectRatio);
+  const slotBudget =
+    aspectRatio != null && aspectRatio >= 0.82 && aspectRatio <= 1.18
+      ? 9
+      : cards.length;
+  const { cols, rows } = inferDedupeGridShape(slotBudget, aspectRatio);
   const bySlot = new Map<string, T>();
   const noLocation: T[] = [];
 

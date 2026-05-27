@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enrichCacheKey, getEnrichMarketCache, setEnrichMarketCache } from "@/lib/market/enrich-cache";
-import { matchCatalogForEnrich } from "@/lib/market/catalog-router";
-import { hydrateRegistryFromCard } from "@/lib/market/hydrate-registry-from-card";
-import { researchCardMarket } from "@/lib/market/research";
+import { ensureCatalogMatchOptions } from "@/lib/market/ensure-catalog-options";
 import {
-  catalogMatchIsAuthoritative,
+  hydrateRegistryFromCard,
+  type RegistryHydration,
+} from "@/lib/market/hydrate-registry-from-card";
+import { researchCardMarket } from "@/lib/market/research";
+import { persistMarketIntelFromEnrich } from "@/lib/pgt-registry/pgt-market-intel-persist";
+import {
   mergeExtractedCardWithCatalog,
   resolveCatalogImageUrl,
+  resolveCatalogPreviewImageUrl,
+  trustedCatalogMatch,
 } from "@/lib/scan/catalog-merge";
 import { buildScanCardContext } from "@/lib/scan/context-builder";
-import { mergeRegistrySlabIntoCard, normalizeGradedSlabFields } from "@/lib/scan/graded-slab";
+import {
+  buildCatalogEnrichTelemetry,
+  logCatalogEnrichTelemetry,
+} from "@/lib/scan/enrich-telemetry";
+import {
+  hasReadableCertNumber,
+  mergeRegistrySlabIntoCard,
+  normalizeGradedSlabFields,
+} from "@/lib/scan/graded-slab";
 import { classifyCardLane } from "@/lib/scan/lane";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 import { catalogCandidateSchema, extractedCardSchema, identityEvidenceSchema } from "@/lib/scan/schemas";
@@ -19,13 +32,13 @@ export const maxDuration = 300;
 
 type EnrichPhase = "full" | "catalog" | "market";
 
-const EMPTY_REGISTRY = {
+const EMPTY_REGISTRY: RegistryHydration = {
   registry: null,
   populationSummary: null,
   provider: null,
   gradeDate: null,
   gemrateId: null,
-  certMarketEvidence: [] as MarketEvidence[],
+  certMarketEvidence: [],
   fromCache: false,
   pgtCardIdentityId: null,
 };
@@ -156,6 +169,15 @@ export async function POST(req: NextRequest) {
       fairValueBasis: market.fairValueBasis,
     });
 
+    if (catalogId) {
+      void persistMarketIntelFromEnrich({
+        catalogId,
+        card: cardOut,
+        marketEvidence,
+        pgtCardIdentityId: reg.pgtCardIdentityId,
+      }).catch(() => null);
+    }
+
     return NextResponse.json({
       card: cardOut,
       context,
@@ -164,17 +186,46 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const catalog = await matchCatalogForEnrich(inputCard);
-  const mergedCard = mergeExtractedCardWithCatalog(inputCard, catalog);
-  const authoritativeCatalog = catalogMatchIsAuthoritative(catalog, mergedCard);
-  const resolvedCatalogImageUrl = resolveCatalogImageUrl(catalog, mergedCard);
+  const lane = classifyCardLane(inputCard as Record<string, unknown>).lane;
+  let catalogInput = inputCard;
+  let preCatalogRegistry: RegistryHydration = EMPTY_REGISTRY;
+  if (lane === "graded" && hasReadableCertNumber(inputCard.cert) && !skipRegistry) {
+    preCatalogRegistry = await registryHydrationForCard(inputCard, false, userId);
+    catalogInput = mergeRegistrySlabIntoCard(inputCard, preCatalogRegistry.registry);
+    const registryName = preCatalogRegistry.registry?.cardName?.trim();
+    if (
+      registryName &&
+      (!catalogInput.name?.trim() || /^unknown|resolving/i.test(catalogInput.name))
+    ) {
+      catalogInput = extractedCardSchema.parse({ ...catalogInput, name: registryName });
+    }
+  }
+
+  const catalog = await ensureCatalogMatchOptions(catalogInput);
+  logCatalogEnrichTelemetry(
+    buildCatalogEnrichTelemetry(specimenId, catalogInput, catalog),
+  );
+  const mergedCard = mergeExtractedCardWithCatalog(catalogInput, catalog);
+  const catalogTrusted = trustedCatalogMatch(catalog, mergedCard);
+  const catalogIdLocked =
+    catalogTrusted
+      ? (catalog?.catalogId ?? catalog?.candidates[0]?.catalogId ?? null)
+      : null;
+  const resolvedCatalogImageUrl =
+    resolveCatalogImageUrl(catalog, mergedCard) ??
+    resolveCatalogPreviewImageUrl(catalog, mergedCard);
 
   if (phase === "catalog") {
     const context = buildScanCardContext({
       specimenId,
       card: mergedCard,
-      catalogId: authoritativeCatalog ? (catalog?.catalogId ?? null) : null,
-      year: mergedCard.year ?? (authoritativeCatalog ? (catalog?.year ?? null) : null),
+      registry: preCatalogRegistry.registry,
+      populationSummary: preCatalogRegistry.populationSummary,
+      certProvider: preCatalogRegistry.provider,
+      certGradeDate: preCatalogRegistry.gradeDate,
+      certMarketEvidence: preCatalogRegistry.certMarketEvidence,
+      catalogId: catalogIdLocked,
+      year: mergedCard.year ?? (catalogTrusted ? (catalog?.year ?? null) : null),
       catalogImageUrl: resolvedCatalogImageUrl,
       catalogIdentityStatus: catalog?.catalogIdentityStatus ?? "failed",
       catalogConfidence: catalog?.catalogConfidence ?? 0,
@@ -189,8 +240,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       card: mergedCard,
       context,
-      catalogMatched: authoritativeCatalog,
-      catalogId: authoritativeCatalog ? (catalog?.catalogId ?? null) : null,
+      catalogMatched: catalogTrusted,
+      catalogId: catalogIdLocked,
     });
   }
 
@@ -202,7 +253,10 @@ export async function POST(req: NextRequest) {
     if (!skipCache) setEnrichMarketCache(cacheKey, market);
   }
 
-  const reg = await registryHydrationForCard(mergedCard, skipRegistry, userId);
+  const reg =
+    preCatalogRegistry.registry != null
+      ? preCatalogRegistry
+      : await registryHydrationForCard(mergedCard, skipRegistry, userId);
   const cardOut = skipRegistry ? mergedCard : mergeRegistrySlabIntoCard(mergedCard, reg.registry);
   const marketEvidence = mergeCertIntoMarketEvidence(
     market.marketEvidence,
@@ -216,8 +270,8 @@ export async function POST(req: NextRequest) {
     certProvider: reg.provider,
     certGradeDate: reg.gradeDate,
     certMarketEvidence: reg.certMarketEvidence,
-    catalogId: authoritativeCatalog ? (catalog?.catalogId ?? null) : null,
-    year: mergedCard.year ?? (authoritativeCatalog ? (catalog?.year ?? null) : null),
+    catalogId: catalogIdLocked,
+    year: mergedCard.year ?? (catalogTrusted ? (catalog?.year ?? null) : null),
     catalogImageUrl: resolvedCatalogImageUrl,
     catalogIdentityStatus: catalog?.catalogIdentityStatus ?? "failed",
     catalogConfidence: catalog?.catalogConfidence ?? 0,
@@ -229,10 +283,23 @@ export async function POST(req: NextRequest) {
     fairValueBasis: market.fairValueBasis,
   });
 
+  const catalogIdForIntel =
+    catalogIdLocked ??
+    (typeof body.catalogId === "string" && body.catalogId.trim() ? body.catalogId.trim() : null);
+
+  if (catalogIdForIntel) {
+    void persistMarketIntelFromEnrich({
+      catalogId: catalogIdForIntel,
+      card: cardOut,
+      marketEvidence,
+      pgtCardIdentityId: reg.pgtCardIdentityId,
+    }).catch(() => null);
+  }
+
   return NextResponse.json({
     card: cardOut,
     context,
-    catalogMatched: authoritativeCatalog,
-    catalogId: authoritativeCatalog ? (catalog?.catalogId ?? null) : null,
+    catalogMatched: catalogTrusted,
+    catalogId: catalogIdLocked,
   });
 }

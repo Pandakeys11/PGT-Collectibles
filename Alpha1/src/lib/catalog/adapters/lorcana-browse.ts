@@ -4,7 +4,6 @@ import type {
   CatalogSetSummary,
 } from "@/lib/catalog/catalog-types";
 import { releaseYearFromDate } from "@/lib/catalog/catalog-types";
-import { listCardsFromDb, listSetsFromDb } from "@/lib/catalog/db-catalog-browse";
 
 const LORCAST = "https://api.lorcast.com/v0";
 
@@ -31,9 +30,6 @@ export async function listLorcanaSets(params: {
   pageSize: number;
   q?: string;
 }): Promise<CatalogPaginated<CatalogSetSummary>> {
-  const db = await listSetsFromDb("lorcana", params);
-  if (db && db.totalCount > 0) return db;
-
   const res = await fetch(`${LORCAST}/sets`, { next: { revalidate: 3600 } });
   if (!res.ok) throw new Error(`Lorcast sets ${res.status}`);
   const payload = (await res.json()) as { results?: LorcastSet[] };
@@ -72,9 +68,6 @@ export async function listLorcanaCards(
   setCode: string,
   params: { page: number; pageSize: number; q?: string },
 ): Promise<CatalogPaginated<CatalogCardSummary>> {
-  const db = await listCardsFromDb("lorcana", setCode, params);
-  if (db && db.totalCount > 0) return db;
-
   let q = `set:${setCode.trim()}`;
   if (params.q?.trim()) q += ` ${params.q.trim()}`;
   const url = new URL(`${LORCAST}/cards/search`);

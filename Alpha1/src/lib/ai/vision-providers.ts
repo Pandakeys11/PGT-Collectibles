@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import {
   getGeminiApiKey,
   getGeminiVisionModel,
+  getGeminiVisionVerifyModel,
   getGroqApiKey,
   getGroqVisionModel,
   getOpenAIApiKey,
@@ -209,10 +210,11 @@ async function callGemini(args: {
   imageBase64s: string[];
   imageMimeTypes: string[];
   maxTokens: number;
+  model?: string;
 }): Promise<{ text: string; finishReason: string | null }> {
   const genAI = new GoogleGenerativeAI(getGeminiApiKey()!);
   const model = genAI.getGenerativeModel({
-    model: getGeminiVisionModel(),
+    model: args.model ?? getGeminiVisionModel(),
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: args.maxTokens,
@@ -378,24 +380,39 @@ export async function runVisionProviderOnce(
   compactPrompt: string,
   imageBase64s: string[],
   imageMimeTypes: string[],
-  options: { allowCompactRetry?: boolean; compactDensePrompt?: string } = {},
+  options: {
+    allowCompactRetry?: boolean;
+    compactDensePrompt?: string;
+    /** Override model for Gemini-only runs (e.g. verify pass). */
+    geminiModelOverride?: string;
+  } = {},
 ): Promise<VisionRunResult> {
   const maxTokens = getVisionMaxOutputTokensForProvider(id);
   const allowCompact = options.allowCompactRetry !== false;
   const densePrompt = options.compactDensePrompt;
+  const geminiModelOverride = options.geminiModelOverride;
 
   const runPass = async (
     textPrompt: string,
     compact: boolean,
     dense = false,
   ): Promise<VisionRunResult> => {
-    const { text, finishReason } = await invokeProvider(
-      id,
-      textPrompt,
-      imageBase64s,
-      imageMimeTypes,
-      maxTokens,
-    );
+    const { text, finishReason } =
+      id === "gemini" && geminiModelOverride
+        ? await callGemini({
+            prompt: textPrompt,
+            imageBase64s,
+            imageMimeTypes,
+            maxTokens,
+            model: geminiModelOverride,
+          })
+        : await invokeProvider(
+            id,
+            textPrompt,
+            imageBase64s,
+            imageMimeTypes,
+            maxTokens,
+          );
     if (!text.trim()) throw new Error("empty model response");
     const result = parseModelText(text, id);
     result.finishReason = finishReason;
@@ -439,3 +456,5 @@ export {
   getVisionMaxOutputTokensForProvider,
   getVisionProviderTimeoutMs,
 } from "@/lib/ai/env";
+
+export { getGeminiVisionVerifyModel } from "@/lib/ai/env";

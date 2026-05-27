@@ -67,6 +67,16 @@ export async function listOnepieceSets(params: {
   };
 }
 
+function normalizeOptcgCards(payload: unknown): OptcgCard[] {
+  if (Array.isArray(payload)) return payload as OptcgCard[];
+  if (payload && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    if (Array.isArray(record.cards)) return record.cards as OptcgCard[];
+    if (Array.isArray(record.data)) return record.data as OptcgCard[];
+  }
+  return [];
+}
+
 export async function listOnepieceCards(
   setId: string,
   params: { page: number; pageSize: number; q?: string },
@@ -75,7 +85,7 @@ export async function listOnepieceCards(
     next: { revalidate: 3600 },
   });
   if (!res.ok) throw new Error(`OPTCG cards ${res.status}`);
-  let cards = (await res.json()) as OptcgCard[];
+  let cards = normalizeOptcgCards(await res.json());
   if (params.q?.trim()) {
     const needle = params.q.trim().toLowerCase();
     cards = cards.filter((c) =>
@@ -101,10 +111,10 @@ export async function getOnepieceCard(catalogId: string): Promise<CatalogCardSum
   for (const set of (sets ?? []) as OptcgSet[]) {
     const setId = String(set.set_id ?? set.id ?? set.setId ?? "");
     if (!setId) continue;
-    const cards = await fetch(`https://optcgapi.com/api/sets/${encodeURIComponent(setId)}/`).then(
+    const cards = normalizeOptcgCards(await fetch(`https://optcgapi.com/api/sets/${encodeURIComponent(setId)}/`).then(
       (r) => r.json(),
-    );
-    const hit = (cards as OptcgCard[]).find(
+    ));
+    const hit = cards.find(
       (c) => String(c.card_set_id ?? c.id) === id,
     );
     if (hit) return optcgCardToSummary(hit, setId);

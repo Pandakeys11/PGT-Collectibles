@@ -64,11 +64,13 @@ function setListInitials(name: string): string {
   return w.slice(0, 2).toUpperCase() || "?";
 }
 
-function SetListLogo({ tcgSet }: { tcgSet: TcgSetSummary }) {
+function SetListLogo({ tcgSet, embedded = false }: { tcgSet: TcgSetSummary; embedded?: boolean }) {
   const [failed, setFailed] = useState(false);
   const src = tcgSet.images?.logo || tcgSet.images?.symbol;
-  const frame =
-    "flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-subtle bg-panel-raised/80 sm:h-12 sm:w-12";
+  const frame = cn(
+    "flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-subtle bg-panel-raised/80",
+    embedded ? "h-10 w-10 lg:h-12 lg:w-12" : "h-11 w-11 sm:h-12 sm:w-12",
+  );
   if (!src || failed) {
     return (
       <div className={cn(frame, "text-[10px] font-semibold uppercase tracking-tight text-faint")} aria-hidden>
@@ -388,25 +390,20 @@ export function PokedexBrowser({
     let cancelled = false;
     setRarityCountsLoading(true);
     setRarityCounts(null);
-    // Let the card grid hit pokemontcg.io first — rarity-counts runs 5 API queries in parallel.
-    const timer = window.setTimeout(() => {
-      if (cancelled) return;
-      void fetchJson<{ counts: Record<RarityBucketId, number> }>(
-        `/api/pokedex/cards/rarity-counts?setId=${encodeURIComponent(selectedSetId)}`,
-      )
-        .then((payload) => {
-          if (!cancelled) setRarityCounts(payload.counts);
-        })
-        .catch(() => {
-          if (!cancelled) setRarityCounts(null);
-        })
-        .finally(() => {
-          if (!cancelled) setRarityCountsLoading(false);
-        });
-    }, 1000);
+    void fetchJson<{ counts: Record<RarityBucketId, number> }>(
+      `/api/pokedex/cards/rarity-counts?setId=${encodeURIComponent(selectedSetId)}`,
+    )
+      .then((payload) => {
+        if (!cancelled) setRarityCounts(payload.counts);
+      })
+      .catch(() => {
+        if (!cancelled) setRarityCounts(null);
+      })
+      .finally(() => {
+        if (!cancelled) setRarityCountsLoading(false);
+      });
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
     };
   }, [selectedSetId]);
 
@@ -460,6 +457,9 @@ export function PokedexBrowser({
     if (supportsFinishTabs(selectedSetId) && finishBucket !== "all") {
       q.set("finishBucket", finishBucket);
     }
+    if (supportsPrintingPresets(selectedSetId) && printingPreset !== "catalog") {
+      q.set("printingPreset", printingPreset);
+    }
     void fetchJson<TcgPaginated<TcgCardSummary>>(`/api/pokedex/cards?${q}`)
       .then((payload) => {
         if (cancelled) return;
@@ -479,16 +479,24 @@ export function PokedexBrowser({
     return () => {
       cancelled = true;
     };
-  }, [selectedSetId, cardsPage, rarityBucket, finishBucket]);
+  }, [selectedSetId, cardsPage, rarityBucket, finishBucket, printingPreset]);
 
   const onRarityTabChange = useCallback((bucket: RarityBucketId) => {
     setRarityBucket(bucket);
     setFinishBucket("all");
     setCardsPage(1);
+    setCards([]);
+    setCardsLoading(true);
+    setCardsError(null);
   }, []);
 
   const onFinishTabChange = useCallback((finish: CatalogFinishBucketId) => {
     setFinishBucket(finish);
+    setCardsPage(1);
+  }, []);
+
+  const onPrintingPresetChange = useCallback((preset: PrintingPresetId) => {
+    setPrintingPreset(preset);
     setCardsPage(1);
   }, []);
 
@@ -620,40 +628,47 @@ export function PokedexBrowser({
 
         <div
           className={cn(
-            "min-h-0 gap-3",
+            "sc-pokedex-catalog-grid min-h-0 gap-3",
             embedded
-              ? "mt-1 flex flex-col lg:grid lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)]"
-              : "mt-8 grid lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]",
+              ? "mt-1 flex flex-col lg:grid lg:grid-cols-[minmax(280px,34%)_minmax(0,1fr)] lg:gap-4 xl:grid-cols-[minmax(320px,36%)_minmax(0,1fr)]"
+              : "mt-8 grid lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-5",
           )}
         >
           <Card
             className={cn(
               "desk-surface-raised flex min-h-0 flex-col overflow-hidden",
               embedded
-                ? "max-h-[min(36dvh,300px)] shrink-0 p-2.5 sc-glass-raised !border-white/8 lg:max-h-[min(58dvh,520px)] lg:min-h-0 lg:p-3"
+                ? "max-h-[min(40dvh,320px)] shrink-0 p-2.5 sc-glass-raised !border-white/8 max-lg:shrink-0 lg:max-h-none lg:min-h-0 lg:p-4"
                 : "max-h-[70dvh] p-4 sm:max-h-none sm:p-5 lg:max-h-[calc(100dvh-10rem)]",
             )}
           >
-            <div className={cn("flex shrink-0 flex-col gap-2", embedded ? "" : "sm:flex-row sm:items-center")}>
+            <div
+              className={cn(
+                "flex shrink-0 flex-col gap-2",
+                embedded ? "lg:flex-row lg:items-stretch lg:gap-2.5" : "sm:flex-row sm:items-center",
+              )}
+            >
               <div className="relative min-w-0 flex-1">
                 <Search
                   className={cn(
                     "pointer-events-none absolute top-1/2 -translate-y-1/2 text-faint",
-                    embedded ? "left-2 h-3.5 w-3.5" : "left-2.5 h-4 w-4",
+                    embedded ? "left-2.5 h-3.5 w-3.5 lg:left-3 lg:h-4 lg:w-4" : "left-2.5 h-4 w-4",
                   )}
                 />
                 <Input
                   value={setQuery}
                   onChange={(e) => setSetQuery(e.target.value)}
                   placeholder="Search set name…"
-                  className={cn(embedded ? "h-8 pl-8 text-[11px] sm:h-8" : "pl-9")}
+                  className={cn(
+                    embedded ? "h-9 pl-9 text-[11px] lg:h-10 lg:pl-10 lg:text-sm" : "pl-9",
+                  )}
                   aria-label="Search sets"
                 />
               </div>
               <div
                 className={cn(
                   "grid shrink-0 grid-cols-3 gap-0.5 rounded-lg border border-border-subtle bg-panel-raised/40 p-0.5",
-                  embedded ? "" : "gap-1 rounded-xl p-1",
+                  embedded ? "lg:min-w-[11.5rem] lg:gap-1 lg:rounded-xl lg:p-1" : "gap-1 rounded-xl p-1",
                 )}
                 role="group"
                 aria-label="Filter sets by era"
@@ -669,7 +684,9 @@ export function PokedexBrowser({
                       onClick={() => setSetEra(era)}
                       className={cn(
                         "rounded-md px-1 py-1.5 text-center font-semibold leading-tight transition touch-manipulation",
-                        embedded ? "text-[9px]" : "rounded-lg px-1.5 py-2 text-[10px] sm:px-2 sm:text-xs",
+                        embedded
+                          ? "text-[10px] lg:rounded-lg lg:px-2 lg:py-2 lg:text-xs"
+                          : "rounded-lg px-1.5 py-2 text-[10px] sm:px-2 sm:text-xs",
                         active
                           ? "bg-accent text-canvas shadow-sm"
                           : "text-muted hover:bg-panel-raised hover:text-primary",
@@ -705,22 +722,40 @@ export function PokedexBrowser({
                           type="button"
                           onClick={() => selectSet(s)}
                           className={cn(
-                            "flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition touch-manipulation",
+                            "flex w-full items-center gap-2.5 text-left transition touch-manipulation",
+                            embedded ? "px-2.5 py-2 lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm" : "gap-3 px-3 py-2.5 text-sm",
                             selectedSetId === s.id ? "bg-accent/15 text-primary" : "hover:bg-panel-raised",
                           )}
                         >
-                          <SetListLogo tcgSet={s} />
+                          <SetListLogo tcgSet={s} embedded={embedded} />
                           <div className="min-w-0 flex-1">
-                            <p className="flex flex-wrap items-center gap-1.5 font-medium leading-snug">
-                              <span>{s.name}</span>
+                            <p
+                              className={cn(
+                                "flex flex-wrap items-center gap-1.5 font-medium leading-snug",
+                                embedded && "text-[11px] lg:text-sm",
+                              )}
+                            >
+                              <span className="line-clamp-2 lg:line-clamp-none">{s.name}</span>
                               {promo ? (
-                                <span className="rounded bg-panel-raised px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted">
+                                <span
+                                  className={cn(
+                                    "shrink-0 rounded bg-panel-raised px-1.5 py-0.5 font-semibold uppercase tracking-wide text-muted",
+                                    embedded ? "text-[8px] lg:text-[9px]" : "text-[9px]",
+                                  )}
+                                >
                                   {promo.bucket === "promo" ? "Promo" : "Special"}
                                 </span>
                               ) : null}
                             </p>
-                            <p className="mt-0.5 text-xs text-muted">
-                              {s.series} · {s.releaseDate} · {s.printedTotal ?? s.total} cards
+                            <p
+                              className={cn(
+                                "mt-0.5 text-muted",
+                                embedded ? "text-[10px] leading-snug lg:text-xs" : "text-xs",
+                              )}
+                            >
+                              <span className="line-clamp-2 lg:line-clamp-1">
+                                {s.series} · {s.releaseDate} · {s.printedTotal ?? s.total} cards
+                              </span>
                             </p>
                           </div>
                           <ChevronRight className="h-4 w-4 shrink-0 text-faint" aria-hidden />
@@ -732,8 +767,13 @@ export function PokedexBrowser({
               )}
             </div>
 
-            <div className="mt-3 flex shrink-0 items-center justify-between gap-2 text-xs text-muted">
-              <span>
+            <div
+              className={cn(
+                "mt-3 flex shrink-0 items-center justify-between gap-2 text-muted",
+                embedded ? "text-[10px] lg:text-xs" : "text-xs",
+              )}
+            >
+              <span className="min-w-0 truncate">
                 Page {setsPage} / {setsTotalPages} · {setsMeta.totalCount} sets
               </span>
               <div className="flex gap-1">
@@ -763,7 +803,7 @@ export function PokedexBrowser({
             className={cn(
               "desk-surface-raised flex min-h-0 flex-col overflow-hidden",
               embedded
-                ? "min-h-[min(38dvh,340px)] flex-1 p-2.5 sc-glass-raised !border-white/8 lg:min-h-[min(58dvh,520px)] lg:p-3"
+                ? "min-h-[min(42dvh,380px)] flex-1 p-2.5 sc-glass-raised !border-white/8 lg:min-h-0 lg:p-4"
                 : "min-h-[50dvh] p-4 sm:p-5 lg:min-h-[calc(100dvh-10rem)]",
             )}
           >
@@ -826,7 +866,7 @@ export function PokedexBrowser({
                     <PrintingPresetTabs
                       options={printingPresetOptionsList}
                       value={printingPreset}
-                      onChange={setPrintingPreset}
+                      onChange={onPrintingPresetChange}
                     />
                   </div>
                 ) : null}
@@ -1061,7 +1101,7 @@ export function PokedexBrowser({
                 </Button>
               ) : null}
             </div>
-            <PokedexCardMarketPanel cardId={detail.id} printingHint={detailMarketPrintingHint} />
+            <PokedexCardMarketPanel cardId={detail.sourceCatalogId ?? detail.id} printingHint={detailMarketPrintingHint} />
           </div>
         </>
       ) : null}

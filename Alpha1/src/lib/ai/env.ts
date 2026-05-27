@@ -26,6 +26,11 @@ export function getGeminiVisionModel(): string {
   return process.env.GEMINI_VISION_MODEL?.trim() || "gemini-2.5-flash";
 }
 
+/** Optional second-pass model for "verify/fix" extraction on single images. */
+export function getGeminiVisionVerifyModel(): string {
+  return process.env.GEMINI_VISION_VERIFY_MODEL?.trim() || getGeminiVisionModel();
+}
+
 export function getGeminiTextModel(): string {
   return process.env.GEMINI_TEXT_MODEL?.trim() || "gemini-2.5-flash";
 }

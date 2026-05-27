@@ -36,6 +36,10 @@ const RARE_TERMS = [
   "Rare Shining",
   "Rare Shining Neo",
   "Rare Reverse Holo",
+  /** Standalone print-type labels in cache */
+  "Reverse Holo",
+  "Trainer Gallery Rare Holo",
+  "Promo",
 ] as const;
 
 const ULTRA_TERMS = [
@@ -56,17 +60,24 @@ const ULTRA_TERMS = [
   "Rare Holo Lv.X",
   "Rare Prism Star",
   "Rare GX",
+  "Rare Holo GX",
   "Rare TAG TEAM",
+  "LEGEND",
+  "Shiny Ultra Rare",
+  "MEGA_ATTACK_RARE",
+  "Black White Rare",
 ] as const;
 
 const SECRET_TERMS = [
   "Secret Rare",
   "Hyper Rare",
+  "Mega Hyper Rare",
   "Special Illustration Rare",
   "Rare Secret",
   "Rare Rainbow",
   "Rare Shiny GX",
   "Rare Secret GX",
+  "Classic Collection",
 ] as const;
 
 const BUCKET_TERMS: Record<Exclude<RarityBucketId, "all">, readonly string[]> = {
@@ -107,4 +118,56 @@ export function buildSetCardsQuery(setId: string, bucket: RarityBucketId): strin
   const inner = rarityOrGroup(BUCKET_TERMS[bucket]);
   if (!inner) return `set.id:${sid}`;
   return `set.id:${sid} AND (${inner})`;
+}
+
+function normalizeRarityLabel(rarity: string): string {
+  return rarity.trim().replace(/\s+/g, " ");
+}
+
+/** True when a catalog/API rarity string belongs to a browse tab term. */
+export function rarityMatchesTerm(rarity: string, term: string): boolean {
+  const r = normalizeRarityLabel(rarity);
+  const t = normalizeRarityLabel(term);
+  if (!r || !t) return false;
+  if (t === "Rare") return r === "Rare";
+  return r.localeCompare(t, undefined, { sensitivity: "accent" }) === 0;
+}
+
+/** Map official rarity text → browse tab (null = only visible under All). */
+export function inferRarityBucket(
+  rarity: string | null | undefined,
+): Exclude<RarityBucketId, "all"> | null {
+  if (!rarity?.trim()) return null;
+  const order: Exclude<RarityBucketId, "all">[] = ["secret", "ultra", "rare", "base"];
+  for (const bucket of order) {
+    for (const term of BUCKET_TERMS[bucket]) {
+      if (rarityMatchesTerm(rarity, term)) return bucket;
+    }
+  }
+  return null;
+}
+
+export function cardMatchesRarityBucket(
+  rarity: string | null | undefined,
+  bucket: RarityBucketId,
+): boolean {
+  if (bucket === "all") return true;
+  return inferRarityBucket(rarity) === bucket;
+}
+
+export function emptyRarityCounts(): Record<RarityBucketId, number> {
+  return { all: 0, base: 0, rare: 0, ultra: 0, secret: 0 };
+}
+
+/** Count cards per tab from in-memory rows (Supabase cache path). */
+export function countCardsByRarityBucket(
+  cards: ReadonlyArray<{ rarity?: string | null }>,
+): Record<RarityBucketId, number> {
+  const counts = emptyRarityCounts();
+  counts.all = cards.length;
+  for (const card of cards) {
+    const bucket = inferRarityBucket(card.rarity ?? null);
+    if (bucket) counts[bucket] += 1;
+  }
+  return counts;
 }

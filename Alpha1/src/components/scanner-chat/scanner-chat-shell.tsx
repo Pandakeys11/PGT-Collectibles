@@ -10,6 +10,7 @@ import { useCompanion } from "@/hooks/use-companion";
 import { useScanQuota } from "@/hooks/use-scan-quota";
 import { useScannerChat } from "@/hooks/use-scanner-chat";
 import { LIQUID_SCAN_PATH } from "@/lib/app-routes";
+import { getActiveCatalogCandidate } from "@/lib/scanner-chat/catalog-match-present";
 import { openAppraisalPrint } from "@/lib/scan/appraisal-export";
 import { downloadSpecimensCsv, downloadSpecimensJson } from "@/lib/scan/export";
 import { ChatMessageList } from "./chat-message";
@@ -76,9 +77,10 @@ export function ScannerChatShell() {
     (specimenId: string) => {
       chat.setSelectedSpecimenId(specimenId);
       const specimen = chat.specimens.find((s) => s.id === specimenId);
-      const top = specimen?.context.catalogCandidates[0];
-      if (top && specimen?.context.catalogIdentityStatus !== "confirmed") {
-        chat.handleConfirmCandidate(top);
+      if (!specimen) return;
+      const pick = getActiveCatalogCandidate(specimen.context);
+      if (pick) {
+        chat.handleConfirmCandidateForSpecimen(specimenId, pick);
       }
     },
     [chat],
@@ -88,11 +90,10 @@ export function ScannerChatShell() {
     (specimenId: string) => {
       chat.setSelectedSpecimenId(specimenId);
       const specimen = chat.specimens.find((s) => s.id === specimenId);
-      const catalogId = specimen?.context.catalogId;
-      if (catalogId) {
-        chat.handleRejectCandidate(catalogId);
-      } else if (specimen?.context.catalogCandidates[0]) {
-        chat.handleRejectCandidate(specimen.context.catalogCandidates[0].catalogId);
+      if (!specimen) return;
+      const pick = getActiveCatalogCandidate(specimen.context);
+      if (pick) {
+        chat.handleRejectCandidateForSpecimen(specimenId, pick.catalogId);
       }
     },
     [chat],
@@ -116,6 +117,12 @@ export function ScannerChatShell() {
       onViewComps: handleViewComps,
       onAddToCollection: (specimenId: string) => void chat.saveSpecimenToCollection(specimenId),
       onExclude: chat.handleExcludeSpecimen,
+      onConfirmCatalogCandidate: chat.handleConfirmCandidateForSpecimen,
+      onRejectCatalogCandidate: chat.handleRejectCandidateForSpecimen,
+      onRefreshCatalogCandidates: chat.handleRefreshCatalogCandidatesForSpecimen,
+      onOpenMasterCatalog: chat.openCatalogOutput,
+      catalogRefreshingId: chat.catalogRefreshingId,
+      catalogBusy: chat.enrichingSpecimenId != null,
     }),
     [chat, handleCorrectMatch, handleWrongMatch, handleViewComps],
   );
@@ -262,6 +269,18 @@ export function ScannerChatShell() {
             onSpeedOnChange={chat.setLiquidScanSpeedOn}
             onOpenLiveCamera={() => setLiveCameraOpen(true)}
             onOpenCalculator={() => chat.openCalculatorOutput()}
+            reviewSpecimen={
+              chat.selectedSpecimen?.context.catalogIdentityStatus !== "confirmed" ||
+              chat.selectedSpecimen?.context.verificationStatus !== "verified"
+                ? chat.selectedSpecimen
+                : null
+            }
+            onConfirmCatalogCandidate={chat.handleConfirmCandidateForSpecimen}
+            onRejectCatalogCandidate={chat.handleRejectCandidateForSpecimen}
+            onRefreshCatalogCandidates={chat.handleRefreshCatalogCandidatesForSpecimen}
+            onOpenMasterCatalog={chat.openCatalogOutput}
+            catalogRefreshingId={chat.catalogRefreshingId}
+            catalogBusy={chat.enrichingSpecimenId != null}
           />
         </main>
         <div className="hidden w-[min(100%,380px)] min-w-0 shrink-0 flex-col border-l border-white/6 lg:flex xl:w-[420px]">

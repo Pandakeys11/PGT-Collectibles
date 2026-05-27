@@ -3,19 +3,29 @@
 import { useEffect, useState } from "react";
 import { cropImageWithVisionLocation } from "@/lib/scan/specimen-crop";
 import { normalizeVisionGridLocation, type VisionGridLocation } from "@/lib/scan/spatial";
+import type { VisionBboxGrid } from "@/lib/scan/spatial-grid";
 
 export function useSpecimenCropPreview(args: {
   fullSrc: string | null;
   location: unknown;
   /** When set (multi-card capture), aligns crop with extracted row order on the sheet. */
   evidenceCropLocation?: VisionGridLocation | null;
+  bbox?: VisionBboxGrid | null;
   radiusMultiplier?: number;
   gradedSlab: boolean;
   maxOutputSide: number;
   enabled?: boolean;
 }): { displaySrc: string | null; cropping: boolean; hasFullSrc: boolean } {
-  const { fullSrc, location, evidenceCropLocation, radiusMultiplier, gradedSlab, maxOutputSide, enabled = true } =
-    args;
+  const {
+    fullSrc,
+    location,
+    evidenceCropLocation,
+    bbox,
+    radiusMultiplier,
+    gradedSlab,
+    maxOutputSide,
+    enabled = true,
+  } = args;
   const [cropped, setCropped] = useState<string | null>(null);
   const [cropping, setCropping] = useState(false);
 
@@ -34,6 +44,7 @@ export function useSpecimenCropPreview(args: {
       gradedSlab,
       maxOutputSide,
       radiusMultiplier,
+      bbox: bbox ?? null,
     })
       .then((url) => {
         if (cancelled) return;
@@ -47,7 +58,7 @@ export function useSpecimenCropPreview(args: {
       cancelled = true;
       setCropping(false);
     };
-  }, [enabled, fullSrc, location, evidenceCropLocation, radiusMultiplier, gradedSlab, maxOutputSide]);
+  }, [enabled, fullSrc, location, evidenceCropLocation, bbox, radiusMultiplier, gradedSlab, maxOutputSide]);
 
   return {
     displaySrc: cropped ?? fullSrc,

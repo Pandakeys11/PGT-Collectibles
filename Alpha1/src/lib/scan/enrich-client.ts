@@ -39,7 +39,7 @@ export async function enrichExtractedCard(args: {
   catalogId?: string | null;
 }> {
   const phase = args.phase ?? "full";
-  const timeoutMs = phase === "catalog" ? 25_000 : phase === "market" ? 60_000 : 45_000;
+  const timeoutMs = phase === "catalog" ? 45_000 : phase === "market" ? 60_000 : 45_000;
   const maxAttempts = 3;
 
   let lastError = "Enrichment failed";
@@ -113,7 +113,7 @@ export async function fetchCatalogCandidates(args: {
       card: args.card,
       existingCandidates: args.existingCandidates,
     }),
-    signal: AbortSignal.timeout(45_000),
+    signal: AbortSignal.timeout(20_000),
   });
 
   const data = await readResponseJson<CatalogCandidatesPayload & { error?: string }>(response);
@@ -121,4 +121,31 @@ export async function fetchCatalogCandidates(args: {
     throw new Error(data.error || `Catalog search failed (${response.status})`);
   }
   return data;
+}
+
+export async function recordScanObservation(args: {
+  eventType: "user_confirm" | "user_reject" | "user_edit";
+  specimenId: string;
+  card: ExtractedCard;
+  context?: Partial<ScanCardContext> | Record<string, unknown>;
+  catalogId?: string | null;
+}): Promise<void> {
+  try {
+    const response = await fetch("/api/scan/observation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventType: args.eventType,
+        specimenId: args.specimenId,
+        card: args.card,
+        context: args.context ?? {},
+        catalogId: args.catalogId ?? null,
+      }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!response.ok) return;
+    await response.json().catch(() => null);
+  } catch {
+    // non-fatal
+  }
 }
