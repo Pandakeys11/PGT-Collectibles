@@ -244,6 +244,8 @@ export async function resolveLocalizedCatalogArtwork(args: {
   card: ExtractedCard;
   catalog: CatalogMatch | null;
   fallbackImageUrl?: string | null;
+  /** Catalog-match hot path: DB overlay + EN fallback only (no TCGdex network). */
+  fastPath?: boolean;
 }): Promise<LocalizedArtworkResolution | null> {
   if (!isJapanesePokemonCard(args.card)) return null;
 
@@ -256,8 +258,10 @@ export async function resolveLocalizedCatalogArtwork(args: {
     }
   }
 
-  const tcgdex = await resolveTcgDexJapaneseArtwork(args.card, args.catalog);
-  if (tcgdex) return tcgdex;
+  if (!args.fastPath) {
+    const tcgdex = await resolveTcgDexJapaneseArtwork(args.card, args.catalog);
+    if (tcgdex) return tcgdex;
+  }
 
   return englishFallbackResolution(args.fallbackImageUrl);
 }

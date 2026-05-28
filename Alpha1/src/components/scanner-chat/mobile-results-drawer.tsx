@@ -129,6 +129,8 @@ export function MobileResultsDrawer({
   selectedSpecimen,
   selectedSpecimenId,
   enrichingSpecimenId,
+  catalogEnriching = false,
+  marketEnriching = false,
   onSelectSpecimen,
   onConfirmCandidate,
   onRejectCandidate,
@@ -158,6 +160,8 @@ export function MobileResultsDrawer({
   selectedSpecimen: ScanSpecimen | null;
   selectedSpecimenId: string | null;
   enrichingSpecimenId: string | null;
+  catalogEnriching?: boolean;
+  marketEnriching?: boolean;
   onSelectSpecimen: (id: string) => void;
   onConfirmCandidate: (candidate: CatalogCandidate) => void;
   onRejectCandidate: (catalogId: string) => void;
@@ -309,6 +313,8 @@ export function MobileResultsDrawer({
                 selectedSpecimen={selectedSpecimen}
                 selectedSpecimenId={selectedSpecimenId}
                 enrichingSpecimenId={enrichingSpecimenId}
+                catalogEnriching={catalogEnriching}
+                marketEnriching={marketEnriching}
                 onSelectSpecimen={onSelectSpecimen}
                 onConfirmCandidate={onConfirmCandidate}
                 onRejectCandidate={onRejectCandidate}

@@ -1,12 +1,38 @@
 import type { CatalogCardSummary } from "@/lib/catalog/catalog-types";
 import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
-import type { TcgCardSummary } from "@/lib/pokedex/tcg-api-types";
+import { bestCatalogUsd } from "@/lib/market/catalog-price-utils";
+import { resolveCatalogRawFmv } from "@/lib/market/catalog-raw-fmv";
+import type { TcgCardSetEmbed, TcgCardSummary } from "@/lib/pokedex/tcg-api-types";
 
 /** Cards from master catalog DB or live TCG API — both feed set insight rollups. */
 export type SetInsightCardSource = CatalogCardSummary | TcgCardSummary;
 
-function priceSnapshotFromTcgCard(card: TcgCardSummary): CatalogPriceSnapshot {
+function toTcgSetEmbed(
+  set: { id: string; name: string; code?: string | null; releaseDate?: string | null } | TcgCardSetEmbed | undefined,
+): TcgCardSetEmbed | undefined {
+  if (!set) return undefined;
+  return {
+    id: set.id,
+    name: set.name,
+    releaseDate: set.releaseDate ?? undefined,
+    ...("series" in set && set.series ? { series: set.series } : {}),
+    ...("printedTotal" in set && set.printedTotal != null ? { printedTotal: set.printedTotal } : {}),
+    ...("total" in set && set.total != null ? { total: set.total } : {}),
+  };
+}
+
+function normalizeInsightKey(name: string, number: string | null | undefined): string {
+  const n = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  const raw = (number ?? "").replace(/^#/, "").trim();
+  const primary = (raw.split("/")[0] ?? raw).replace(/^0+/, "").trim() || raw;
+  return `${n}|${primary}`;
+}
+
+export function priceSnapshotFromTcgCard(card: TcgCardSummary): CatalogPriceSnapshot {
   const tcgPlayerPrices = card.tcgplayer?.prices
     ? Object.entries(card.tcgplayer.prices).map(([variant, p]) => ({
         variant,
@@ -73,8 +99,11 @@ function bestTcgUsd(prices: CatalogPriceSnapshot): number | null {
   return best;
 }
 
-/** Cardmarket trend vs 7-day avg — catalog proxy for short-term momentum (not live 24h feed). */
+/** Momentum: PokeTrace medians first, then Cardmarket trend vs 7d, then WS overlay. */
 export function catalogMomentumPct(prices: CatalogPriceSnapshot): number | null {
+  if (prices.pokeTrace?.momentumPct != null) {
+    return prices.pokeTrace.momentumPct;
+  }
   const cm = prices.cardMarket;
   if (!cm?.trendPrice || !cm.avg7 || cm.avg7 <= 0) return null;
   return Math.round(((cm.trendPrice - cm.avg7) / cm.avg7) * 1000) / 10;
@@ -84,15 +113,71 @@ export function cardInsightRow(card: SetInsightCardSource): SetInsightCardRow {
   const prices = pricesForInsightCard(card);
   const number = card.number ?? null;
   const rarity = card.rarity ?? null;
+  const catalogFinish =
+    "catalogFinish" in card && card.catalogFinish === "reverse_holo" ? "reverse_holo" : undefined;
+  const fmv = resolveCatalogRawFmv({
+    prices,
+    catalogFinish,
+    rarity,
+    identity: { name: card.name, number, set: card.set?.name ?? null },
+  });
   return {
     catalogId: card.id,
     name: card.name,
     number,
     rarity,
     imageUrl: card.images?.small ?? card.images?.large ?? null,
-    priceUsd: bestTcgUsd(prices),
+    priceUsd: fmv.usd ?? bestTcgUsd(prices),
     momentumPct: catalogMomentumPct(prices),
   };
+}
+
+/** Fill missing TCGPlayer/Cardmarket snapshots from live Pokémon TCG API rows. */
+export function enrichCardsWithLiveTcgPrices(
+  catalogCards: SetInsightCardSource[],
+  liveCards: TcgCardSummary[],
+): SetInsightCardSource[] {
+  if (!liveCards.length || !catalogCards.length) return catalogCards;
+
+  const byApiId = new Map<string, TcgCardSummary>();
+  const byKey = new Map<string, TcgCardSummary>();
+  for (const live of liveCards) {
+    byApiId.set(live.id, live);
+    byKey.set(normalizeInsightKey(live.name, live.number), live);
+  }
+
+  return catalogCards.map((card) => {
+    const existing = pricesForInsightCard(card);
+    if (bestCatalogUsd(existing) != null) return card;
+
+    const apiId =
+      ("sourceCatalogId" in card && card.sourceCatalogId?.trim()) ||
+      ("id" in card &&
+      typeof card.id === "string" &&
+      /^[a-z0-9]{2,}-[a-z0-9]+/i.test(card.id)
+        ? card.id.trim()
+        : null);
+    const hit =
+      (apiId ? byApiId.get(apiId) : undefined) ??
+      byKey.get(normalizeInsightKey(card.name, card.number ?? null));
+    if (!hit) return card;
+
+    const mergedPrices = priceSnapshotFromTcgCard(hit);
+    if ("prices" in card) {
+      return { ...card, prices: mergedPrices } satisfies CatalogCardSummary;
+    }
+    return {
+      ...hit,
+      id: card.id,
+      images: card.images ?? hit.images,
+      set: toTcgSetEmbed(card.set) ?? hit.set,
+      catalogFinish: "catalogFinish" in card ? card.catalogFinish : hit.catalogFinish,
+      catalogVariantKey: "catalogVariantKey" in card ? card.catalogVariantKey : hit.catalogVariantKey,
+      catalogVariantLabel:
+        "catalogVariantLabel" in card ? card.catalogVariantLabel : hit.catalogVariantLabel,
+      sourceCatalogId: apiId ?? hit.id,
+    } satisfies TcgCardSummary;
+  });
 }
 
 export function rollupSetInsightCards(cards: SetInsightCardSource[]): SetInsightRollup {

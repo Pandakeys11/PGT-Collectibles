@@ -6,6 +6,7 @@ import type {
 } from "@/lib/catalog/catalog-types";
 import { releaseYearFromDate } from "@/lib/catalog/catalog-types";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
+import { tcgPlayerEmbedFromSnapshot } from "@/lib/market/catalog-raw-fmv";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 type DbSetRow = {
@@ -32,7 +33,7 @@ export function normalizeCatalogBrowseSearch(raw?: string): string {
     .trim();
 }
 
-async function resolveSetRecord(
+export async function resolveSetRecord(
   franchise: CatalogFranchiseId,
   setId: string,
 ): Promise<DbSetRow | null> {
@@ -400,7 +401,7 @@ function dbCardToSummary(
       releaseDate: row.year ? `${row.year}-01-01` : undefined,
     },
     franchise,
-    tcgplayer: prices.tcgPlayerUrl ? { url: prices.tcgPlayerUrl } : undefined,
+    tcgplayer: tcgPlayerEmbedFromSnapshot(prices),
   };
 }
 

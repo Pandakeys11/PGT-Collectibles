@@ -1,5 +1,10 @@
 import OpenAI from "openai";
 import { getGroqApiKey, getGroqCompoundModel } from "@/lib/ai/env";
+import {
+  getSetInsightGroqMaxTokens,
+  isAiRateLimitError,
+  markAiResearchCooldown,
+} from "@/lib/ai/research-budget";
 import { withTimeout } from "@/lib/async-timeout";
 import type { SetInsightPriceCard, SetInsightSealedProduct } from "@/lib/catalog/set-insight-payload";
 
@@ -198,7 +203,7 @@ export async function researchSetInsightWithGroq(input: {
           { role: "user", content: buildUserPrompt({ ...input, todayUtc }) },
         ],
         temperature: 0.2,
-        max_tokens: 2_800,
+        max_tokens: getSetInsightGroqMaxTokens(),
         response_format: { type: "json_object" },
       }),
       85_000,
@@ -208,7 +213,8 @@ export async function researchSetInsightWithGroq(input: {
     const raw = parseGroqSetInsightJson(text);
     if (!raw) return null;
     return { raw, model };
-  } catch {
+  } catch (err) {
+    if (isAiRateLimitError(err)) markAiResearchCooldown("groq");
     return null;
   }
 }

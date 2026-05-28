@@ -20,12 +20,11 @@ import {
   type GradeBucket,
   type GradeBucketSummary,
 } from "@/lib/market/market-intelligence";
-import type { PokemonMarketKnowledge } from "@/lib/market/pokemon-market-knowledge";
+import type { PokemonMarketKnowledge } from "@/lib/market/pokemon-market-knowledge-shared";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
 import { cn } from "@/lib/cn";
 
-const LADDER_BUCKETS: GradeBucket[] = [
-  "raw",
+const GRADED_LADDER_BUCKETS: GradeBucket[] = [
   "psa9",
   "psa10",
   "bgsBlackLabel",
@@ -129,7 +128,7 @@ export function PokemonMarketIntelView({
 
   const ladderRows = useMemo(() => {
     const byBucket = new Map(intelligence.buckets.map((b) => [b.bucket, b]));
-    return LADDER_BUCKETS.map((bucket) => byBucket.get(bucket)).filter(
+    return GRADED_LADDER_BUCKETS.map((bucket) => byBucket.get(bucket)).filter(
       (row): row is GradeBucketSummary => Boolean(row),
     );
   }, [intelligence.buckets]);
@@ -226,11 +225,14 @@ export function PokemonMarketIntelView({
             <div className="mt-4 flex flex-wrap items-end gap-4">
               <div>
                 <p className="text-[10px] font-medium uppercase tracking-wide text-faint">
-                  Fair market value
+                  Raw FMV
                 </p>
-                <p className="font-mono text-3xl text-accent">{fmtUsd(knowledge.fairValueUsd)}</p>
+                <p className="font-mono text-3xl text-accent">
+                  {fmtUsd(knowledge.rawFmvUsd ?? knowledge.fairValueUsd)}
+                </p>
                 <p className="text-xs text-muted">
-                  Based on {formatFmvBasis(knowledge.fairValueBasis)}
+                  {formatFmvBasis(knowledge.rawFmvBasis ?? knowledge.fairValueBasis)} ·{" "}
+                  {knowledge.rawFmvSourceLabel}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-[10px]">
@@ -303,7 +305,7 @@ export function PokemonMarketIntelView({
 
       {ladderRows.some((r) => r.soldCount + r.activeCount + r.referenceCount > 0) ? (
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-primary">Grade ladder</h2>
+          <h2 className="mb-2 text-sm font-semibold text-primary">Graded FMV</h2>
           <div className="flex gap-2 overflow-x-auto pb-1 scanner-chat-scrollbar sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-3 xl:grid-cols-5">
             {ladderRows.map((row) => (
               <GradeLadderCard key={row.bucket} row={row} />

@@ -4,7 +4,7 @@
  * - Speed OFF — gentler API pacing.
  * Market intelligence (comps, premium lanes, session report) runs for **every** scan
  * regardless of Speed toggle — only concurrency differs.
- * Graded slabs with certs always hydrate registry during enrich regardless of mode.
+ * Speed ON skips bulk cert registry — slabs hydrate when the row is selected (`/api/scan/registry`).
  */
 
 export const LIQUID_SCAN_SPEED_STORAGE_KEY = "pgt-liquid-scan-speed-on";
@@ -45,7 +45,7 @@ export function getLiquidScanSpeedProfile(speedOn: boolean): LiquidScanSpeedProf
       catalogConcurrency: 6,
       marketConcurrency: 4,
       precisionConcurrency: 2,
-      skipRegistryOnBulkEnrich: false,
+      skipRegistryOnBulkEnrich: true,
       precisionCropEnabled: true,
       precisionCropMax: 5,
       autoSessionReport: true,
@@ -87,6 +87,6 @@ export function precisionCropMaxForCardCount(
 }
 
 /** Session market intelligence report after enrich — not gated by Speed toggle. */
-export function shouldAutoSessionReport(_speedOn?: boolean): boolean {
+export function shouldAutoSessionReport(): boolean {
   return true;
 }

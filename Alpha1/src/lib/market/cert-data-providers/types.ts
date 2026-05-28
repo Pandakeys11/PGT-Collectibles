@@ -4,6 +4,7 @@ import type { ParsedCertRef } from "@/lib/market/cert-lookup";
 export type CertDataProviderId =
   | "gemrate"
   | "psa_public"
+  | "brightdata"
   | "apify_psa"
   | "psa_cert_page"
   | "web_snippet";

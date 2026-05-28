@@ -1,6 +1,8 @@
+import { bestCatalogUsd } from "@/lib/market/catalog-price-utils";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
+import { tickerFmvFromIntel } from "@/lib/market/ticker-fmv";
+import { readCatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
 import type { LiveMarketTickerSlide } from "@/lib/market/live-market-ticker-types";
-import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
 import { resolveJapaneseSetReleaseYear } from "@/lib/scan/japanese-pokemon";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -42,25 +44,6 @@ type SetGroup = {
     momentumPct: number | null;
   }[];
 };
-
-function bestTcgUsd(prices: CatalogPriceSnapshot): number | null {
-  let best: number | null = null;
-  for (const row of prices.tcgPlayerPrices) {
-    const n = row.market ?? row.mid ?? row.low;
-    if (n == null || !Number.isFinite(n)) continue;
-    if (best == null || n > best) best = n;
-  }
-  return best;
-}
-
-function bestCatalogUsd(prices: CatalogPriceSnapshot): number | null {
-  const tcg = bestTcgUsd(prices);
-  if (tcg != null) return tcg;
-  const cm = prices.cardMarket;
-  const cmUsd = cm?.trendPrice ?? cm?.averageSellPrice ?? cm?.avg30 ?? cm?.avg7 ?? cm?.lowPrice ?? null;
-  if (cmUsd != null && Number.isFinite(cmUsd)) return cmUsd;
-  return null;
-}
 
 function releaseSortKey(year: string | null): number {
   if (!year || !/^\d{4}$/.test(year)) return 9_999;
@@ -225,6 +208,9 @@ export async function buildJpnArtworkTickerSlides(): Promise<LiveMarketTickerSli
 
     const { overlay, card, priceUsd } = best;
     const displayName = overlay.localized_name ?? card.name;
+    const intel = await readCatalogMarketIntel(card.catalog_id, { compLimit: 24 });
+    const fmv = tickerFmvFromIntel(intel);
+    const displayUsd = fmv.rawFmvUsd ?? priceUsd;
     slides.push({
       lane: "jpn_art",
       setId: card.set_code ?? group.setKey,
@@ -236,13 +222,18 @@ export async function buildJpnArtworkTickerSlides(): Promise<LiveMarketTickerSli
       cardNumber: overlay.printed_number ?? card.card_number,
       rarity: card.rarity,
       imageUrl: overlay.image_large_url ?? overlay.image_small_url ?? null,
-      priceUsd: priceUsd != null ? Math.round(priceUsd * 100) / 100 : null,
+      priceUsd: displayUsd != null ? Math.round(displayUsd * 100) / 100 : null,
+      tcgMarketUsd: priceUsd != null ? Math.round(priceUsd * 100) / 100 : null,
+      rawFmvUsd: fmv.rawFmvUsd,
+      psa10FmvUsd: fmv.psa10FmvUsd,
       priceLabel:
-        priceUsd != null
-          ? "TCGPlayer (EN catalog ref)"
-          : overlay.artwork_match_status === "exact_japanese_print"
-            ? "Japanese print · price pending"
-            : "Japanese art · EN reference",
+        fmv.rawFmvUsd != null
+          ? "Raw FMV (EN spine)"
+          : priceUsd != null
+            ? "TCGPlayer (EN catalog ref)"
+            : overlay.artwork_match_status === "exact_japanese_print"
+              ? "Japanese print · price pending"
+              : "Japanese art · EN reference",
     });
   }
 

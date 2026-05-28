@@ -33,7 +33,10 @@ npm run verify:card-display
 |--------|---------|
 | `db:verify` / `db:apply` / `db:push` | Supabase schema |
 | `db:probe` | Test Postgres connection string |
-| `smoke:scan` / `smoke:enrich` | API smoke tests (server running) |
+| `smoke:scan` / `smoke:enrich` / `smoke:enrich-batch` | API smoke tests (server running) |
+| `market:ingest` / `platform:nightly` | Market intel + nightly jobs |
+| `setup:brightdata` / `verify:brightdata` | Bright Data cert / pop harvest |
+| `catalog:sync:pokemon` | TCG catalog sync |
 | `sprites:verify` / `sprites:upload` | Companion sprites |
 
 ## Docs

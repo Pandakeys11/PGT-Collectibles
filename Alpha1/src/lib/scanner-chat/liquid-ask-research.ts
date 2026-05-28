@@ -10,14 +10,7 @@ import { filterEvidenceByPrintEdition } from "@/lib/scan/print-edition";
 import type { ExtractedCard, MarketEvidence, ScanCardContext } from "@/lib/scan/schemas";
 import { shouldRunLiveResearch } from "@/lib/scanner-chat/liquid-ask-intent";
 import { resolveLiquidAskResearchTier } from "@/lib/scanner-chat/liquid-ask-research-tier";
-import {
-  isLiquidAskFreeWebBriefConfigured,
-  isLiquidAskGroqWebBriefConfigured,
-  isLiquidAskProWebBriefConfigured,
-  runLiquidAskFreeWebBrief,
-  runLiquidAskGroqWebBrief,
-  runLiquidAskProWebBrief,
-} from "@/lib/scanner-chat/liquid-ask-web-brief";
+import { runLiquidAskWebBriefWithBudget } from "@/lib/scanner-chat/liquid-ask-web-brief-runner";
 import { countCompsBySource, sortCompsForDisplay } from "@/lib/scanner-chat/prioritize-comps";
 import { buildGradedHubLinks } from "@/lib/market/graded-hub-urls";
 import { isLiquidAskGeminiResearchEnabled } from "@/lib/ai/env";
@@ -96,6 +89,7 @@ function cardFromCertLookup(lookup: LiquidAskCertLookup): ExtractedCard | null {
 function sessionEvidenceFromContexts(
   contexts: ScanCardContext[],
   focusSpecimenId?: string | null,
+  maxContexts = 8,
 ): { comps: LiquidAskComp[]; imageBySpecimen: Map<string, string | null> } {
   const imageBySpecimen = new Map<string, string | null>();
   const comps: LiquidAskComp[] = [];
@@ -107,7 +101,7 @@ function sessionEvidenceFromContexts(
         ]
       : contexts;
 
-  for (const ctx of ordered.slice(0, 8)) {
+  for (const ctx of ordered.slice(0, maxContexts)) {
     imageBySpecimen.set(ctx.specimenId, ctx.catalogImageUrl ?? null);
     const card = extractionToCard(ctx.extraction);
     const scoped = card
@@ -254,6 +248,8 @@ export async function runLiquidAskResearch(args: {
   contexts: ScanCardContext[];
   focusSpecimenId?: string | null;
   proTier: boolean;
+  /** Post-scan session report — pull comps from all rows + sentiment web brief. */
+  scanReport?: boolean;
 }): Promise<LiquidAskResearch> {
   const researchTier = resolveLiquidAskResearchTier(args.proTier);
   const useProMarket = researchTier === "pro";
@@ -317,6 +313,7 @@ export async function runLiquidAskResearch(args: {
   const { comps: sessionComps } = sessionEvidenceFromContexts(
     args.contexts,
     args.focusSpecimenId,
+    args.scanReport ? 24 : 8,
   );
   let comps = sessionComps;
   const sources: LiquidAskSource[] = [...certSnippets];
@@ -324,7 +321,13 @@ export async function runLiquidAskResearch(args: {
 
   const focusCard = focus ? extractionToCard(focus.extraction) : null;
   const certCard = certLookups[0] ? cardFromCertLookup(certLookups[0]) : null;
-  const researchCard = focusCard ?? certCard;
+  let researchCard = focusCard ?? certCard;
+  if (!researchCard?.name && args.scanReport && args.contexts.length > 0) {
+    const top = [...args.contexts].sort(
+      (a, b) => (b.fairValueUsd ?? 0) - (a.fairValueUsd ?? 0),
+    )[0];
+    researchCard = extractionToCard(top.extraction);
+  }
   const wantsLive =
     shouldRunLiveResearch(args.message, args.contexts.length) || Boolean(researchCard?.name);
 
@@ -341,43 +344,25 @@ export async function runLiquidAskResearch(args: {
   const generalQuestion = !researchCard?.name;
 
   if (wantsLive && generalQuestion) {
-    if (isLiquidAskGroqWebBriefConfigured()) {
-      try {
-        const brief = await runLiquidAskGroqWebBrief(args.message, RESEARCH_TODAY_ISO);
-        if (brief?.markdown) {
-          webBrief = brief.markdown;
-          liveResearchUsed = true;
-          webNotes.push(`Groq Compound web brief (${brief.model}, ${RESEARCH_TODAY_ISO}).`);
-        }
-      } catch {
-        /* fall through */
+    try {
+      const brief = await runLiquidAskWebBriefWithBudget(args.message, RESEARCH_TODAY_ISO, {
+        allowPro: useProMarket,
+      });
+      if (brief?.markdown) {
+        webBrief = brief.markdown;
+        liveResearchUsed = true;
+        geminiBriefUsed = brief.provider === "gemini";
+        proWebBriefUsed = brief.provider === "openrouter";
+        const label =
+          brief.provider === "gemini"
+            ? "Gemini search brief"
+            : brief.provider === "groq"
+              ? "Groq Compound web brief"
+              : "Pro open-web brief";
+        webNotes.push(`${label} (${brief.model}, ${RESEARCH_TODAY_ISO}).`);
       }
-    }
-    if (!webBrief && useProMarket && isLiquidAskProWebBriefConfigured()) {
-      try {
-        const brief = await runLiquidAskProWebBrief(args.message, RESEARCH_TODAY_ISO);
-        if (brief?.markdown) {
-          webBrief = brief.markdown;
-          proWebBriefUsed = true;
-          liveResearchUsed = true;
-          webNotes.push(`Pro open-web brief (${brief.model}, ${RESEARCH_TODAY_ISO}).`);
-        }
-      } catch {
-        /* fall through to free brief */
-      }
-    }
-    if (!webBrief && isLiquidAskGeminiResearchEnabled() && isLiquidAskFreeWebBriefConfigured()) {
-      try {
-        const brief = await runLiquidAskFreeWebBrief(args.message, RESEARCH_TODAY_ISO);
-        if (brief?.markdown) {
-          webBrief = brief.markdown;
-          geminiBriefUsed = true;
-          liveResearchUsed = true;
-          webNotes.push(`Gemini search brief (${brief.model}, ${RESEARCH_TODAY_ISO}).`);
-        }
-      } catch {
-        /* continue */
-      }
+    } catch {
+      /* continue */
     }
   }
 
@@ -424,7 +409,7 @@ export async function runLiquidAskResearch(args: {
   }
 
   if (researchCard?.name && wantsLive && !useProMarket) {
-    proMarketSkipped = caps.ebayConfigured;
+    proMarketSkipped = caps.ebaySoldReady;
     if (proMarketSkipped) {
       webNotes.push(
         "Automated eBay sold comps and full market enrich are Pro — using web search and Gemini grounding on this plan.",
@@ -474,6 +459,7 @@ export async function runLiquidAskResearch(args: {
     caps.geminiSearch &&
     ebaySoldFromHarvest < 3 &&
     !webBrief &&
+    !geminiBriefUsed &&
     (certLookups.length > 0 || args.message.length > 20) &&
     wantsLive
   ) {
@@ -519,7 +505,8 @@ export async function runLiquidAskResearch(args: {
       sources.length > certSnippets.length,
     dataCoverage: {
       researchTier,
-      ebayConfigured: caps.ebayConfigured,
+      ebaySoldReady: caps.ebaySoldReady,
+      ebayConfigured: caps.ebaySoldReady,
       ebaySoldCount: compCounts.ebaySold,
       ebayActiveCount: compCounts.ebayActive,
       snippetCompCount: compCounts.snippet,

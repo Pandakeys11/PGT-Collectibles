@@ -8,6 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import { CERT_NOT_VISIBLE, isCertNotApplicable } from "@/lib/scan/graded-slab";
 import type { ExtractedCard } from "@/lib/scan/schemas";
+import {
+  matchPresetFromPrintStamps,
+  PRINT_VERSION_PRESETS,
+  printStampsForPreset,
+} from "@/lib/scan/print-identity-ui";
 import { cn } from "@/lib/cn";
 
 const SHEET_INPUT =
@@ -178,8 +183,32 @@ export function SpecimenEditFields({
         <Field label="Rarity" variant={fieldVariant}>
           <Input value={card.rarity ?? ""} onChange={(e) => onUpdate({ rarity: e.target.value })} onBlur={onCommitEdit} className={inputClass} />
         </Field>
-        <Field label="Version" variant={fieldVariant}>
-          <Input value={card.printStamps ?? ""} onChange={(e) => onUpdate({ printStamps: e.target.value })} onBlur={onCommitEdit} className={inputClass} placeholder="1st Edition · Holo" />
+        <Field label="Print run" variant={fieldVariant}>
+          <select
+            value={matchPresetFromPrintStamps(card.printStamps)}
+            onChange={(e) => {
+              const presetId = e.target.value;
+              const stamps = printStampsForPreset(presetId);
+              onUpdate({ printStamps: stamps || undefined });
+              setTimeout(() => onCommitEdit(), 50);
+            }}
+            className={selectClass}
+          >
+            {PRINT_VERSION_PRESETS.map((p) => (
+              <option key={p.id || "auto"} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Version detail" variant={fieldVariant}>
+          <Input
+            value={card.printStamps ?? ""}
+            onChange={(e) => onUpdate({ printStamps: e.target.value })}
+            onBlur={onCommitEdit}
+            className={inputClass}
+            placeholder="1st Edition · Holo"
+          />
         </Field>
         <Field label="Slab label" variant={fieldVariant}>
           <Input

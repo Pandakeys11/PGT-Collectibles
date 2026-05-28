@@ -103,16 +103,6 @@ async function upsertSetsBatch(rows) {
   return total;
 }
 
-async function countCardsForSet(franchise, setCode) {
-  const { count, error } = await supabase
-    .from("tcg_catalog_cards")
-    .select("id", { count: "exact", head: true })
-    .eq("franchise", franchise)
-    .eq("set_code", setCode);
-  if (error) return 0;
-  return count ?? 0;
-}
-
 function setRow(franchise, externalSetId, name, code, releaseDate, cardCount, sourceId, rawJson = {}) {
   return {
     franchise,

@@ -74,6 +74,11 @@ Screen Recording*
 # --- Optional local catalog export drops ---
 **/catalog-exports/
 
+# --- Local scratch / probe captures (PSA pop, cert HTML, etc.) ---
+**/.tmp
+**/.tmp-*
+**/.tmp-*.*
+
 # --- OS & editors ---
 .DS_Store
 Thumbs.db

@@ -1,7 +1,6 @@
 import type { VisionGridLocation } from "@/lib/scan/spatial";
 import {
   bboxGridToCropRectFloat,
-  normalizeVisionBboxGrid,
   type VisionBboxGrid,
 } from "@/lib/scan/spatial-grid";
 

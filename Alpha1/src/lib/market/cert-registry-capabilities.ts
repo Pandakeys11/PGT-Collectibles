@@ -1,6 +1,8 @@
+import { isBrightDataPopHarvestEnabled } from "@/lib/market/brightdata/config";
 import { isApifyPsaPopConfigured } from "@/lib/market/apify-psa-pop";
+import { getPsaApiQuotaStatus } from "@/lib/market/cert-data-providers/psa-api-quota";
 import { psaPublicApiConfigured } from "@/lib/market/cert-data-providers/psa-api-token";
-import { getGeminiApiKey } from "@/lib/ai/env";
+import { isGeminiServiceEnabled } from "@/lib/ai/env";
 
 export type CertRegistryCapability = {
   id: string;
@@ -13,10 +15,11 @@ export type CertRegistryCapability = {
 export function getCertRegistryCapabilities(): CertRegistryCapability[] {
   const gemrate = Boolean(process.env.GEMRATE_API_KEY?.trim());
   const psaApi = psaPublicApiConfigured();
-  const psaManualToken = Boolean(process.env.PSA_API_ACCESS_TOKEN?.trim());
+  const psaQuota = getPsaApiQuotaStatus();
   const apify = isApifyPsaPopConfigured();
+  const brightdata = isBrightDataPopHarvestEnabled();
   const psaPage = process.env.PSA_CERT_PAGE_SCRAPE !== "0";
-  const gemini = Boolean(getGeminiApiKey());
+  const gemini = isGeminiServiceEnabled();
 
   return [
     {
@@ -29,9 +32,19 @@ export function getCertRegistryCapabilities(): CertRegistryCapability[] {
     {
       id: "psa_public",
       label: "PSA Public API",
-      configured: psaApi || psaManualToken,
+      configured: psaApi && psaQuota.remaining > 0,
       tier: "official",
-      notes: "OAuth at psacard.com/publicapi or PSA_API_ACCESS_TOKEN bearer.",
+      notes: psaApi
+        ? `Cert lookup only (~${psaQuota.limit}/day). ${psaQuota.remaining} calls left today.`
+        : "Set PSA_API_KEY or PSA OAuth vars from psacard.com/publicapi.",
+    },
+    {
+      id: "brightdata",
+      label: "Bright Data Crawl / Unlocker",
+      configured: brightdata,
+      tier: "paid_fallback",
+      notes:
+        "BRIGHTDATA_API_KEY + Crawl dataset_id or Web Unlocker zone — PSA/BGS/CGC pop harvest.",
     },
     {
       id: "apify_psa",
@@ -71,7 +84,7 @@ export function certRegistryReadySummary(): {
   const caps = getCertRegistryCapabilities();
   const active = caps.filter((c) => c.configured).map((c) => c.id);
   const hasStructuredProvider = active.some((id) =>
-    ["gemrate", "psa_public", "apify_psa"].includes(id),
+    ["gemrate", "psa_public", "brightdata", "apify_psa"].includes(id),
   );
   return { hasStructuredProvider, activeChain: active };
 }

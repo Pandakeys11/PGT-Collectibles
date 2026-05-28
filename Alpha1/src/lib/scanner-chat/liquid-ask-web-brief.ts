@@ -3,12 +3,18 @@ import OpenAI from "openai";
 import {
   getGeminiApiKey,
   getGeminiTextModel,
+  isGeminiServiceEnabled,
   getGroqApiKey,
   getGroqCompoundModel,
+  getLiquidAskGroqBriefMaxTokens,
   getOpenRouterApiKey,
   getOpenRouterBaseUrl,
   getOpenRouterMarketModel,
 } from "@/lib/ai/env";
+import {
+  isAiRateLimitError,
+  markAiResearchCooldown,
+} from "@/lib/ai/research-budget";
 import { withTimeout } from "@/lib/async-timeout";
 import { buildMarketMasterWebBriefRules } from "@/lib/scanner-chat/market-master-guard-rails";
 
@@ -25,7 +31,7 @@ Produce a direct, web-grounded answer. If the question is about the highest-valu
 
 /** Free tier: Gemini + Google Search grounding (uses GEMINI_API_KEY free quota). */
 export function isLiquidAskFreeWebBriefConfigured(): boolean {
-  return Boolean(getGeminiApiKey());
+  return isGeminiServiceEnabled();
 }
 
 export async function runLiquidAskFreeWebBrief(
@@ -58,7 +64,8 @@ export async function runLiquidAskFreeWebBrief(
     const markdown = result.response.text().trim();
     if (!markdown) return null;
     return { markdown, model: modelName };
-  } catch {
+  } catch (err) {
+    if (isAiRateLimitError(err)) markAiResearchCooldown("gemini");
     return null;
   }
 }
@@ -87,7 +94,7 @@ export async function runLiquidAskGroqWebBrief(
           { role: "user", content: buildUserPrompt(message, todayUtc) },
         ],
         temperature: 0.25,
-        max_tokens: 2_400,
+        max_tokens: getLiquidAskGroqBriefMaxTokens(),
       }),
       90_000,
       "liquid ask groq web brief",
@@ -95,7 +102,8 @@ export async function runLiquidAskGroqWebBrief(
     const markdown = response.choices[0]?.message?.content?.trim() ?? "";
     if (!markdown) return null;
     return { markdown, model };
-  } catch {
+  } catch (err) {
+    if (isAiRateLimitError(err)) markAiResearchCooldown("groq");
     return null;
   }
 }
@@ -137,7 +145,8 @@ export async function runLiquidAskProWebBrief(
     const markdown = response.choices[0]?.message?.content?.trim() ?? "";
     if (!markdown) return null;
     return { markdown, model };
-  } catch {
+  } catch (err) {
+    if (isAiRateLimitError(err)) markAiResearchCooldown("openrouter");
     return null;
   }
 }

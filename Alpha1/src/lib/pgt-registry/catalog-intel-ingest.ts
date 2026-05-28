@@ -1,9 +1,15 @@
 import { getCardFromDb } from "@/lib/catalog/db-catalog-browse";
 import { upsertCatalogCards } from "@/lib/catalog/db-catalog";
+import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
+import { priceChartingUsdFromEvidence } from "@/lib/market/catalog-raw-fmv";
 import { inferEvidenceGradeBucket } from "@/lib/market/market-intelligence";
+import { isPokeTraceConfigured, isPokeTracePrimary } from "@/lib/market/env-market";
+import { refreshPokeTraceCatalogPrices } from "@/lib/market/poketrace/sync-catalog";
 import { researchCardMarket } from "@/lib/market/research";
 import { catalogSummaryToExtractedCard } from "@/lib/market/pokemon-market-knowledge";
 import { fetchPokemonCardById } from "@/lib/pokedex/tcg-api-server";
+import { isBrightDataPopHarvestEnabled } from "@/lib/market/brightdata/config";
+import { harvestGraderPopForCatalogCard } from "@/lib/pgt-registry/grader-pop-ingest";
 import { persistMarketIntelFromEnrich } from "@/lib/pgt-registry/pgt-market-intel-persist";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { MarketEvidence } from "@/lib/scan/schemas";
@@ -18,26 +24,60 @@ const GRADE_POP_TARGETS: Array<{ grader: string; grade: string; bucket: string }
   { grader: "PGT", grade: "Raw", bucket: "raw" },
 ];
 
-function tcgPlayerPricesFromApi(card: {
-  tcgplayer?: { url?: string; updatedAt?: string; prices?: Record<string, { market?: number; mid?: number; low?: number; high?: number }> };
+function asNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function priceSnapshotFromApiCard(card: {
+  tcgplayer?: {
+    url?: string;
+    updatedAt?: string;
+    prices?: Record<string, { market?: number; mid?: number; low?: number; high?: number }>;
+  };
+  cardmarket?: {
+    url?: string;
+    updatedAt?: string;
+    prices?: {
+      averageSellPrice?: number;
+      trendPrice?: number;
+      lowPrice?: number;
+      avg7?: number;
+      avg30?: number;
+      reverseHoloTrend?: number;
+    };
+  };
 }): Record<string, unknown> {
   const tp = card.tcgplayer;
-  if (!tp?.prices) return {};
-  const tcgPlayerPrices = Object.entries(tp.prices).map(([variant, block]) => ({
-    variant,
-    market: block.market ?? null,
-    mid: block.mid ?? null,
-    low: block.low ?? null,
-    high: block.high ?? null,
-    directLow: null,
-  }));
+  const tcgPlayerPrices = tp?.prices
+    ? Object.entries(tp.prices).map(([variant, block]) => ({
+        variant,
+        market: block.market ?? null,
+        mid: block.mid ?? null,
+        low: block.low ?? null,
+        high: block.high ?? null,
+        directLow: null,
+      }))
+    : [];
+
+  const cm = card.cardmarket?.prices;
+  const cardMarket = cm
+    ? {
+        averageSellPrice: asNumber(cm.averageSellPrice),
+        trendPrice: asNumber(cm.trendPrice),
+        lowPrice: asNumber(cm.lowPrice),
+        avg7: asNumber(cm.avg7),
+        avg30: asNumber(cm.avg30),
+        reverseHoloTrend: asNumber(cm.reverseHoloTrend),
+      }
+    : null;
+
   return {
-    tcgPlayerUrl: tp.url ?? null,
-    tcgPlayerUpdatedAt: tp.updatedAt ?? null,
+    tcgPlayerUrl: tp?.url ?? null,
+    tcgPlayerUpdatedAt: tp?.updatedAt ?? null,
     tcgPlayerPrices,
-    cardMarketUrl: null,
-    cardMarketUpdatedAt: null,
-    cardMarket: null,
+    cardMarketUrl: card.cardmarket?.url ?? null,
+    cardMarketUpdatedAt: card.cardmarket?.updatedAt ?? null,
+    cardMarket,
   };
 }
 
@@ -53,9 +93,9 @@ export async function refreshCatalogPricesFromTcgApi(catalogId: string): Promise
     catalogId;
 
   const apiCard = await fetchPokemonCardById(pokemonId, { cache: "no-store" });
-  if (!apiCard?.tcgplayer?.prices) return false;
+  if (!apiCard?.tcgplayer?.prices && !apiCard?.cardmarket?.prices) return false;
 
-  const pricesJson = tcgPlayerPricesFromApi(apiCard);
+  const pricesJson = priceSnapshotFromApiCard(apiCard);
   await upsertCatalogCards([
     {
       franchise: "pokemon",
@@ -75,6 +115,51 @@ export async function refreshCatalogPricesFromTcgApi(catalogId: string): Promise
     },
   ]);
   return true;
+}
+
+/** Cache PriceCharting loose guide on the card row for instant RAW FMV in catalog UI. */
+async function persistPriceChartingOnCatalogCard(
+  catalogId: string,
+  evidence: MarketEvidence[],
+): Promise<void> {
+  const pcUsd = priceChartingUsdFromEvidence(evidence);
+  if (pcUsd == null || !isSupabaseConfigured()) return;
+
+  const card = await getCardFromDb("pokemon", catalogId);
+  if (!card) return;
+
+  const snap = card.prices ?? parseCatalogPriceSnapshot(null);
+  const pcRow = evidence.find((e) => e.source === "PriceCharting" && e.url);
+  const pricesJson = {
+    tcgPlayerUrl: snap.tcgPlayerUrl,
+    tcgPlayerUpdatedAt: snap.tcgPlayerUpdatedAt,
+    tcgPlayerPrices: snap.tcgPlayerPrices,
+    cardMarketUrl: snap.cardMarketUrl,
+    cardMarketUpdatedAt: snap.cardMarketUpdatedAt,
+    cardMarket: snap.cardMarket,
+    priceChartingLooseUsd: pcUsd,
+    priceChartingUrl: pcRow?.url ?? snap.priceChartingUrl,
+    priceChartingUpdatedAt: new Date().toISOString().slice(0, 10),
+  };
+
+  await upsertCatalogCards([
+    {
+      franchise: "pokemon",
+      catalogId,
+      name: card.name,
+      printedName: card.name,
+      setName: card.set?.name ?? null,
+      setCode: card.set?.code ?? null,
+      cardNumber: card.number,
+      year: card.set?.releaseDate?.slice(0, 4) ?? null,
+      rarity: card.rarity,
+      imageSmallUrl: card.images?.small ?? null,
+      imageLargeUrl: card.images?.large ?? null,
+      pricesJson,
+      rawJson: { catalogVariantKey: card.catalogVariantKey },
+      sourceId: "pgt_market_ingest",
+    },
+  ]);
 }
 
 /**
@@ -138,6 +223,7 @@ export type CatalogIntelIngestResult = {
   ok: boolean;
   comps: number;
   popSnapshots: number;
+  graderPopSnapshots: number;
   pricesRefreshed: boolean;
   institutionalMemory: boolean;
   error?: string;
@@ -151,7 +237,16 @@ export async function ingestCatalogMarketIntel(
   const profile = options?.profile ?? "full";
   const id = catalogId.trim();
   if (!id) {
-    return { catalogId: id, ok: false, comps: 0, popSnapshots: 0, pricesRefreshed: false, institutionalMemory: false, error: "missing_id" };
+    return {
+      catalogId: id,
+      ok: false,
+      comps: 0,
+      popSnapshots: 0,
+      graderPopSnapshots: 0,
+      pricesRefreshed: false,
+      institutionalMemory: false,
+      error: "missing_id",
+    };
   }
 
   try {
@@ -162,13 +257,19 @@ export async function ingestCatalogMarketIntel(
         ok: false,
         comps: 0,
         popSnapshots: 0,
+        graderPopSnapshots: 0,
         pricesRefreshed: false,
         institutionalMemory: false,
         error: "not_in_catalog",
       };
     }
 
-    const pricesRefreshed = await refreshCatalogPricesFromTcgApi(id);
+    const pokeRefreshed =
+      isPokeTraceConfigured() ? await refreshPokeTraceCatalogPrices(id) : false;
+    const pricesRefreshed =
+      pokeRefreshed && isPokeTracePrimary()
+        ? true
+        : await refreshCatalogPricesFromTcgApi(id);
     const card = catalogSummaryToExtractedCard(
       pricesRefreshed ? (await getCardFromDb("pokemon", id)) ?? catalogCard : catalogCard,
     );
@@ -182,17 +283,30 @@ export async function ingestCatalogMarketIntel(
       card,
       marketEvidence: market.marketEvidence,
     });
+    await persistPriceChartingOnCatalogCard(id, market.marketEvidence);
 
     const popSnapshots = await persistCatalogPopulationFromMarketEvidence(
       id,
       market.marketEvidence,
     );
 
+    let graderPopSnapshots = 0;
+    if (
+      isBrightDataPopHarvestEnabled() &&
+      process.env.CATALOG_INGEST_GRADER_POP !== "0"
+    ) {
+      const graderResults = await harvestGraderPopForCatalogCard(id, {
+        graders: ["PSA"],
+      });
+      graderPopSnapshots = graderResults.reduce((n, r) => n + r.gradesWritten, 0);
+    }
+
     return {
       catalogId: id,
       ok: true,
       comps: market.marketEvidence.length,
       popSnapshots,
+      graderPopSnapshots,
       pricesRefreshed,
       institutionalMemory: market.institutionalMemory,
     };
@@ -202,6 +316,7 @@ export async function ingestCatalogMarketIntel(
       ok: false,
       comps: 0,
       popSnapshots: 0,
+      graderPopSnapshots: 0,
       pricesRefreshed: false,
       institutionalMemory: false,
       error: e instanceof Error ? e.message : "ingest_failed",

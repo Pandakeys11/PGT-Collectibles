@@ -14,7 +14,8 @@ import {
 import { isScanLimitError } from "@/lib/scan/scan-limit-error";
 import { cn } from "@/lib/cn";
 
-const AUTO_SCAN_MS = 3_000;
+const AUTO_SCAN_MS_IDLE = 3_000;
+const AUTO_SCAN_MS_BUSY = 6_500;
 
 /**
  * In-app camera using getUserMedia — NOT the native `<input capture>` picker.
@@ -134,11 +135,18 @@ export function LiquidScanLiveCamera({
         return;
       }
       lastCaptureRef.current = dataUrl;
-      setStatusText("PGT vision + market…");
+      setStatusText("PGT vision…");
       const result = await runLiveCardScan({
         previewUrl: dataUrl,
         laneMode,
         singleCard: true,
+        onCatalogReady: (partial) => {
+          setLastResult({
+            ...partial,
+            specimen: partial.specimen,
+          });
+          setStatusText("Loading market…");
+        },
       });
       setLastResult(result);
       setStatusText(null);
@@ -157,9 +165,10 @@ export function LiquidScanLiveCamera({
 
   useEffect(() => {
     if (!open || !autoScanOn || cameraError || useNativeFallback) return;
+    const intervalMs = scanning || busy ? AUTO_SCAN_MS_BUSY : AUTO_SCAN_MS_IDLE;
     const id = window.setInterval(() => {
       if (!scanning && !busy) void runScan();
-    }, AUTO_SCAN_MS);
+    }, intervalMs);
     return () => window.clearInterval(id);
   }, [open, autoScanOn, cameraError, useNativeFallback, scanning, busy, runScan]);
 

@@ -5,7 +5,6 @@ import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/branding/brand-logo";
 import { ScanQuotaChip } from "@/components/billing/scan-quota-chip";
-import { ThemeCyclePill } from "@/components/shell/theme-cycle-pill";
 import { CatalogHealthPill } from "@/components/scanner-chat/catalog-health-pill";
 import type { AccountQuota } from "@/hooks/use-scan-quota";
 import { LIQUID_SCAN_PATH } from "@/lib/app-routes";
@@ -72,7 +71,6 @@ export function ScannerHeader({
         ) : null}
         <CatalogHealthPill className="shrink-0" />
         <div className="flex shrink-0 items-center gap-1">
-          <ThemeCyclePill size="sm" showLabel={false} className="shrink-0" />
           <Show when="signed-in">
             <UserButton
               userProfileUrl="/profile"

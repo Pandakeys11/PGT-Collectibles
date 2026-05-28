@@ -36,3 +36,8 @@ yarn-error.log*
 
 # Optional local catalog export drops (see CATALOG_*_PATH in .env.example)
 /catalog-exports/
+
+# Local probe / harvest scratch (PSA pop HTML, Bright Data tests, etc.)
+.tmp
+.tmp-*
+.tmp-*.*

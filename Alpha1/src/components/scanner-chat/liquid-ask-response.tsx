@@ -91,8 +91,21 @@ function DataCoverageBanner({
                 ? ` · ${coverage.ebayActiveCount} listing(s)`
                 : ""}
             </p>
-          ) : coverage.ebayConfigured ? (
-            <p className="text-amber-100/80">eBay is configured — no sold rows matched this query yet.</p>
+          ) : coverage.ebaySoldReady ? (
+            coverage.snippetCompCount > 0 ? (
+              <p className="text-amber-100/80">
+                eBay sold pipeline returned no rows for this query — using{" "}
+                <span className="font-semibold text-sky-200">
+                  {coverage.snippetCompCount} session/search comp highlight(s)
+                </span>{" "}
+                from your scan enrich pass.
+              </p>
+            ) : (
+              <p className="text-amber-100/80">
+                eBay sold comps are enabled — no sold rows matched this query yet. Run enrich on
+                cards or open platform links below for full sold history.
+              </p>
+            )
           ) : (
             <p className="text-amber-100/80">
               Add EBAY_FINDING_APP_ID or EBAY_CLIENT_ID on the server for automated sold comps.
@@ -211,6 +224,20 @@ export function LiquidAskResponsePanel({
           <p className="text-sm text-slate-500">Thinking…</p>
         ) : !streaming && !narrative.trim() ? (
           <p className="text-sm text-slate-500">No narrative returned.</p>
+        ) : null}
+        {!streaming && narrative.includes("All text providers failed") ? (
+          <p className="mt-3 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs leading-relaxed text-rose-100/95">
+            All cloud LLM quotas are exhausted. Fix billing on Groq/OpenAI/Gemini, or set{" "}
+            <span className="font-mono text-rose-50">OPENROUTER_TEXT_MODEL=meta-llama/llama-3.3-70b-instruct:free</span>{" "}
+            and <span className="font-mono text-rose-50">TEXT_PROVIDER_ORDER=openrouter,...</span>.
+            Session reports should still render via <strong>local desk mode</strong> using your enrich
+            comps — re-run the scan if you only see this error.
+          </p>
+        ) : null}
+        {provider === "local-desk" ? (
+          <p className="mt-2 text-[10px] text-slate-500">
+            Report source: session enrich data (LLM providers unavailable).
+          </p>
         ) : null}
         {streaming && narrative.trim() ? (
           <span className="mt-2 inline-block h-4 w-0.5 animate-pulse bg-emerald-400 align-middle" />

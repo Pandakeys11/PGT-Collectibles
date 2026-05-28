@@ -4,10 +4,10 @@
  *        npm run dev:tunnel -- 3003
  */
 import { spawn } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnvLocal } from "./load-env-local.mjs";
+import { ensureCleanNextForDev } from "./next-dev-hygiene.mjs";
 import {
   fetchNgrokPublicUrl,
   printClerkWebhookHint,
@@ -45,14 +45,7 @@ function prefixStream(stream, label, out) {
   });
 }
 
-const nextDir = path.join(root, ".next");
-const routesManifest = path.join(nextDir, "routes-manifest.json");
-if (fs.existsSync(nextDir) && !fs.existsSync(routesManifest)) {
-  console.warn(
-    "Detected incomplete .next (missing routes-manifest.json). Removing stale build output…\n",
-  );
-  fs.rmSync(nextDir, { recursive: true, force: true });
-}
+await ensureCleanNextForDev(root);
 
 console.log(`Starting Next.js on http://localhost:${port} + ngrok tunnel…`);
 console.log(

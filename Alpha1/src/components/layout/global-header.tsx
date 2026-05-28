@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/branding/brand-logo";
 import { AuthControls } from "@/components/auth/auth-controls";
-import { ThemeControl } from "@/components/shell/theme-control";
 import { APP_HOME_PATH } from "@/lib/app-routes";
 import { APP_NAV_ITEMS, activeNavId, pageMetaForPath } from "@/lib/navigation";
 import { cn } from "@/lib/cn";
@@ -46,7 +45,6 @@ export function GlobalHeader() {
           </div>
           <div className="flex shrink-0 items-center gap-2 lg:hidden">
             <AuthControls />
-            <ThemeControl />
           </div>
         </div>
 
@@ -81,7 +79,6 @@ export function GlobalHeader() {
         </nav>
 
         <div className="hidden shrink-0 items-center gap-2 lg:flex">
-          <ThemeControl />
           <AuthControls />
         </div>
       </motion.div>

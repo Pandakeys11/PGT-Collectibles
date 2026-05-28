@@ -212,9 +212,26 @@ export function LiveMarketTickerPanel({
                     {slide.momentumPct}%
                   </p>
                 ) : (
-                  <p className="font-mono text-2xl font-semibold leading-none text-sky-200">
-                    {fmtUsd(slide.priceUsd)}
-                  </p>
+                  <div className="space-y-1">
+                    <p className="font-mono text-2xl font-semibold leading-none text-sky-200">
+                      {fmtUsd(slide.rawFmvUsd ?? slide.priceUsd)}
+                    </p>
+                    {(slide.psa10FmvUsd != null || slide.tcgMarketUsd != null) && (
+                      <p className="font-mono text-[11px] leading-tight text-slate-400">
+                        {slide.psa10FmvUsd != null ? (
+                          <span className="text-amber-200/90">
+                            PSA 10 {fmtUsd(slide.psa10FmvUsd)}
+                          </span>
+                        ) : null}
+                        {slide.psa10FmvUsd != null && slide.tcgMarketUsd != null ? (
+                          <span className="text-faint"> · </span>
+                        ) : null}
+                        {slide.tcgMarketUsd != null ? (
+                          <span>TCG {fmtUsd(slide.tcgMarketUsd)}</span>
+                        ) : null}
+                      </p>
+                    )}
+                  </div>
                 )}
                 <p className="mt-0.5 text-[10px] text-muted">{slide.priceLabel}</p>
               </div>

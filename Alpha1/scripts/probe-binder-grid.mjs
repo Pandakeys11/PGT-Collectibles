@@ -3,7 +3,6 @@
  * Usage: node scripts/probe-binder-grid.mjs <path-to-image>
  */
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
 import { loadEnvLocal } from "./load-env-local.mjs";
 
 loadEnvLocal();

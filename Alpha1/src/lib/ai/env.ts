@@ -22,6 +22,15 @@ export function getGeminiApiKey(): string | null {
   return firstConfiguredEnv("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY");
 }
 
+/** Set GEMINI_DISABLED=1 to skip Gemini for vision, text, market research, and Liquid Ask. */
+export function isGeminiDisabled(): boolean {
+  return process.env.GEMINI_DISABLED?.trim() === "1";
+}
+
+export function isGeminiServiceEnabled(): boolean {
+  return Boolean(getGeminiApiKey()) && !isGeminiDisabled();
+}
+
 export function getGeminiVisionModel(): string {
   return process.env.GEMINI_VISION_MODEL?.trim() || "gemini-2.5-flash";
 }
@@ -127,7 +136,7 @@ export function getVisionProviderOrderForBinderGrid(): string[] {
   const preferred = ["openrouter", "gemini", "openai", "xai", "groq"];
   const configured = preferred.filter((id) => {
     if (id === "groq") return Boolean(getGroqApiKey());
-    if (id === "gemini") return Boolean(getGeminiApiKey());
+    if (id === "gemini") return isGeminiServiceEnabled();
     if (id === "openrouter") return Boolean(getOpenRouterApiKey());
     if (id === "openai") return Boolean(getOpenAIApiKey());
     if (id === "xai") return Boolean(getXaiApiKey());
@@ -175,7 +184,7 @@ export function isScanAutoReportEnabled(): boolean {
 export function isLiquidAskGeminiResearchEnabled(): boolean {
   if (process.env.LIQUID_ASK_GEMINI_RESEARCH === "0") return false;
   if (isGroqPrimaryOnly()) return false;
-  return true;
+  return isGeminiServiceEnabled();
 }
 
 export function getGroqTextMaxTokensAsk(): number {
@@ -193,12 +202,13 @@ export function getLiquidAskMaxTokens(): number {
 /** Comma-separated providers to skip (e.g. `gemini,openai` when out of quota). */
 export function getVisionSkipProviders(): string[] {
   const fromEnv = parseCommaList(process.env.VISION_SKIP_PROVIDERS);
+  const geminiOff = !isGeminiServiceEnabled() ? ["gemini"] : [];
   if (isGroqPrimaryOnly()) {
     return mergeSkipProviders(fromEnv, ["gemini", "openrouter", "openai", "xai"]);
   }
   return isFreeTierOnly()
-    ? mergeSkipProviders(fromEnv, ["openai", "xai"])
-    : fromEnv;
+    ? mergeSkipProviders(fromEnv, geminiOff, ["openai", "xai"])
+    : mergeSkipProviders(fromEnv, geminiOff);
 }
 
 export function getVisionProviderTimeoutMs(): number {
@@ -263,11 +273,29 @@ export function getVisionMaxOutputTokensForProvider(provider: string): number {
   }
 }
 
+const OPENROUTER_TEXT_MODEL_FALLBACKS_DEFAULT = [
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "qwen/qwen3-coder:free",
+  "openrouter/free",
+] as const;
+
 export function getOpenRouterTextModel(): string {
   return (
     process.env.OPENROUTER_TEXT_MODEL?.trim() ||
-    "meta-llama/llama-3.1-8b-instruct:free"
+    OPENROUTER_TEXT_MODEL_FALLBACKS_DEFAULT[0]
   );
+}
+
+/** Models to try in order when OpenRouter returns 404 / no endpoint. */
+export function getOpenRouterTextModelCandidates(): string[] {
+  const primary = getOpenRouterTextModel();
+  const fromEnv = parseCommaList(process.env.OPENROUTER_TEXT_MODEL_FALLBACKS);
+  const merged = [
+    primary,
+    ...fromEnv,
+    ...OPENROUTER_TEXT_MODEL_FALLBACKS_DEFAULT,
+  ];
+  return [...new Set(merged.filter(Boolean))];
 }
 
 /** Search-capable model for Liquid Ask open-web research (Perplexity Sonar, etc.). */
@@ -304,15 +332,23 @@ export function getMarketNightlyTimeBudgetMs(): number {
 export function getMarketNightlyAiOrder(): Array<"groq" | "gemini" | "openrouter"> {
   const raw = process.env.MARKET_NIGHTLY_AI_ORDER?.trim();
   const defaultOrder: Array<"groq" | "gemini" | "openrouter"> = ["groq", "gemini", "openrouter"];
-  if (!raw) return defaultOrder;
-  const parsed = raw
-    .split(",")
-    .map((p) => p.trim().toLowerCase())
-    .filter(
-      (p): p is "groq" | "gemini" | "openrouter" =>
-        p === "groq" || p === "gemini" || p === "openrouter",
-    );
-  return parsed.length > 0 ? parsed : defaultOrder;
+  let order: Array<"groq" | "gemini" | "openrouter">;
+  if (!raw) {
+    order = defaultOrder;
+  } else {
+    const parsed = raw
+      .split(",")
+      .map((p) => p.trim().toLowerCase())
+      .filter(
+        (p): p is "groq" | "gemini" | "openrouter" =>
+          p === "groq" || p === "gemini" || p === "openrouter",
+      );
+    order = parsed.length > 0 ? parsed : defaultOrder;
+  }
+  if (!isGeminiServiceEnabled()) {
+    order = order.filter((p) => p !== "gemini");
+  }
+  return order;
 }
 
 /** OpenRouter model for nightly market JSON (default free instruct; override with Sonar if you have credits). */
@@ -320,8 +356,13 @@ export function getMarketNightlyOpenRouterModel(): string {
   return (
     process.env.MARKET_NIGHTLY_OPENROUTER_MODEL?.trim() ||
     process.env.OPENROUTER_TEXT_MODEL?.trim() ||
-    "meta-llama/llama-3.1-8b-instruct:free"
+    "meta-llama/llama-3.3-70b-instruct:free"
   );
+}
+
+/** Max tokens for Liquid Ask Groq Compound web brief (default 2000). */
+export function getLiquidAskGroqBriefMaxTokens(): number {
+  return boundedTokenCount(process.env.LIQUID_ASK_GROQ_BRIEF_MAX_TOKENS, 2_000, 3_200);
 }
 
 /** Skip Gemini/OpenRouter on nightly ingest when memory is fresh (default 10 days). */
@@ -342,34 +383,41 @@ export function getTextModel(): string {
 }
 
 const DEFAULT_TEXT_PROVIDER_ORDER = [
+  "openrouter",
   "groq",
+  "gemini",
   "openai",
   "xai",
-  "gemini",
-  "openrouter",
 ] as const;
 
 export type TextProviderId = (typeof DEFAULT_TEXT_PROVIDER_ORDER)[number];
 
-/** Comma-separated override, e.g. `groq,gemini` when OpenRouter has no credits. */
-export function getTextProviderOrder(): string[] {
-  if (isGroqPrimaryOnly() && getGroqApiKey()) return ["groq"];
-  const raw = process.env.TEXT_PROVIDER_ORDER?.trim();
-  if (!raw) return [...DEFAULT_TEXT_PROVIDER_ORDER];
-  const ids = raw
-    .split(",")
-    .map((part) => part.trim().toLowerCase())
-    .filter(Boolean);
-  return ids.length > 0 ? ids : [...DEFAULT_TEXT_PROVIDER_ORDER];
-}
-
 /** Skip providers with no credits or exhausted free tier, e.g. `openrouter,gemini,openai`. */
 export function getTextSkipProviders(): string[] {
   const fromEnv = parseCommaList(process.env.TEXT_SKIP_PROVIDERS);
+  const geminiOff = !isGeminiServiceEnabled() ? ["gemini"] : [];
   if (isGroqPrimaryOnly()) {
     return mergeSkipProviders(fromEnv, ["gemini", "openrouter", "openai", "xai"]);
   }
-  return isFreeTierOnly()
-    ? mergeSkipProviders(fromEnv, ["openai", "xai"])
-    : fromEnv;
+  if (isFreeTierOnly()) {
+    return mergeSkipProviders(fromEnv, geminiOff, ["openai", "xai"]);
+  }
+  return mergeSkipProviders(fromEnv, geminiOff);
+}
+
+/** Prefer OpenRouter when configured and not in skip list (works on free models). */
+export function getTextProviderOrder(): string[] {
+  if (isGroqPrimaryOnly() && getGroqApiKey()) return ["groq"];
+  const raw = process.env.TEXT_PROVIDER_ORDER?.trim();
+  let order =
+    raw
+      ?.split(",")
+      .map((part) => part.trim().toLowerCase())
+      .filter(Boolean) ?? [...DEFAULT_TEXT_PROVIDER_ORDER];
+  if (order.length === 0) order = [...DEFAULT_TEXT_PROVIDER_ORDER];
+  const skip = new Set(getTextSkipProviders());
+  if (getOpenRouterApiKey() && !skip.has("openrouter") && !raw?.trim()) {
+    order = ["openrouter", ...order.filter((id) => id !== "openrouter")];
+  }
+  return order;
 }

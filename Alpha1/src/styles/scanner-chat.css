@@ -3,7 +3,7 @@
  */
 
 .scanner-chat-root {
-  /* Inherit active desk theme — keeps Liquid Scan in sync when cycling presets */
+  /* Inherit catalog ambient holo mesh on the document root */
   --sc-bg: var(--bg-canvas);
   --sc-panel: var(--bg-panel);
   --sc-panel-raised: var(--bg-panel-raised);
@@ -209,45 +209,33 @@
   scrollbar-gutter: stable;
 }
 
-/* Vault set tiles — legacy foil gallery */
-.scanner-chat-root .sc-catalog-set-tile {
-  -webkit-tap-highlight-color: transparent;
+/* Master catalog set picker — uniform 4-column cells, capped logo height */
+.scanner-chat-root .sc-catalog-set-grid {
+  grid-auto-rows: minmax(0, auto);
 }
 
-.scanner-chat-root .sc-catalog-set-tile-hero {
-  border-bottom: 1px solid rgb(255 255 255 / 0.06);
-}
-
-.scanner-chat-root
-  .sc-pokedex-catalog-grid:not(.sc-pokedex-catalog-grid--set-open)
-  .sc-catalog-set-tile-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.625rem;
-}
-
-@media (min-width: 640px) {
-  .scanner-chat-root
-    .sc-pokedex-catalog-grid:not(.sc-pokedex-catalog-grid--set-open)
-    .sc-catalog-set-tile-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  .scanner-chat-root
-    .sc-pokedex-catalog-grid:not(.sc-pokedex-catalog-grid--set-open)
-    .sc-catalog-set-tile-grid {
+@media (min-width: 768px) {
+  .scanner-chat-root .sc-catalog-set-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
-.scanner-chat-root .sc-catalog-franchise-tabs button[role="tab"] {
-  min-height: 2rem;
+/* Master catalog card grid — 4 columns, fluid tile width */
+.sc-catalog-card-grid-4x4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, auto);
+  align-items: stretch;
 }
 
-.scanner-chat-root .sc-catalog-era-filter button {
-  min-height: 2rem;
+.sc-catalog-card-tile {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
+.sc-catalog-card-tile .sc-catalog-fmv-ribbon {
+  min-height: 1.05rem;
 }
 
 /* Catalog card detail — compact identity + FMV-first layout */
@@ -284,6 +272,41 @@
   .sc-catalog-card-detail--sheet .sc-catalog-detail-identity__media {
     width: 3.25rem;
     height: 4.35rem;
+  }
+}
+
+.sc-catalog-fmv-badge {
+  pointer-events: none;
+}
+
+.sc-catalog-fmv-bar {
+  flex-shrink: 0;
+}
+
+.sc-catalog-fmv-ribbon {
+  min-height: 1.125rem;
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-fmv-band {
+  padding: 0;
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-fmv-band > div:first-child {
+  padding: 0.625rem 0.75rem;
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-fmv-band p.font-mono.text-\[1\.75rem\] {
+  font-size: 1.375rem;
+}
+
+.sc-pokedex-card-detail-sheet {
+  max-height: min(88dvh, 780px);
+}
+
+@media (min-width: 640px) {
+  .sc-pokedex-card-detail-sheet {
+    max-height: min(90dvh, 820px);
+    width: min(26rem, calc(100vw - 1.5rem));
   }
 }
 
@@ -393,12 +416,12 @@
 }
 
 .sc-live-market-banner-open {
-  display: block;
+  display: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sc-live-market-banner-track--animate .sc-live-market-pill {
-    animation: none;
+@media (min-width: 1280px) {
+  .sc-live-market-banner-open {
+    display: block;
   }
 }
 

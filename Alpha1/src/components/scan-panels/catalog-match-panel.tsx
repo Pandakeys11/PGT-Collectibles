@@ -6,6 +6,10 @@ import { cn } from "@/lib/cn";
 import { getCardDisplayTitle } from "@/lib/scan/card-display";
 import { MIN_CATALOG_PICK_OPTIONS } from "@/lib/market/ensure-catalog-options";
 import type { CatalogCandidate, ExtractedCard, ScanCardContext } from "@/lib/scan/schemas";
+import {
+  catalogVariantFromCandidateName,
+  catalogVariantLabelFromCatalogId,
+} from "@/lib/scan/print-identity-ui";
 
 type CatalogMatchSpecimen = {
   card: ExtractedCard;
@@ -43,6 +47,9 @@ function CandidateRow({
   onReject: () => void;
 }) {
   const confidencePct = Math.round(candidate.confidence * 100);
+  const variantLabel =
+    catalogVariantLabelFromCatalogId(candidate.catalogId) ??
+    catalogVariantFromCandidateName(candidate.name);
 
   if (compact) {
     return (
@@ -70,6 +77,11 @@ function CandidateRow({
               {[candidate.setName, candidate.cardNumber, candidate.year].filter(Boolean).join(" · ") ||
                 "—"}
             </p>
+            {variantLabel ? (
+              <span className="mt-1 inline-flex rounded border border-cyan-500/25 bg-cyan-500/10 px-1 py-0.5 text-[8px] font-medium text-cyan-100/95">
+                {variantLabel}
+              </span>
+            ) : null}
             <div className="mt-1 h-1 overflow-hidden rounded-full bg-black/40">
               <div
                 className={cn("h-full rounded-full", confidenceTone(candidate.confidence))}
@@ -150,8 +162,20 @@ function CandidateRow({
             .filter(Boolean)
             .join(" · ") || "Catalog metadata pending"}
         </p>
-        {candidate.conflicts.length > 0 ? (
-          <p className="mt-1 text-[10px] text-rose-200/85">{candidate.conflicts.join(" · ")}</p>
+        {variantLabel ? (
+          <span className="mt-1 inline-flex rounded-md border border-cyan-500/25 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] font-medium text-cyan-100/95">
+            Print run · {variantLabel}
+          </span>
+        ) : null}
+        {candidate.conflicts.some((c) => /print|edition|variant/i.test(c)) ? (
+          <p className="mt-1 text-[10px] font-medium text-rose-200/90">
+            {candidate.conflicts.filter((c) => /print|edition|variant/i.test(c)).join(" · ")}
+          </p>
+        ) : null}
+        {candidate.conflicts.filter((c) => !/print|edition|variant/i.test(c)).length > 0 ? (
+          <p className="mt-1 text-[10px] text-rose-200/85">
+            {candidate.conflicts.filter((c) => !/print|edition|variant/i.test(c)).join(" · ")}
+          </p>
         ) : candidate.reasons.length > 0 ? (
           <p className="mt-1 text-[10px] text-slate-500">{candidate.reasons.slice(0, 3).join(" · ")}</p>
         ) : null}

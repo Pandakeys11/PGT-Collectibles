@@ -27,6 +27,25 @@ function parseTcgPlayerVariants(raw: unknown): TcgPlayerVariantPrice[] {
   return out;
 }
 
+function tcgPlayerPricesFromLegacyObject(raw: unknown): TcgPlayerVariantPrice[] {
+  if (!raw || typeof raw !== "object") return [];
+  const record = raw as Record<string, unknown>;
+  const pricesBlock = record.prices;
+  if (!pricesBlock || typeof pricesBlock !== "object" || Array.isArray(pricesBlock)) {
+    return [];
+  }
+  return Object.entries(pricesBlock as Record<string, Record<string, unknown>>).map(
+    ([variant, block]) => ({
+      variant,
+      low: asNumber(block.low),
+      mid: asNumber(block.mid),
+      high: asNumber(block.high),
+      market: asNumber(block.market),
+      directLow: asNumber(block.directLow),
+    }),
+  );
+}
+
 export function parseCatalogPriceSnapshot(
   pricesJson: Record<string, unknown> | null | undefined,
 ): CatalogPriceSnapshot {
@@ -44,13 +63,77 @@ export function parseCatalogPriceSnapshot(
         }
       : null;
 
+  const pt = p.pokeTrace;
+  const pokeTrace =
+    pt && typeof pt === "object" && typeof (pt as Record<string, unknown>).cardId === "string"
+      ? {
+          cardId: String((pt as Record<string, unknown>).cardId),
+          syncedAt:
+            typeof (pt as Record<string, unknown>).syncedAt === "string"
+              ? String((pt as Record<string, unknown>).syncedAt)
+              : new Date().toISOString(),
+          market: ((pt as Record<string, unknown>).market === "EU" ? "EU" : "US") as
+            | "US"
+            | "EU",
+          primaryTier:
+            typeof (pt as Record<string, unknown>).primaryTier === "string"
+              ? String((pt as Record<string, unknown>).primaryTier)
+              : null,
+          primarySource:
+            typeof (pt as Record<string, unknown>).primarySource === "string"
+              ? (String((pt as Record<string, unknown>).primarySource) as
+                  | "ebay"
+                  | "tcgplayer"
+                  | "cardmarket"
+                  | "cardmarket_unsold")
+              : null,
+          momentumPct: asNumber((pt as Record<string, unknown>).momentumPct),
+          trendLabel:
+            (pt as Record<string, unknown>).trendLabel === "up" ||
+            (pt as Record<string, unknown>).trendLabel === "down" ||
+            (pt as Record<string, unknown>).trendLabel === "flat"
+              ? ((pt as Record<string, unknown>).trendLabel as "up" | "down" | "flat")
+              : null,
+          anomalyFlag: (pt as Record<string, unknown>).anomalyFlag === true,
+          historyPoints:
+            typeof (pt as Record<string, unknown>).historyPoints === "number"
+              ? Number((pt as Record<string, unknown>).historyPoints)
+              : 0,
+          lastSpotUsd: asNumber((pt as Record<string, unknown>).lastSpotUsd),
+        }
+      : null;
+
+  const legacyTp = tcgPlayerPricesFromLegacyObject(p.tcgplayer);
+  const parsedRows = parseTcgPlayerVariants(p.tcgPlayerPrices);
+  const tcgPlayerPrices =
+    parsedRows.length > 0
+      ? parsedRows
+      : legacyTp.length > 0
+        ? legacyTp
+        : [];
+
   return {
-    tcgPlayerUrl: typeof p.tcgPlayerUrl === "string" ? p.tcgPlayerUrl : null,
-    tcgPlayerUpdatedAt: typeof p.tcgPlayerUpdatedAt === "string" ? p.tcgPlayerUpdatedAt : null,
-    tcgPlayerPrices: parseTcgPlayerVariants(p.tcgPlayerPrices),
+    tcgPlayerUrl:
+      typeof p.tcgPlayerUrl === "string"
+        ? p.tcgPlayerUrl
+        : typeof (p.tcgplayer as Record<string, unknown> | undefined)?.url === "string"
+          ? String((p.tcgplayer as Record<string, unknown>).url)
+          : null,
+    tcgPlayerUpdatedAt:
+      typeof p.tcgPlayerUpdatedAt === "string"
+        ? p.tcgPlayerUpdatedAt
+        : typeof (p.tcgplayer as Record<string, unknown> | undefined)?.updatedAt === "string"
+          ? String((p.tcgplayer as Record<string, unknown>).updatedAt)
+          : null,
+    tcgPlayerPrices,
     cardMarketUrl: typeof p.cardMarketUrl === "string" ? p.cardMarketUrl : null,
     cardMarketUpdatedAt: typeof p.cardMarketUpdatedAt === "string" ? p.cardMarketUpdatedAt : null,
     cardMarket,
+    priceChartingLooseUsd: asNumber(p.priceChartingLooseUsd),
+    priceChartingUrl: typeof p.priceChartingUrl === "string" ? p.priceChartingUrl : null,
+    priceChartingUpdatedAt:
+      typeof p.priceChartingUpdatedAt === "string" ? p.priceChartingUpdatedAt : null,
+    pokeTrace,
   };
 }
 

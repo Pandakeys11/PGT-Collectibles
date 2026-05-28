@@ -7,6 +7,9 @@
 /** Longest edge for standard uploads. */
 export const SCAN_UPLOAD_MAX_SIDE = 2048;
 
+/** Tight single-card / slab uploads — faster vision, smaller payload. */
+export const SCAN_UPLOAD_SINGLE_MAX_SIDE = 1536;
+
 /** Binder / grid screenshots — more pixels per card when payload budget allows. */
 export const SCAN_UPLOAD_BINDER_MAX_SIDE = 3072;
 
@@ -138,22 +141,28 @@ function encodeUnderBudget(
   return fallback;
 }
 
-function pickUploadMaxSide(source: DrawableSource, binderGrid?: boolean): number {
-  if (!binderGrid) return SCAN_UPLOAD_MAX_SIDE;
-  const longEdge = Math.max(source.width, source.height);
-  if (longEdge >= 2400) return SCAN_UPLOAD_BINDER_MAX_SIDE;
-  if (longEdge >= 1600) return 2560;
+function pickUploadMaxSide(
+  source: DrawableSource,
+  options?: { binderGrid?: boolean; singleCard?: boolean },
+): number {
+  if (options?.binderGrid) {
+    const longEdge = Math.max(source.width, source.height);
+    if (longEdge >= 2400) return SCAN_UPLOAD_BINDER_MAX_SIDE;
+    if (longEdge >= 1600) return 2560;
+    return SCAN_UPLOAD_MAX_SIDE;
+  }
+  if (options?.singleCard) return SCAN_UPLOAD_SINGLE_MAX_SIDE;
   return SCAN_UPLOAD_MAX_SIDE;
 }
 
 /** Resize, correct orientation, and compress a file for scan preview + vision upload. */
 export async function prepareScanUploadDataUrl(
   file: File,
-  options?: { binderGrid?: boolean },
+  options?: { binderGrid?: boolean; singleCard?: boolean },
 ): Promise<string> {
   const source = await loadDrawableFromFile(file);
   try {
-    const maxSide = pickUploadMaxSide(source, options?.binderGrid);
+    const maxSide = pickUploadMaxSide(source, options);
     return encodeUnderBudget(source, maxSide, SCAN_UPLOAD_JPEG_QUALITY);
   } finally {
     source.dispose?.();

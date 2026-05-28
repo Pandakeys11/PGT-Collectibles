@@ -58,6 +58,7 @@ const apify = tokenStatus();
 console.log("--- Cert registry env check ---");
 console.log("env file:", existsSync(envPath) ? envPath : "(missing)");
 console.log("GEMRATE_API_KEY:", Boolean(process.env.GEMRATE_API_KEY?.trim()));
+console.log("PSA_API_KEY:", Boolean(process.env.PSA_API_KEY?.trim()));
 console.log(
   "PSA Public API OAuth:",
   Boolean(

@@ -5,29 +5,38 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { marketPokemonHref } from "@/lib/app-routes";
+import { formatCatalogFmvUsd } from "@/lib/market/catalog-raw-fmv";
 import type { FairValueBasis } from "@/lib/market/fair-value";
 import {
   gradeBucketLabel,
   type GradeBucket,
   type GradeBucketSummary,
 } from "@/lib/market/market-intelligence";
-import type { PokemonMarketKnowledge } from "@/lib/market/pokemon-market-knowledge";
+import { filterMarketEvidenceForCardIdentity } from "@/lib/market/market-evidence-identity";
+import {
+  catalogSummaryToExtractedCard,
+  type PokemonMarketKnowledge,
+} from "@/lib/market/pokemon-market-knowledge-shared";
 import type { CatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
 import { cn } from "@/lib/cn";
 
-const LADDER_BUCKETS: GradeBucket[] = ["raw", "psa9", "psa10", "bgsBlackLabel", "cgcPristine10"];
+const GRADED_LADDER_BUCKETS: GradeBucket[] = [
+  "psa9",
+  "psa10",
+  "bgsBlackLabel",
+  "cgcPristine10",
+];
 
 const FMV_BASIS_PHRASE: Partial<Record<FairValueBasis, string>> = {
   sold_median: "recent sold median",
   active_median: "active listing median",
   reference_median: "price guide median",
   sticker_anchor: "sticker price",
-  tcg_catalog: "TCGPlayer market price",
+  tcg_catalog: "TCGPlayer market",
 };
 
 function fmtUsd(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return `$${Math.round(n).toLocaleString()}`;
+  return formatCatalogFmvUsd(n);
 }
 
 function formatFmvBasis(basis: FairValueBasis | null): string {
@@ -35,11 +44,9 @@ function formatFmvBasis(basis: FairValueBasis | null): string {
   return FMV_BASIS_PHRASE[basis] ?? basis.replace(/_/g, " ");
 }
 
-function formatObserved(at: string | null): string {
-  if (!at) return "—";
-  const d = new Date(at);
-  if (Number.isNaN(d.getTime())) return at.slice(0, 10);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+function labelTcgVariant(key: string): string {
+  const spaced = key.replace(/([a-z])([A-Z0-9])/g, "$1 $2");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 function confidenceClass(label: PokemonMarketKnowledge["intelligence"]["confidenceLabel"]): string {
@@ -68,7 +75,7 @@ function sortCompsForDisplay(comps: CatalogMarketIntel["comps"], limit: number) 
     .slice(0, limit);
 }
 
-function FmvBand({
+function RawFmvBand({
   knowledge,
   isSheet,
   onRefresh,
@@ -83,12 +90,15 @@ function FmvBand({
   needsLive: boolean;
   catalogId: string;
 }) {
+  const headline = knowledge.rawFmvUsd ?? knowledge.fairValueUsd;
+  const basis = knowledge.rawFmvBasis ?? knowledge.fairValueBasis;
+
   return (
     <div className="sc-catalog-fmv-band rounded-xl border border-accent/30 bg-gradient-to-r from-accent/[0.12] via-panel-raised/50 to-panel-raised/30">
       <div className="flex items-stretch gap-2 p-2.5 sm:gap-3 sm:p-3">
         <div className="min-w-0 flex-1">
           <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-faint">
-            Fair market value
+            Raw FMV
           </p>
           <p
             className={cn(
@@ -96,9 +106,21 @@ function FmvBand({
               isSheet ? "mt-0.5 text-[1.75rem] sm:text-[1.625rem]" : "mt-1 text-3xl",
             )}
           >
-            {fmtUsd(knowledge.fairValueUsd)}
+            {fmtUsd(headline)}
           </p>
-          <p className="mt-0.5 text-[10px] text-muted">{formatFmvBasis(knowledge.fairValueBasis)}</p>
+          <p className="mt-0.5 text-[10px] text-muted">
+            {formatFmvBasis(basis)} · {knowledge.rawFmvSourceLabel}
+          </p>
+          {(knowledge.tcgPlayerUsd != null || knowledge.priceChartingUsd != null) && (
+            <p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-faint">
+              {knowledge.tcgPlayerUsd != null ? (
+                <span>TCG {fmtUsd(knowledge.tcgPlayerUsd)}</span>
+              ) : null}
+              {knowledge.priceChartingUsd != null ? (
+                <span>PC {fmtUsd(knowledge.priceChartingUsd)}</span>
+              ) : null}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end justify-between gap-1.5">
           <span
@@ -134,7 +156,7 @@ function FmvBand({
       <p className="border-t border-accent/15 px-2.5 py-1 text-[9px] text-faint sm:px-3">
         {knowledge.institutionalMemory
           ? `${knowledge.dataDepth.persistedComps} comps · ${knowledge.dataDepth.populationSnapshots} pop`
-          : "Building memory — live refresh may run"}
+          : "Building memory — live refresh pulls TCGPlayer, PriceCharting, and sold comps"}
       </p>
     </div>
   );
@@ -225,10 +247,10 @@ export function CatalogCardMarketIntelPanel({
     void refreshLive(false);
   }, [autoRefreshWhenThin, knowledge, refreshLive]);
 
-  const ladderRows = useMemo(() => {
+  const gradedLadderRows = useMemo(() => {
     if (!knowledge) return [];
     const byBucket = new Map(knowledge.intelligence.buckets.map((b) => [b.bucket, b]));
-    return LADDER_BUCKETS.map((bucket) => byBucket.get(bucket)).filter(
+    return GRADED_LADDER_BUCKETS.map((bucket) => byBucket.get(bucket)).filter(
       (row): row is GradeBucketSummary =>
         Boolean(row && row.soldCount + row.activeCount + row.referenceCount > 0),
     );
@@ -236,9 +258,34 @@ export function CatalogCardMarketIntelPanel({
 
   const displayComps = useMemo(() => {
     const comps = knowledge?.intel?.comps ?? [];
-    return sortCompsForDisplay(comps, isSheet ? 5 : 10);
-  }, [knowledge?.intel?.comps, isSheet]);
+    if (!knowledge?.card) return sortCompsForDisplay(comps, isSheet ? 5 : 12);
+    const extracted = catalogSummaryToExtractedCard({
+      name: knowledge.card.name,
+      number: knowledge.card.number,
+      rarity: knowledge.card.rarity,
+      set: knowledge.card.setName
+        ? { id: knowledge.card.setCode ?? "", name: knowledge.card.setName }
+        : undefined,
+    });
+    const evidence = comps.map((c) => ({
+      kind: c.kind as "sold" | "active" | "reference",
+      title: c.title,
+      priceUsd: c.priceUsd,
+      observedAt: c.observedAt,
+      url: c.url,
+      source: c.source,
+      slab: c.gradeBucket,
+    }));
+    const matched = filterMarketEvidenceForCardIdentity(evidence, extracted);
+    const matchedTitles = new Set(matched.map((m) => m.title));
+    const filtered = comps.filter((c) => matchedTitles.has(c.title));
+    return sortCompsForDisplay(filtered.length ? filtered : comps, isSheet ? 5 : 12);
+  }, [knowledge, isSheet]);
 
+  const population = knowledge?.intel?.population ?? [];
+  const certifications = knowledge?.intel?.certifications ?? [];
+
+  const referencePrices = knowledge?.referencePrices;
   const needsLive =
     knowledge != null &&
     (!knowledge.institutionalMemory || knowledge.dataDepth.persistedComps < 6);
@@ -275,7 +322,7 @@ export function CatalogCardMarketIntelPanel({
         </div>
       ) : null}
 
-      <FmvBand
+      <RawFmvBand
         knowledge={knowledge}
         isSheet={isSheet}
         catalogId={catalogId}
@@ -284,21 +331,56 @@ export function CatalogCardMarketIntelPanel({
         onRefresh={() => void refreshLive(needsLive)}
       />
 
-      {ladderRows.length > 0 ? (
-        <div className="sc-catalog-grade-ladder flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden">
-          {ladderRows.slice(0, isSheet ? 3 : 5).map((row) => (
-            <div
-              key={row.bucket}
-              className="min-w-[4.5rem] shrink-0 rounded-lg border border-border-subtle/80 bg-panel-raised/40 px-2 py-1.5 text-center sm:min-w-0"
-            >
-              <p className="text-[8px] font-semibold uppercase tracking-wide text-muted">
-                {row.label}
-              </p>
-              <p className="font-mono text-sm leading-tight text-primary">
-                {fmtUsd(row.medianSoldUsd ?? row.medianActiveUsd)}
-              </p>
-            </div>
-          ))}
+      {referencePrices && referencePrices.tcgPlayerPrices.length > 0 ? (
+        <div className="rounded-lg border border-border-subtle/70 bg-panel-raised/25 p-2">
+          <p className="text-[9px] font-semibold uppercase tracking-wide text-faint">
+            TCGPlayer reference
+          </p>
+          <div className="mt-1.5 overflow-x-auto">
+            <table className="w-full min-w-[14rem] text-left text-[10px]">
+              <thead>
+                <tr className="border-b border-border-subtle/60 text-faint">
+                  <th className="pb-1 pr-2 font-medium">Variant</th>
+                  <th className="pb-1 pr-2 font-medium">Market</th>
+                  <th className="pb-1 font-medium">Low</th>
+                </tr>
+              </thead>
+              <tbody>
+                {referencePrices.tcgPlayerPrices.slice(0, isSheet ? 4 : 8).map((row) => (
+                  <tr key={row.variant} className="border-b border-border-subtle/30 last:border-0">
+                    <td className="py-1 pr-2 text-primary">{labelTcgVariant(row.variant)}</td>
+                    <td className="py-1 pr-2 font-mono text-accent">
+                      {fmtUsd(row.market ?? row.mid)}
+                    </td>
+                    <td className="py-1 font-mono text-muted">{fmtUsd(row.low)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
+      {gradedLadderRows.length > 0 ? (
+        <div>
+          <p className="mb-1 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">
+            Graded FMV
+          </p>
+          <div className="sc-catalog-grade-ladder flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden">
+            {gradedLadderRows.slice(0, isSheet ? 3 : 5).map((row) => (
+              <div
+                key={row.bucket}
+                className="min-w-[4.5rem] shrink-0 rounded-lg border border-border-subtle/80 bg-panel-raised/40 px-2 py-1.5 text-center sm:min-w-0"
+              >
+                <p className="text-[8px] font-semibold uppercase tracking-wide text-muted">
+                  {row.label}
+                </p>
+                <p className="font-mono text-sm leading-tight text-primary">
+                  {fmtUsd(row.medianSoldUsd ?? row.medianActiveUsd)}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -350,8 +432,45 @@ export function CatalogCardMarketIntelPanel({
           </ul>
         </div>
       ) : (
-        <p className="text-[10px] text-muted">No comps yet — tap refresh on FMV.</p>
+        <p className="text-[10px] text-muted">No comps yet — tap refresh on Raw FMV.</p>
       )}
+
+      {population.length > 0 ? (
+        <div className="rounded-lg border border-border-subtle/70 bg-panel-raised/20 p-2">
+          <p className="text-[9px] font-semibold uppercase tracking-wide text-faint">Population</p>
+          <ul className="mt-1 space-y-1">
+            {population.slice(0, isSheet ? 4 : 8).map((row, i) => (
+              <li
+                key={`${row.grader}-${row.grade}-${i}`}
+                className="flex justify-between gap-2 text-[10px]"
+              >
+                <span className="text-primary">
+                  {row.grader}
+                  {row.grade ? ` ${row.grade}` : ""}
+                </span>
+                <span className="font-mono text-accent">
+                  {row.populationCount != null
+                    ? row.populationCount.toLocaleString()
+                    : "—"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {certifications.length > 0 ? (
+        <div className="rounded-lg border border-border-subtle/70 bg-panel-raised/20 p-2">
+          <p className="text-[9px] font-semibold uppercase tracking-wide text-faint">Certs</p>
+          <ul className="mt-1 space-y-1">
+            {certifications.slice(0, isSheet ? 3 : 6).map((row) => (
+              <li key={`${row.grader}-${row.certNumber}`} className="text-[10px] text-primary">
+                {row.grader} {row.grade ?? ""} · #{row.certNumber}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {error ? <p className="text-[10px] text-danger">{error}</p> : null}
       {refreshing ? (

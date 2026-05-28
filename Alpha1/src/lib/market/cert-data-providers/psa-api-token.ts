@@ -1,21 +1,29 @@
-/** Shared PSA Public API OAuth token (used by psa_public + optional Apify actor input). */
+/** Shared PSA Public API auth (portal token, API key, or OAuth password grant). */
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
+function cleanEnv(key: string): string | null {
+  const raw = process.env[key]?.trim();
+  if (!raw || /^(your_|replace|paste|<)/i.test(raw)) return null;
+  return raw.replace(/^["']|["']$/g, "");
+}
+
 export function psaPublicApiConfigured(): boolean {
+  if (cleanEnv("PSA_API_ACCESS_TOKEN")) return true;
+  if (cleanEnv("PSA_API_KEY")) return true;
   return Boolean(
-    process.env.PSA_API_CLIENT_ID?.trim() &&
-      process.env.PSA_API_CLIENT_SECRET?.trim() &&
-      process.env.PSA_API_USERNAME?.trim() &&
-      process.env.PSA_API_PASSWORD?.trim(),
+    cleanEnv("PSA_API_CLIENT_ID") &&
+      cleanEnv("PSA_API_CLIENT_SECRET") &&
+      cleanEnv("PSA_API_USERNAME") &&
+      cleanEnv("PSA_API_PASSWORD"),
   );
 }
 
 export async function getPsaPublicApiAccessToken(): Promise<string | null> {
-  const manual = process.env.PSA_API_ACCESS_TOKEN?.trim();
+  const manual = cleanEnv("PSA_API_ACCESS_TOKEN") ?? cleanEnv("PSA_API_KEY");
   if (manual) return manual;
 
-  if (!psaPublicApiConfigured()) return null;
+  if (!psaPublicApiOAuthConfigured()) return null;
 
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
     return cachedToken.value;
@@ -27,10 +35,10 @@ export async function getPsaPublicApiAccessToken(): Promise<string | null> {
 
   const body = new URLSearchParams({
     grant_type: "password",
-    username: process.env.PSA_API_USERNAME!.trim(),
-    password: process.env.PSA_API_PASSWORD!.trim(),
-    client_id: process.env.PSA_API_CLIENT_ID!.trim(),
-    client_secret: process.env.PSA_API_CLIENT_SECRET!.trim(),
+    username: cleanEnv("PSA_API_USERNAME")!,
+    password: cleanEnv("PSA_API_PASSWORD")!,
+    client_id: cleanEnv("PSA_API_CLIENT_ID")!,
+    client_secret: cleanEnv("PSA_API_CLIENT_SECRET")!,
   });
 
   try {
@@ -52,4 +60,13 @@ export async function getPsaPublicApiAccessToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+function psaPublicApiOAuthConfigured(): boolean {
+  return Boolean(
+    cleanEnv("PSA_API_CLIENT_ID") &&
+      cleanEnv("PSA_API_CLIENT_SECRET") &&
+      cleanEnv("PSA_API_USERNAME") &&
+      cleanEnv("PSA_API_PASSWORD"),
+  );
 }

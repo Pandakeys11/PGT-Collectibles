@@ -45,6 +45,19 @@ export type CardMarketPrices = {
   reverseHoloTrend: number | null;
 };
 
+export type PokeTraceCatalogMeta = {
+  cardId: string;
+  syncedAt: string;
+  market: "US" | "EU";
+  primaryTier: string | null;
+  primarySource: string | null;
+  momentumPct: number | null;
+  trendLabel: "up" | "down" | "flat" | null;
+  anomalyFlag: boolean;
+  historyPoints: number;
+  lastSpotUsd: number | null;
+};
+
 export type CatalogPriceSnapshot = {
   tcgPlayerUrl: string | null;
   tcgPlayerUpdatedAt: string | null;
@@ -52,6 +65,12 @@ export type CatalogPriceSnapshot = {
   cardMarketUrl: string | null;
   cardMarketUpdatedAt: string | null;
   cardMarket: CardMarketPrices | null;
+  /** Cached PriceCharting loose/raw guide (set during market ingest). */
+  priceChartingLooseUsd?: number | null;
+  priceChartingUrl?: string | null;
+  priceChartingUpdatedAt?: string | null;
+  /** PokeTrace 24/7 price spine (when POKETRACE_API_KEY is set). */
+  pokeTrace?: PokeTraceCatalogMeta | null;
 };
 
 export type CatalogMatch = {

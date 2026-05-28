@@ -1,6 +1,13 @@
 import type { CatalogSetSummary } from "@/lib/catalog/catalog-types";
+import {
+  bestCatalogUsd,
+  hasParseableCatalogPrices,
+} from "@/lib/market/catalog-price-utils";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
-import { catalogMomentumPct } from "@/lib/catalog/set-insight-utils";
+import { resolvedCatalogMomentumPct } from "@/lib/market/poketrace/momentum";
+import { tickerFmvFromIntel } from "@/lib/market/ticker-fmv";
+import { refreshCatalogPricesFromTcgApi } from "@/lib/pgt-registry/catalog-intel-ingest";
+import { readCatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
 import {
   buildJpnArtworkTickerSlides,
   validateJpnArtworkTickerBuild,
@@ -11,7 +18,6 @@ import type {
   LiveMarketTickerPayload,
   LiveMarketTickerSlide,
 } from "@/lib/market/live-market-ticker-types";
-import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 const SET_CONCURRENCY = 10;
@@ -32,27 +38,6 @@ function setVisibilityFilter(): string {
   return `release_date.lte.${today},release_date.is.null,card_count.gt.0,card_count.is.null`;
 }
 
-function bestTcgUsd(prices: CatalogPriceSnapshot): number | null {
-  let best: number | null = null;
-  for (const row of prices.tcgPlayerPrices) {
-    const n = row.market ?? row.mid ?? row.low;
-    if (n == null || !Number.isFinite(n)) continue;
-    if (best == null || n > best) best = n;
-  }
-  return best;
-}
-
-function bestCatalogUsd(prices: CatalogPriceSnapshot): { usd: number | null; label: string } {
-  const tcg = bestTcgUsd(prices);
-  if (tcg != null) return { usd: tcg, label: "TCGPlayer market" };
-  const cm = prices.cardMarket;
-  const cmUsd = cm?.trendPrice ?? cm?.averageSellPrice ?? cm?.avg30 ?? cm?.avg7 ?? cm?.lowPrice ?? null;
-  if (cmUsd != null && Number.isFinite(cmUsd)) {
-    return { usd: cmUsd, label: "Cardmarket trend" };
-  }
-  return { usd: null, label: "Market reference" };
-}
-
 function rowToSlide(
   set: CatalogSetSummary,
   lane: LiveMarketTickerLaneId,
@@ -60,7 +45,14 @@ function rowToSlide(
   priceUsd: number | null,
   priceLabel: string,
   momentumPct?: number | null,
+  marketExtras?: {
+    tcgMarketUsd?: number | null;
+    rawFmvUsd?: number | null;
+    psa10FmvUsd?: number | null;
+  },
 ): LiveMarketTickerSlide {
+  const displayUsd =
+    marketExtras?.rawFmvUsd ?? priceUsd ?? marketExtras?.tcgMarketUsd ?? null;
   return {
     lane,
     setId: set.id,
@@ -72,9 +64,58 @@ function rowToSlide(
     cardNumber: row.card_number,
     rarity: row.rarity,
     imageUrl: row.image_large_url ?? row.image_small_url ?? null,
-    priceUsd: priceUsd != null ? Math.round(priceUsd * 100) / 100 : null,
+    priceUsd: displayUsd != null ? Math.round(displayUsd * 100) / 100 : null,
+    tcgMarketUsd:
+      marketExtras?.tcgMarketUsd != null
+        ? Math.round(marketExtras.tcgMarketUsd * 100) / 100
+        : priceUsd != null
+          ? Math.round(priceUsd * 100) / 100
+          : null,
+    rawFmvUsd: marketExtras?.rawFmvUsd ?? null,
+    psa10FmvUsd: marketExtras?.psa10FmvUsd ?? null,
     momentumPct: momentumPct ?? null,
     priceLabel,
+  };
+}
+
+async function marketExtrasForCatalogId(catalogId: string): Promise<{
+  tcgMarketUsd: number | null;
+  rawFmvUsd: number | null;
+  psa10FmvUsd: number | null;
+}> {
+  const intel = await readCatalogMarketIntel(catalogId, { compLimit: 32 });
+  const fmv = tickerFmvFromIntel(intel);
+  return {
+    tcgMarketUsd: null,
+    rawFmvUsd: fmv.rawFmvUsd,
+    psa10FmvUsd: fmv.psa10FmvUsd,
+  };
+}
+
+async function hydrateSlideMarket(
+  slide: LiveMarketTickerSlide,
+  row: TickerCardRow,
+): Promise<LiveMarketTickerSlide> {
+  const prices = parseCatalogPriceSnapshot(row.prices_json);
+  const tcgMarketUsd = bestCatalogUsd(prices);
+  const extras = await marketExtrasForCatalogId(slide.catalogId);
+  const rawFmvUsd = extras.rawFmvUsd ?? tcgMarketUsd;
+  const displayUsd =
+    slide.lane === "spotlight" && extras.psa10FmvUsd != null
+      ? extras.psa10FmvUsd
+      : rawFmvUsd ?? tcgMarketUsd;
+  return {
+    ...slide,
+    priceUsd: displayUsd != null ? Math.round(displayUsd * 100) / 100 : slide.priceUsd,
+    tcgMarketUsd,
+    rawFmvUsd,
+    psa10FmvUsd: extras.psa10FmvUsd,
+    priceLabel:
+      slide.lane === "spotlight" && extras.psa10FmvUsd != null
+        ? "PSA 10 FMV"
+        : slide.lane === "top_value" && rawFmvUsd != null
+          ? "Raw FMV"
+          : slide.priceLabel,
   };
 }
 
@@ -172,24 +213,28 @@ type SetInsights = {
 };
 
 async function insightsForSet(set: CatalogSetSummary): Promise<SetInsights> {
-  const rows = await fetchPricedCardsForSet(set);
+  let rows = await fetchPricedCardsForSet(set);
   if (!rows.length) return { topValue: null, momentum: null, spotlight: null };
+
+  const anyPriced = rows.some((row) => hasParseableCatalogPrices(row.prices_json));
+  if (!anyPriced && rows[0]?.catalog_id) {
+    await refreshCatalogPricesFromTcgApi(rows[0].catalog_id).catch(() => false);
+    rows = await fetchPricedCardsForSet(set);
+  }
 
   const scored: {
     row: TickerCardRow;
     price: number | null;
-    priceLabel: string;
     momentum: number | null;
   }[] = [];
 
   for (const row of rows) {
+    if (!hasParseableCatalogPrices(row.prices_json)) continue;
     const prices = parseCatalogPriceSnapshot(row.prices_json);
-    const best = bestCatalogUsd(prices);
     scored.push({
       row,
-      price: best.usd,
-      priceLabel: best.label,
-      momentum: catalogMomentumPct(prices),
+      price: bestCatalogUsd(prices),
+      momentum: resolvedCatalogMomentumPct(row.prices_json),
     });
   }
 
@@ -199,10 +244,8 @@ async function insightsForSet(set: CatalogSetSummary): Promise<SetInsights> {
 
   const topValue =
     priced[0] != null
-      ? rowToSlide(set, "top_value", priced[0].row, priced[0].price, priced[0].priceLabel)
-      : rows[0]
-        ? rowToSlide(set, "top_value", rows[0], null, "TCGPlayer reference")
-        : null;
+      ? rowToSlide(set, "top_value", priced[0].row, priced[0].price, "Raw FMV · TCG ref")
+      : null;
 
   const topCatalogId = priced[0]?.row.catalog_id ?? null;
 
@@ -224,8 +267,8 @@ async function insightsForSet(set: CatalogSetSummary): Promise<SetInsights> {
         momentumCandidate.row,
         momentumCandidate.price,
         momentumCandidate.momentum != null && Math.abs(momentumCandidate.momentum) >= 1
-          ? "Cardmarket trend vs 7d avg"
-          : momentumCandidate.priceLabel,
+          ? "7d Cardmarket trend"
+          : "Raw FMV",
         momentumCandidate.momentum,
       )
     : null;
@@ -243,13 +286,32 @@ async function insightsForSet(set: CatalogSetSummary): Promise<SetInsights> {
         spotlightSource.row,
         spotlightSource.price,
         spotlightSource.row.catalog_id !== topCatalogId
-          ? spotlightSource.priceLabel
+          ? "PSA 10 FMV"
           : "Set highlight",
         spotlightSource.momentum,
       )
     : null;
 
-  return { topValue, momentum, spotlight };
+  const slides = [topValue, momentum, spotlight].filter(
+    (s): s is LiveMarketTickerSlide => Boolean(s),
+  );
+  const hydrated = await Promise.all(
+    slides.map((slide) => {
+      const row =
+        slide.catalogId === topValue?.catalogId
+          ? priced[0]?.row
+          : slide.catalogId === momentum?.catalogId
+            ? momentumCandidate?.row
+            : spotlightSource?.row;
+      return row ? hydrateSlideMarket(slide, row) : slide;
+    }),
+  );
+
+  return {
+    topValue: hydrated.find((s) => s.lane === "top_value") ?? null,
+    momentum: hydrated.find((s) => s.lane === "momentum") ?? null,
+    spotlight: hydrated.find((s) => s.lane === "spotlight") ?? null,
+  };
 }
 
 async function mapPool<T, R>(

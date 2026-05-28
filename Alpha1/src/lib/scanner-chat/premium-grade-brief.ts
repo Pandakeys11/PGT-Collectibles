@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import {
   getGeminiApiKey,
+  isGeminiServiceEnabled,
   getGeminiTextModel,
   getOpenRouterApiKey,
   getOpenRouterBaseUrl,
@@ -164,7 +165,7 @@ export async function runPremiumGradeWebBrief(
     }
   }
 
-  const geminiKey = getGeminiApiKey();
+  const geminiKey = isGeminiServiceEnabled() ? getGeminiApiKey() : null;
   if (geminiKey) {
     try {
       const modelName = getGeminiTextModel();

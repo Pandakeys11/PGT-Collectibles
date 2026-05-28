@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { completePlainText } from "@/lib/ai/text";
 import {
   getGeminiApiKey,
+  isGeminiServiceEnabled,
   getGeminiTextModel,
   getGroqApiKey,
   getGroqCompoundModel,
@@ -12,6 +13,12 @@ import {
   getOpenRouterApiKey,
   getOpenRouterBaseUrl,
 } from "@/lib/ai/env";
+import {
+  getMarketScanAiOrder,
+  isAiRateLimitError,
+  isAiResearchInCooldown,
+  markAiResearchCooldown,
+} from "@/lib/ai/research-budget";
 import type { CatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
 import { deriveFairValueResult, type FairValueBasis } from "@/lib/market/fair-value";
 import { buildMarketQueries } from "@/lib/market/queries";
@@ -228,6 +235,7 @@ async function collectSourceSnippets(card: ExtractedCard) {
 }
 
 async function researchWithGemini(card: ExtractedCard, bundles: Awaited<ReturnType<typeof collectSourceSnippets>>["bundles"]) {
+  if (isAiResearchInCooldown("gemini")) return [];
   const genAI = new GoogleGenerativeAI(getGeminiApiKey()!);
   const model = genAI.getGenerativeModel({
     model: getGeminiTextModel(),
@@ -254,10 +262,15 @@ observedAt policy: null unless a date string for that specific sale/list appears
 Return JSON only matching:
 ${MARKET_JSON_SCHEMA}`;
 
-  const result = await model.generateContent({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-  });
-  return parseMarketJson(result.response.text());
+  try {
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+    return parseMarketJson(result.response.text());
+  } catch (err) {
+    if (isAiRateLimitError(err)) markAiResearchCooldown("gemini");
+    return [];
+  }
 }
 
 async function researchWithGroqCompound(
@@ -265,7 +278,7 @@ async function researchWithGroqCompound(
   bundles: Awaited<ReturnType<typeof collectSourceSnippets>>["bundles"],
 ): Promise<MarketEvidence[]> {
   const key = getGroqApiKey();
-  if (!key) return [];
+  if (!key || isAiResearchInCooldown("groq")) return [];
   const client = new OpenAI({ apiKey: key, baseURL: "https://api.groq.com/openai/v1" });
   const model = getGroqCompoundModel();
   const prompt = `${MARKET_ANALYST_SYSTEM}
@@ -295,7 +308,8 @@ ${MARKET_JSON_SCHEMA}`;
     const text = response.choices[0]?.message?.content?.trim() ?? "";
     if (!text) return [];
     return parseMarketJson(text);
-  } catch {
+  } catch (err) {
+    if (isAiRateLimitError(err)) markAiResearchCooldown("groq");
     return [];
   }
 }
@@ -368,7 +382,7 @@ async function collectNightlyAiEvidence(
       collected.push(...rows);
       if (rows.filter((r) => r.kind === "sold" && r.priceUsd != null).length >= 3) break;
     }
-    if (provider === "gemini" && getGeminiApiKey()) {
+    if (provider === "gemini" && isGeminiServiceEnabled()) {
       const rows = await withTimeout(researchWithGemini(card, bundles), 16_000, "nightly gemini").catch(
         () => [],
       );
@@ -536,27 +550,39 @@ export async function researchCardMarket(
       const nightlyAi = await collectNightlyAiEvidence(card, bundles);
       evidence.push(...nightlyAi);
     } else {
-      const tasks: Promise<MarketEvidence[]>[] = [];
-      if (getGroqApiKey()) {
-        tasks.push(
-          withTimeout(researchWithGroqCompound(card, bundles), 20_000, "groq market research").catch(
-            () => [],
-          ),
-        );
+      let soldFromAi = 0;
+      for (const provider of getMarketScanAiOrder()) {
+        if (soldFromAi >= 3) break;
+        if (provider === "groq" && getGroqApiKey() && !isAiResearchInCooldown("groq")) {
+          const rows = await withTimeout(
+            researchWithGroqCompound(card, bundles),
+            20_000,
+            "groq market research",
+          ).catch(() => []);
+          evidence.push(...rows);
+          soldFromAi = rows.filter((r) => r.kind === "sold" && r.priceUsd != null).length;
+          continue;
+        }
+        if (provider === "gemini" && isGeminiServiceEnabled() && !isAiResearchInCooldown("gemini")) {
+          const rows = await withTimeout(
+            researchWithGemini(card, bundles),
+            22_000,
+            "gemini market research",
+          ).catch(() => []);
+          evidence.push(...rows);
+          soldFromAi = Math.max(
+            soldFromAi,
+            rows.filter((r) => r.kind === "sold" && r.priceUsd != null).length,
+          );
+        }
       }
-      if (getGeminiApiKey()) {
-        tasks.push(
-          withTimeout(researchWithGemini(card, bundles), 22_000, "gemini market research").catch(() => []),
-        );
-      }
-      tasks.push(
-        withTimeout(researchWithSearchSnippets(card, bundles), 18_000, "market text extraction").catch(
-          () => [],
-        ),
-      );
-      const chunks = await Promise.all(tasks);
-      for (const chunk of chunks) {
-        evidence.push(...chunk);
+      if (soldFromAi < 2) {
+        const snippets = await withTimeout(
+          researchWithSearchSnippets(card, bundles),
+          18_000,
+          "market text extraction",
+        ).catch(() => []);
+        evidence.push(...snippets);
       }
     }
   }

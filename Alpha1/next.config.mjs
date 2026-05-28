@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["three", "@react-three/fiber"],
+  // Avoid corrupted webpack pack files on Windows when .next is cleared mid-compile.
+  webpack: (config, { dev }) => {
+    if (dev && process.platform === "win32") {
+      config.cache = false;
+    }
+    return config;
+  },
   async redirects() {
     return [
       {

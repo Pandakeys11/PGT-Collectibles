@@ -2,8 +2,29 @@
 
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CatalogSetTile, type CatalogSetTileModel } from "@/components/catalog/catalog-set-tile";
+import {
+  CatalogSetTile,
+  type CatalogSetTileDensity,
+  type CatalogSetTileModel,
+} from "@/components/catalog/catalog-set-tile";
+import {
+  CATALOG_SET_GRID_BROWSE,
+  CATALOG_SET_GRID_FULL,
+  CATALOG_SET_GRID_SIDEBAR,
+} from "@/lib/catalog/catalog-grid-layout";
 import { cn } from "@/lib/cn";
+
+function gridClassForDensity(density: CatalogSetTileDensity): string {
+  switch (density) {
+    case "sidebar":
+      return CATALOG_SET_GRID_SIDEBAR;
+    case "full":
+      return CATALOG_SET_GRID_FULL;
+    case "browse":
+    default:
+      return CATALOG_SET_GRID_BROWSE;
+  }
+}
 
 export function CatalogSetTileGrid({
   sets,
@@ -12,6 +33,8 @@ export function CatalogSetTileGrid({
   loading,
   error,
   emptyMessage = "No sets match this filter.",
+  density = "browse",
+  /** @deprecated Use density="sidebar" */
   compact = false,
   className,
   page,
@@ -27,6 +50,7 @@ export function CatalogSetTileGrid({
   loading?: boolean;
   error?: string | null;
   emptyMessage?: string;
+  density?: CatalogSetTileDensity;
   compact?: boolean;
   className?: string;
   page?: number;
@@ -36,6 +60,8 @@ export function CatalogSetTileGrid({
   onNextPage?: () => void;
   pagingDisabled?: boolean;
 }) {
+  const resolvedDensity: CatalogSetTileDensity = compact ? "sidebar" : density;
+
   if (loading) {
     return (
       <div className="flex h-full min-h-[12rem] flex-col items-center justify-center gap-2 py-12 text-sm text-slate-500">
@@ -64,22 +90,14 @@ export function CatalogSetTileGrid({
           "sc-catalog-set-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pr-0.5 scanner-chat-scrollbar touch-pan-y",
         )}
       >
-        <div
-          className={cn(
-            "sc-catalog-set-tile-grid grid content-start pb-2",
-            compact
-              ? "grid-cols-2 gap-2 max-lg:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3"
-              : "grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4",
-          )}
-        >
+        <div className={cn("sc-catalog-set-grid grid content-start pb-2", gridClassForDensity(resolvedDensity))}>
           {sets.map((set) => (
             <CatalogSetTile
               key={set.id}
               set={set}
               selected={selectedSetId === set.id}
               onSelect={() => onSelect(set)}
-              compact={compact}
-              vault
+              density={resolvedDensity}
             />
           ))}
         </div>

@@ -37,6 +37,13 @@ export const marketEvidenceSchema = z.object({
     .optional(),
   saleType: z.enum(["auction", "buy_now", "offer", "unknown"]).optional(),
   confidence: z.number().min(0).max(1).optional(),
+  /** Short-term move vs 30d baseline (%), from PokeTrace medians or history. */
+  trendPct: z.number().optional(),
+  /** Spot price diverges from 3d median (PokeTrace-style spike guard). */
+  anomalyFlag: z.boolean().optional(),
+  priceWindow: z.enum(["spot", "7d", "30d", "history"]).optional(),
+  /** Provider-native key, e.g. PokeTrace card|source|tier. */
+  externalRef: z.string().optional(),
 });
 
 export const marketSourceLinkSchema = z.object({

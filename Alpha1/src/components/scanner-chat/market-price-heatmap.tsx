@@ -32,17 +32,16 @@ export function MarketPriceHeatmap({
   fmvOverride?: number | null;
   className?: string;
 }) {
-  const pool = evidence ?? specimen?.context.marketEvidence ?? [];
   const change = useMemo(
     () => priceChangeVsFmv(specimen, fmvOverride),
     [specimen, fmvOverride],
   );
   const model = useMemo(
     () =>
-      buildMarketPriceBubbles(pool, {
+      buildMarketPriceBubbles(evidence ?? specimen?.context.marketEvidence ?? [], {
         fmvUsd: fmvOverride ?? specimen?.context.fairValueUsd ?? null,
       }),
-    [pool, fmvOverride, specimen?.context.fairValueUsd],
+    [evidence, fmvOverride, specimen?.context.fairValueUsd, specimen?.context.marketEvidence],
   );
   const [hover, setHover] = useState<PriceBubbleCluster | null>(null);
   const up = (change.deltaUsd ?? 0) >= 0;

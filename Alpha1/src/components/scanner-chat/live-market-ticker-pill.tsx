@@ -78,7 +78,15 @@ export function LiveMarketTickerPill({
               {momentum}%
             </span>
           ) : (
-            <span className="ml-1 font-mono text-sky-200/90">{fmtUsd(slide.priceUsd)}</span>
+            <span className="ml-1 font-mono text-sky-200/90">
+              {fmtUsd(slide.rawFmvUsd ?? slide.priceUsd)}
+              {slide.psa10FmvUsd != null && slide.lane === "top_value" ? (
+                <span className="text-faint">
+                  {" "}
+                  · PSA10 {fmtUsd(slide.psa10FmvUsd)}
+                </span>
+              ) : null}
+            </span>
           )}
           {slideTotal > 1 ? (
             <span className="text-faint">

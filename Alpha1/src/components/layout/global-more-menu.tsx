@@ -1,80 +1,10 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, ExternalLink, Sparkles, X } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
 import Link from "next/link";
-import { useLayoutEffect, useState } from "react";
-import { ThemeSwatchOrb, ThemeSwatchStrip } from "@/components/shell/theme-swatch";
 import { Button } from "@/components/ui/button";
-import { applyTheme, readActiveTheme, THEME_CHANGE_EVENT } from "@/lib/apply-theme";
-import { themeEnergyLabel } from "@/lib/energy-theme";
-import { DEFAULT_THEME_ID, THEME_GROUP_LABELS, THEMES, type ThemeGroup, type ThemeId } from "@/lib/themes";
 import { cn } from "@/lib/cn";
-
-const THEME_GROUPS: ThemeGroup[] = ["core", "tcg"];
-
-function ThemePickerGrid({ onPick }: { onPick: () => void }) {
-  const [activeId, setActiveId] = useState<ThemeId>(DEFAULT_THEME_ID);
-
-  useLayoutEffect(() => {
-    setActiveId(readActiveTheme());
-    const sync = () => setActiveId(readActiveTheme());
-    window.addEventListener(THEME_CHANGE_EVENT, sync);
-    return () => window.removeEventListener(THEME_CHANGE_EVENT, sync);
-  }, []);
-
-  return (
-    <div className="mt-3 max-h-[min(22rem,55dvh)] space-y-4 overflow-y-auto pr-0.5">
-      {THEME_GROUPS.map((group) => (
-        <div key={group}>
-          <div className="flex items-center gap-2 px-1">
-            <Sparkles className="h-3 w-3 text-accent-tertiary" aria-hidden />
-            <p className="text-desk-label">{THEME_GROUP_LABELS[group]}</p>
-          </div>
-          <div className="mt-2 grid gap-2">
-            {THEMES.filter((t) => t.group === group).map((theme) => {
-              const active = theme.id === activeId;
-              return (
-                <button
-                  key={theme.id}
-                  type="button"
-                  onClick={() => {
-                    applyTheme(theme.id);
-                    setActiveId(theme.id);
-                    onPick();
-                  }}
-                  className={cn(
-                    "group w-full overflow-hidden rounded-2xl border text-left transition touch-manipulation",
-                    active
-                      ? "border-border-accent bg-panel-raised/90 shadow-[0_0_32px_-8px_rgb(var(--holo-a)/0.35)]"
-                      : "border-border-subtle bg-panel-raised/50 hover:border-border-accent/60 hover:bg-panel-raised/80",
-                  )}
-                >
-                  <ThemeSwatchStrip themeId={theme.id} size="md" className="rounded-none" />
-                  <div className="flex items-start gap-3 px-3 py-2.5">
-                    <ThemeSwatchOrb themeId={theme.id} className="h-11 w-11 shrink-0" />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span className="font-medium text-primary">{theme.label}</span>
-                        {active ? (
-                          <Check className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
-                        ) : null}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] font-medium leading-snug text-accent/90">
-                        {themeEnergyLabel(theme.id)}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] leading-snug text-muted">{theme.hint}</span>
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function GlobalMoreMenu({
   open,
@@ -97,13 +27,6 @@ export function GlobalMoreMenu({
         >
           <MoreMenuHeader />
           <div className="mt-5 space-y-5">
-            <section className="rounded-2xl bg-panel-raised/40 p-4">
-              <p className="text-desk-label">Appearance</p>
-              <p className="mt-1.5 text-caption">
-                Palettes, panel tints, and ambient atmosphere.
-              </p>
-              <ThemePickerGrid onPick={() => onOpenChange(false)} />
-            </section>
             <section className="desk-divider border-t pt-5">
               <p className="text-desk-label">Account</p>
               <ul className="mt-2 space-y-1">
@@ -160,7 +83,7 @@ function MoreMenuHeader() {
       <div>
         <Dialog.Title className="font-display text-lg font-semibold text-primary">More</Dialog.Title>
         <Dialog.Description className="mt-1 text-desk-subtitle">
-          Theme, links, and product info
+          Links and product info
         </Dialog.Description>
       </div>
       <Dialog.Close asChild>

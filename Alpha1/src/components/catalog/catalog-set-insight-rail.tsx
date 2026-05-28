@@ -102,14 +102,36 @@ export function CatalogSetInsightRail({
         if (!res.ok) {
           throw new Error(body.error ?? `Request failed (${res.status})`);
         }
-        if (!body.ready) {
+        const pricedFromApi = (body.setWide?.pricedSlots ?? 0) > 0;
+        const pricedInView = inViewRollup.pricedSlots > 0;
+        if (!body.ready && !pricedFromApi && !pricedInView) {
           throw new Error(
             body.error === "insight_empty"
-              ? "No market data yet — add GROQ_API_KEY for web research or sync catalog prices."
+              ? "No prices loaded for this set — confirm POKEMON_TCG_API_KEY and run catalog sync."
               : body.error ?? "Set insight unavailable",
           );
         }
-        setInsight(body);
+        setInsight(
+          body.ready
+            ? body
+            : {
+                ...body,
+                ready: true,
+                summary:
+                  body.summary ??
+                  (pricedFromApi
+                    ? `${setName}: ${body.setWide.pricedSlots} of ${body.setWide.cardCount} cards priced from catalog.`
+                    : `${inViewRollup.pricedSlots} of ${inViewRollup.cardCount} visible cards priced in this filter.`),
+                setWide: pricedFromApi
+                  ? body.setWide
+                  : {
+                      cardCount: inViewRollup.cardCount,
+                      tcgPlayerSumUsd: inViewRollup.tcgPlayerSumUsd,
+                      pricedSlots: inViewRollup.pricedSlots,
+                      pricedPct: inViewPct,
+                    },
+              },
+        );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load set insight");
         setInsight(null);
@@ -117,7 +139,7 @@ export function CatalogSetInsightRail({
         setLoading(false);
       }
     },
-    [setId],
+    [setId, setName, inViewRollup, inViewPct],
   );
 
   useEffect(() => {
@@ -183,7 +205,7 @@ export function CatalogSetInsightRail({
           <div className="flex flex-col items-center justify-center gap-2 px-2 py-8 text-center">
             <Loader2 className="h-5 w-5 animate-spin text-amber-300" aria-hidden />
             <p className="text-[11px] text-muted">Researching {setName}…</p>
-            <p className="text-[9px] text-faint">Groq web search + catalog merge</p>
+            <p className="text-[9px] text-faint">AI web research + catalog merge</p>
           </div>
         ) : error && !insight ? (
           <div className="flex flex-col items-center gap-2 px-2 py-6 text-center">

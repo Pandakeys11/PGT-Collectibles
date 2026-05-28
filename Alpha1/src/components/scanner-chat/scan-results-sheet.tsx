@@ -8,6 +8,7 @@ import {
   liquidScanSheetRowsToCsv,
   specimensToLiquidScanSheetRows,
 } from "@/lib/scan/liquid-scan-sheet";
+import { buildPrintIdentitySnapshot } from "@/lib/scan/print-identity-ui";
 import { cn } from "@/lib/cn";
 
 function timestampSlug() {
@@ -35,7 +36,9 @@ export function ScanResultsMobileList({
       {rows.map((row, i) => {
         const specimen = specimens[i];
         const selected = specimen && selectedSpecimenId === specimen.id;
+        const printSnap = specimen ? buildPrintIdentitySnapshot(specimen) : null;
         const hasVersion = row.version !== "—";
+        const needsPrintConfirm = printSnap?.status === "needs_confirm";
         const hasPromo = row.promo !== "—" && row.promo !== row.version;
         return (
           <li key={specimen?.id ?? row.row}>
@@ -70,6 +73,10 @@ export function ScanResultsMobileList({
                 {hasVersion ? (
                   <span className="rounded-md border border-violet-500/30 bg-violet-500/12 px-2 py-0.5 text-[10px] font-medium text-violet-100">
                     {row.version}
+                  </span>
+                ) : needsPrintConfirm ? (
+                  <span className="rounded-md border border-amber-500/35 bg-amber-500/12 px-2 py-0.5 text-[10px] font-medium text-amber-100">
+                    Confirm print run
                   </span>
                 ) : (
                   <span className="text-[10px] text-slate-600">Version —</span>

@@ -1,4 +1,3 @@
-import type { CertLookupResult } from "@/lib/market/cert-data-providers/types";
 import { isMissingRelationError } from "@/lib/market/supabase-errors";
 import { inferCardTargetGradeBucket } from "@/lib/market/market-intelligence";
 import { marketIdentityHash } from "@/lib/market/identity-hash";

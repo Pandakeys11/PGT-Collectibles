@@ -137,6 +137,7 @@ export function usePremiumGradeBrief(
     };
   }, [
     enabled,
+    card,
     card?.name,
     card?.set,
     card?.number,
@@ -145,6 +146,7 @@ export function usePremiumGradeBrief(
     card?.printStamps,
     options?.specimenId,
     options?.marketAsOf,
+    options?.sessionEvidence,
     options?.sessionEvidence?.length,
   ]);
 

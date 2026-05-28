@@ -1,7 +1,11 @@
 import { readResponseJson } from "@/lib/http/read-response-json";
 import type { ExtractedCard, ScanCardContext } from "@/lib/scan/schemas";
+import { pickCatalogContext, type CatalogContextSnapshot } from "@/lib/scan/context-builder";
 
 export type EnrichPhase = "full" | "catalog" | "market";
+
+/** Server accepts at most this many specimens per batch request. */
+export const ENRICH_BATCH_MAX_ITEMS = 24;
 
 /** Drop in-memory enrich + Pokédex API caches (call on Clear session / new scan). */
 export async function flushRuntimeCaches(): Promise<void> {
@@ -17,6 +21,32 @@ const TRANSIENT_ENRICH_STATUSES = new Set([404, 408, 429, 500, 502, 503, 504]);
 function enrichBackoffMs(attempt: number): number {
   return 400 * (attempt + 1);
 }
+
+function batchTimeoutMs(phase: EnrichPhase, itemCount: number): number {
+  const waves = Math.max(1, Math.ceil(itemCount / 6));
+  const perWave =
+    phase === "market" ? 92_000 : phase === "catalog" ? 48_000 : 78_000;
+  const base = phase === "market" ? 25_000 : 18_000;
+  return Math.min(280_000, base + waves * perWave);
+}
+
+export type EnrichBatchItemInput = {
+  specimenId: string;
+  card: ExtractedCard;
+  phase?: EnrichPhase;
+  skipRegistry?: boolean;
+  skipCache?: boolean;
+} & Partial<CatalogContextSnapshot>;
+
+export type EnrichBatchItemResult = {
+  specimenId: string;
+  ok: boolean;
+  card?: ExtractedCard;
+  context?: ScanCardContext;
+  catalogMatched?: boolean;
+  catalogId?: string | null;
+  error?: string;
+};
 
 export async function enrichExtractedCard(args: {
   specimenId: string;
@@ -92,6 +122,138 @@ export async function enrichExtractedCard(args: {
   }
 
   throw new Error(lastError);
+}
+
+async function postEnrichBatch(args: {
+  items: EnrichBatchItemInput[];
+  phase: EnrichPhase;
+  skipRegistry?: boolean;
+  concurrency?: number;
+}): Promise<EnrichBatchItemResult[]> {
+  const timeoutMs = batchTimeoutMs(args.phase, args.items.length);
+  const maxAttempts = 2;
+  let lastError = "Batch enrichment failed";
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, enrichBackoffMs(attempt - 1)));
+    }
+
+    let response: Response;
+    try {
+      response = await fetch("/api/scan/enrich-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          phase: args.phase,
+          skipRegistry: args.skipRegistry === true ? true : undefined,
+          concurrency: args.concurrency,
+          items: args.items.map((item) => ({
+            ...item,
+            phase: item.phase ?? args.phase,
+            skipRegistry: item.skipRegistry === true ? true : undefined,
+            skipCache: item.skipCache === true ? true : undefined,
+          })),
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : "Batch enrichment request failed";
+      if (attempt < maxAttempts - 1) continue;
+      throw new Error(lastError);
+    }
+
+    const data = await readResponseJson<{
+      results?: EnrichBatchItemResult[];
+      error?: string;
+    }>(response);
+
+    if (response.ok && Array.isArray(data.results)) {
+      return data.results;
+    }
+
+    lastError = data.error || `Batch enrichment failed (${response.status})`;
+    if (TRANSIENT_ENRICH_STATUSES.has(response.status) && attempt < maxAttempts - 1) {
+      continue;
+    }
+    break;
+  }
+
+  throw new Error(lastError);
+}
+
+/**
+ * Batch catalog / market / full enrich via `/api/scan/enrich-batch`.
+ * Chunks automatically when more than {@link ENRICH_BATCH_MAX_ITEMS} specimens.
+ */
+export async function enrichExtractedCardsBatch(args: {
+  items: EnrichBatchItemInput[];
+  phase: EnrichPhase;
+  skipRegistry?: boolean;
+  concurrency?: number;
+}): Promise<EnrichBatchItemResult[]> {
+  if (args.items.length === 0) return [];
+
+  const out: EnrichBatchItemResult[] = [];
+  for (let offset = 0; offset < args.items.length; offset += ENRICH_BATCH_MAX_ITEMS) {
+    const slice = args.items.slice(offset, offset + ENRICH_BATCH_MAX_ITEMS);
+    const chunkResults = await postEnrichBatch({
+      items: slice,
+      phase: args.phase,
+      skipRegistry: args.skipRegistry,
+      concurrency: args.concurrency,
+    });
+    out.push(...chunkResults);
+  }
+  return out;
+}
+
+/** Retry failed batch rows with single-specimen `/api/scan/enrich`. */
+export async function enrichExtractedCardWithBatchFallback(
+  item: EnrichBatchItemInput,
+): Promise<EnrichBatchItemResult> {
+  try {
+    const single = await enrichExtractedCard({
+      specimenId: item.specimenId,
+      card: item.card,
+      phase: item.phase ?? "catalog",
+      skipCache: item.skipCache,
+      skipRegistry: item.skipRegistry,
+      ...pickCatalogContextFields(item),
+    });
+    return {
+      specimenId: item.specimenId,
+      ok: true,
+      card: single.card,
+      context: single.context,
+      catalogMatched: single.catalogMatched,
+      catalogId: single.catalogId,
+    };
+  } catch (err) {
+    return {
+      specimenId: item.specimenId,
+      ok: false,
+      error: err instanceof Error ? err.message : "Enrichment failed",
+    };
+  }
+}
+
+function pickCatalogContextFields(
+  item: EnrichBatchItemInput,
+): Partial<CatalogContextSnapshot> {
+  if (item.phase !== "market" && item.phase !== "full") return {};
+  return {
+    catalogId: item.catalogId,
+    catalogImageUrl: item.catalogImageUrl,
+    catalogImageSource: item.catalogImageSource,
+    catalogImageSourceLabel: item.catalogImageSourceLabel,
+    catalogImageNeedsReview: item.catalogImageNeedsReview,
+    catalogIdentityStatus: item.catalogIdentityStatus,
+    catalogConfidence: item.catalogConfidence,
+    catalogCandidates: item.catalogCandidates,
+    identityEvidence: item.identityEvidence,
+  };
 }
 
 export type CatalogCandidatesPayload = {

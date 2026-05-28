@@ -71,32 +71,12 @@ export function verificationToBadgeTone(
   return "danger";
 }
 
-/** Primary energy identity per app theme (for docs / future EnergyCard chrome). */
 export const THEME_ENERGY_MAP: Record<ThemeId, { primary: EnergyType; secondary: EnergyType }> = {
-  "energy-nexus": { primary: "electric", secondary: "psychic" },
-  "midnight-mirage": { primary: "psychic", secondary: "electric" },
-  "coral-depth": { primary: "fire", secondary: "water" },
-  "auric-void": { primary: "dragon", secondary: "metal" },
-  "neon-district": { primary: "electric", secondary: "psychic" },
-  "pastel-signal": { primary: "fairy", secondary: "water" },
-  "terracotta-field": { primary: "fighting", secondary: "fire" },
-  "zen-mist": { primary: "grass", secondary: "water" },
   "obsidian-clean": { primary: "metal", secondary: "electric" },
-  "emerald-vault": { primary: "grass", secondary: "dark" },
-  "chrome-slate": { primary: "metal", secondary: "water" },
-  "booster-classic": { primary: "electric", secondary: "water" },
-  "illustrators-sky": { primary: "fairy", secondary: "dragon" },
-  "crystal-chamber": { primary: "water", secondary: "psychic" },
-  "shadow-scheme": { primary: "dark", secondary: "psychic" },
-  "silver-dive": { primary: "metal", secondary: "water" },
-  "ember-holo": { primary: "fire", secondary: "dragon" },
-  "hoenn-dawn": { primary: "grass", secondary: "fighting" },
-  "rainbow-chase": { primary: "dragon", secondary: "psychic" },
 };
 
-/** Human-readable energy pair for a theme preset (single source of truth for UI copy). */
 export function themeEnergyLabel(id: ThemeId): string {
   const { primary, secondary } = THEME_ENERGY_MAP[id];
   if (primary === secondary) return ENERGY_LABELS[primary];
-  return `${ENERGY_LABELS[primary]} + ${ENERGY_LABELS[secondary]}`;
+  return `${ENERGY_LABELS[primary]} · ${ENERGY_LABELS[secondary]}`;
 }

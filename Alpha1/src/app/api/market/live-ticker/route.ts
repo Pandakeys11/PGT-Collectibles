@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildLiveMarketTicker } from "@/lib/market/build-live-market-ticker";
+import { ensurePokeTraceWsBridge } from "@/lib/market/poketrace/ws-bridge";
+import { isPokeTraceWsEnabled } from "@/lib/market/env-market";
 import type { LiveMarketTickerPayload } from "@/lib/market/live-market-ticker-types";
 import { registerRuntimeCacheClear } from "@/lib/server/runtime-caches";
 
@@ -21,6 +23,8 @@ async function ensureBuilt(refresh: boolean): Promise<LiveMarketTickerPayload> {
   }
 
   if (buildInFlight) return buildInFlight;
+
+  if (isPokeTraceWsEnabled()) ensurePokeTraceWsBridge();
 
   buildInFlight = buildLiveMarketTicker()
     .then((body) => {

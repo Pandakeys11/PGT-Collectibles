@@ -34,6 +34,16 @@ function isFindingRateLimited(message: string | null | undefined): boolean {
 let findingCompletedCooldownUntil = 0;
 const EBAY_FINDING_COOLDOWN_MS = 15 * 60 * 1000;
 
+export function isEbayFindingInCooldown(): boolean {
+  return Date.now() < findingCompletedCooldownUntil;
+}
+
+export function isEbayFindingAvailable(): boolean {
+  if (process.env.EBAY_DISABLE_FINDING === "1") return false;
+  if (!getEbayFindingAppId()) return false;
+  return !isEbayFindingInCooldown();
+}
+
 function inferSlabFromHaystack(hay: string): string | null {
   if (/bgs.*black\s*label|black\s*label/i.test(hay)) return "BGS Black Label";
   if (/psa\s*10|gem\s*mint\s*10/i.test(hay)) return "PSA 10";

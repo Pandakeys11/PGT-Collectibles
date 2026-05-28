@@ -14,6 +14,12 @@ export type LiveMarketTickerSlide = {
   rarity: string | null;
   imageUrl: string | null;
   priceUsd: number | null;
+  /** TCGPlayer / Cardmarket reference from catalog cache. */
+  tcgMarketUsd?: number | null;
+  /** PGT comp median — raw / ungraded. */
+  rawFmvUsd?: number | null;
+  /** PGT comp median — PSA 10 bucket. */
+  psa10FmvUsd?: number | null;
   /** Secondary metric for momentum lane (% vs 7d avg). */
   momentumPct?: number | null;
   priceLabel: string;

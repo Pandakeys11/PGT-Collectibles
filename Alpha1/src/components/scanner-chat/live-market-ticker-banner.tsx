@@ -22,7 +22,7 @@ export function LiveMarketTickerBanner({
     return (
       <div
         className={cn(
-          "sc-live-market-banner flex items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/[0.05] px-3 py-2 text-[11px] text-muted",
+          "sc-live-market-banner hidden lg:flex lg:items-center lg:justify-center lg:rounded-xl lg:border lg:border-sky-500/20 lg:bg-sky-500/[0.05] lg:px-3 lg:py-2 lg:text-[11px] lg:text-muted",
           className,
         )}
       >
@@ -37,7 +37,7 @@ export function LiveMarketTickerBanner({
       return (
         <div
           className={cn(
-            "sc-live-market-banner flex items-center justify-between gap-2 rounded-xl border border-rose-500/25 bg-rose-500/[0.06] px-3 py-2",
+            "sc-live-market-banner hidden lg:flex lg:items-center lg:justify-between lg:gap-2 lg:rounded-xl lg:border lg:border-rose-500/25 lg:bg-rose-500/[0.06] lg:px-3 lg:py-2",
             className,
           )}
         >
@@ -57,14 +57,14 @@ export function LiveMarketTickerBanner({
 
   return (
     <div
-      className={cn("sc-live-market-banner-row", className)}
+      className={cn("sc-live-market-banner-row hidden lg:block", className)}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       <div
         className={cn(
-          "sc-live-market-banner-track flex gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          !paused && bannerPills.length > 1 && "sc-live-market-banner-track--animate",
+          "sc-live-market-banner-track flex gap-2",
+          !paused && "sc-live-market-banner-track--animate",
         )}
       >
         {bannerPills.map(({ laneId, lane, slide, index }) => (
@@ -75,16 +75,15 @@ export function LiveMarketTickerBanner({
             slideIndex={index}
             slideTotal={lane.slides.length}
             onClick={onOpenFull}
-            className="min-w-[min(100%,14rem)] shrink-0 sm:min-w-0 sm:flex-1"
           />
         ))}
       </div>
       <button
         type="button"
         onClick={onOpenFull}
-        className="sc-live-market-banner-open mt-1.5 w-full rounded-lg border border-sky-500/20 bg-sky-500/10 py-1.5 text-center text-[10px] font-semibold text-sky-200 transition hover:bg-sky-500/15 touch-manipulation"
+        className="sc-live-market-banner-open mt-1.5 w-full rounded-lg border border-sky-500/20 bg-sky-500/10 py-1 text-center text-[10px] font-semibold text-sky-200 transition hover:bg-sky-500/15"
       >
-        Vault pulse · full market tour
+        Open full market tour
       </button>
     </div>
   );

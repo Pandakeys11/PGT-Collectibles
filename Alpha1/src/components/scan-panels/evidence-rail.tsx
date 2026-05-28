@@ -22,8 +22,12 @@ import type { ExtractedCard } from "@/lib/scan/schemas";
 import { formatGradedSlabTag, formatSlabLabelLine } from "@/lib/scan/graded-slab";
 import { getCardDisplayTitle, getCardImageAlt } from "@/lib/scan/card-display";
 import { cn } from "@/lib/cn";
-import { displayPrintVersionForSpecimen } from "@/lib/scan/display-print-edition";
+import { buildPrintIdentitySnapshot } from "@/lib/scan/print-identity-ui";
 import { formatAskingPriceCompact } from "@/lib/scan/specimen-present";
+import {
+  PrintIdentityDetailBlock,
+  PrintVersionBadges,
+} from "@/components/scan-panels/print-version-identity";
 
 function catalogStatusLabel(status: ScanSpecimen["context"]["catalogIdentityStatus"]): string {
   if (status === "confirmed") return "Confirmed";
@@ -61,77 +65,88 @@ function IdentityDetailRows({
     [specimen.card.set, specimen.card.number, specimen.card.year ?? specimen.context.year]
       .filter(Boolean)
       .join(" · ") || "—";
-  const version = displayPrintVersionForSpecimen(specimen);
   const slab = formatSlabLabelLine(specimen.card);
   const grade = formatGradedSlabTag(specimen.card, specimen.context.lane) ?? "—";
   const sticker = formatAskingPriceCompact(specimen);
   const catalog = `${catalogStatusLabel(specimen.context.catalogIdentityStatus)} ${Math.round(specimen.context.catalogConfidence * 100)}% / ${Math.round(specimen.context.confidence * 100)}%`;
 
-  if (dense) {
-    const rows: Array<{ label: string; value: string; valueClass?: string }> = [
-      { label: "Set · ID", value: setLine },
-      { label: "Version", value: version, valueClass: "text-violet-200/95 font-medium" },
-      ...(slab ? [{ label: "Slab", value: slab }] : []),
-      { label: "Grade", value: grade, valueClass: "font-mono text-slate-200" },
-      { label: "Sticker", value: sticker, valueClass: "font-mono text-amber-200/90" },
-      { label: "Status", value: catalog },
-    ];
-
-    return (
-      <dl className="sc-identity-sheet-grid divide-y divide-white/[0.06] rounded-md border border-white/8 bg-white/[0.02]">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="grid grid-cols-[minmax(4.25rem,5.25rem)_1fr] items-baseline gap-x-2 px-2 py-1"
-          >
-            <dt className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
-              {row.label}
-            </dt>
-            <dd
-              className={cn(
-                "min-w-0 text-[11px] leading-snug text-slate-300 break-words",
-                row.valueClass,
-              )}
-            >
-              {row.value}
-            </dd>
+  const tailRows = (
+    <>
+      {slab ? (
+        dense ? (
+          <div className="grid grid-cols-[minmax(4.25rem,5.25rem)_1fr] items-baseline gap-x-2 px-2 py-1">
+            <dt className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Slab</dt>
+            <dd className="min-w-0 text-[11px] text-slate-300 break-words">{slab}</dd>
           </div>
-        ))}
-      </dl>
+        ) : (
+          <div className="flex justify-between gap-3">
+            <dt className="text-slate-500">Slab label</dt>
+            <dd className="max-w-[58%] text-right text-slate-200 break-words">{slab}</dd>
+          </div>
+        )
+      ) : null}
+      {dense ? (
+        <>
+          <div className="grid grid-cols-[minmax(4.25rem,5.25rem)_1fr] items-baseline gap-x-2 px-2 py-1">
+            <dt className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Grade</dt>
+            <dd className="font-mono text-[11px] text-slate-200">{grade}</dd>
+          </div>
+          <div className="grid grid-cols-[minmax(4.25rem,5.25rem)_1fr] items-baseline gap-x-2 px-2 py-1">
+            <dt className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Sticker</dt>
+            <dd className="font-mono text-[11px] text-amber-200/90">{sticker}</dd>
+          </div>
+          <div className="grid grid-cols-[minmax(4.25rem,5.25rem)_1fr] items-baseline gap-x-2 px-2 py-1">
+            <dt className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Status</dt>
+            <dd className="text-[11px] text-slate-300">{catalog}</dd>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex justify-between gap-3">
+            <dt className="text-slate-500">Grade · cert</dt>
+            <dd className="max-w-[58%] text-right font-mono text-slate-200 break-words">{grade}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-slate-500">Sticker / ask</dt>
+            <dd className="font-mono text-amber-200/90">{sticker}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-slate-500">Catalog · scan</dt>
+            <dd className="text-right text-slate-200">{catalog}</dd>
+          </div>
+        </>
+      )}
+    </>
+  );
+
+  if (dense) {
+    return (
+      <div className="space-y-2">
+        <dl className="sc-identity-sheet-grid divide-y divide-white/[0.06] rounded-md border border-white/8 bg-white/[0.02]">
+          <div className="grid grid-cols-[minmax(4.25rem,5.25rem)_1fr] items-baseline gap-x-2 px-2 py-1">
+            <dt className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Set · ID</dt>
+            <dd className="min-w-0 text-[11px] text-slate-300 break-words">{setLine}</dd>
+          </div>
+        </dl>
+        <PrintIdentityDetailBlock specimen={specimen} dense />
+        <dl className="sc-identity-sheet-grid divide-y divide-white/[0.06] rounded-md border border-white/8 bg-white/[0.02]">
+          {tailRows}
+        </dl>
+      </div>
     );
   }
 
   return (
-    <dl className="space-y-2 text-[11px] sm:text-xs">
-      <div className="flex justify-between gap-3">
-        <dt className="text-slate-500">Set · ID · Year</dt>
-        <dd className="max-w-[58%] text-right font-medium text-slate-200 break-words">{setLine}</dd>
-      </div>
-      <div className="flex justify-between gap-3">
-        <dt className="text-slate-500">Print / version</dt>
-        <dd className="max-w-[58%] text-right font-medium text-violet-200/95 break-words">
-          {version}
-        </dd>
-      </div>
-      {slab ? (
+    <div className="space-y-2">
+      <dl className="space-y-2 text-[11px] sm:text-xs">
         <div className="flex justify-between gap-3">
-          <dt className="text-slate-500">Slab label</dt>
-          <dd className="max-w-[58%] text-right text-slate-200 break-words">{slab}</dd>
+          <dt className="text-slate-500">Set · ID · Year</dt>
+          <dd className="max-w-[58%] text-right font-medium text-slate-200 break-words">{setLine}</dd>
         </div>
-      ) : null}
-      <div className="flex justify-between gap-3">
-        <dt className="text-slate-500">Grade · cert</dt>
-        <dd className="max-w-[58%] text-right font-mono text-slate-200 break-words">{grade}</dd>
-      </div>
-      <div className="flex justify-between gap-3">
-        <dt className="text-slate-500">Sticker / ask</dt>
-        <dd className="font-mono text-amber-200/90">{sticker}</dd>
-      </div>
-      <div className="flex justify-between gap-3">
-        <dt className="text-slate-500">Catalog · scan</dt>
-        <dd className="text-right text-slate-200">{catalog}</dd>
-      </div>
-    </dl>
+      </dl>
+      <PrintIdentityDetailBlock specimen={specimen} />
+      <dl className="space-y-2 text-[11px] sm:text-xs">{tailRows}</dl>
+    </div>
   );
 }
 
@@ -187,7 +202,7 @@ export function EvidenceRail({
       /* private mode */
     }
     setIdentityCollapsed(identityLooksSettled(specimen));
-  }, [specimen?.id]);
+  }, [specimen, specimen?.id]);
 
   useEffect(() => {
     if (!specimen?.id || userToggledIdentityRef.current) return;
@@ -195,6 +210,7 @@ export function EvidenceRail({
       setIdentityCollapsed(true);
     }
   }, [
+    specimen,
     specimen?.id,
     specimen?.context.catalogIdentityStatus,
     specimen?.context.verificationStatus,
@@ -343,7 +359,9 @@ export function EvidenceRail({
 
   if (variant === "liquid") {
     const settled = identityLooksSettled(specimen);
+    const printSnap = buildPrintIdentitySnapshot(specimen);
     const identitySummary = [
+      printSnap.version || null,
       specimen.context.setName,
       specimen.context.cardNumber,
       formatGradedSlabTag(specimen.card, specimen.context.lane),
@@ -399,6 +417,7 @@ export function EvidenceRail({
                   grade={specimen.card.grade}
                   labelTitle={specimen.card.labelTitle}
                 />
+                <PrintVersionBadges snapshot={printSnap} size="xs" />
                 {settled && identityCollapsed ? (
                   <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-300/90">
                     {catalogStatusLabel(specimen.context.catalogIdentityStatus)}
@@ -546,11 +565,11 @@ export function EvidenceRail({
                 .join(" · ") || "—"}
             </dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted">Print / version</dt>
-            <dd className="max-w-[65%] text-right font-medium text-primary break-words">
-              {displayPrintVersionForSpecimen(specimen)}
-            </dd>
+          <div className="mt-3 rounded-lg border border-border-subtle/60 bg-panel-raised/20 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-faint">Print run &amp; version</p>
+            <div className="mt-2">
+              <PrintIdentityDetailBlock specimen={specimen} />
+            </div>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-muted">Language</dt>

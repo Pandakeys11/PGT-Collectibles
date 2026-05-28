@@ -1,5 +1,10 @@
 import { buildRegistryUrl } from "@/lib/market/cert-lookup";
 import type { ParsedCertRef } from "@/lib/market/cert-lookup";
+import { parsePsaCertApiPayload } from "@/lib/market/cert-data-providers/psa-api-parse";
+import {
+  canUsePsaApiNow,
+  tryConsumePsaApiCall,
+} from "@/lib/market/cert-data-providers/psa-api-quota";
 import {
   getPsaPublicApiAccessToken,
   psaPublicApiConfigured,
@@ -7,7 +12,8 @@ import {
 import type { CertDataProvider, CertLookupResult } from "@/lib/market/cert-data-providers/types";
 
 /**
- * PSA Public API — official PSA cert data (PSA slabs only).
+ * PSA Public API — official cert lookup by cert number only (free tier ≈100 calls/day).
+ * Do not use for bulk catalog population — use Bright Data harvest instead.
  * Register: https://www.psacard.com/publicapi
  */
 export const psaPublicCertProvider: CertDataProvider = {
@@ -16,12 +22,16 @@ export const psaPublicCertProvider: CertDataProvider = {
 
   async lookup(ref: ParsedCertRef): Promise<CertLookupResult | null> {
     if (ref.grader.toUpperCase() !== "PSA") return null;
+    if (!canUsePsaApiNow()) return null;
+
     const token = await getPsaPublicApiAccessToken();
     if (!token) return null;
 
     const cert = ref.cert.replace(/\D/g, "");
     const base =
       process.env.PSA_API_BASE_URL?.trim() || "https://api.psacard.com/publicapi";
+
+    if (!tryConsumePsaApiCall()) return null;
 
     const res = await fetch(`${base}/cert/GetByCertNumber/${cert}`, {
       headers: {
@@ -34,33 +44,21 @@ export const psaPublicCertProvider: CertDataProvider = {
     if (!res.ok) return null;
 
     const data = (await res.json()) as Record<string, unknown>;
-    const cardName =
-      (typeof data.Subject === "string" && data.Subject) ||
-      (typeof data.CardName === "string" && data.CardName) ||
-      (typeof data.cardName === "string" && data.cardName) ||
-      null;
-    const grade =
-      (typeof data.CardGrade === "string" && data.CardGrade) ||
-      (typeof data.grade === "string" && data.grade) ||
-      null;
-    const pop =
-      data.Population != null
-        ? String(data.Population)
-        : data.TotalPopulation != null
-          ? String(data.TotalPopulation)
-          : null;
+    const parsed = parsePsaCertApiPayload(data);
+    if (!parsed.isValid) return null;
+
+    const { cardName, grade, gradeDate, population } = parsed;
 
     return {
       provider: "psa_public",
       gemrateId: null,
-      populationNote: pop ? `PSA population: ${pop}` : null,
-      gradeDate:
-        typeof data.GradeDate === "string"
-          ? data.GradeDate
-          : typeof data.gradeDate === "string"
-            ? data.gradeDate
-            : null,
-      raw: data,
+      populationNote: population.populationNote,
+      gradeDate,
+      raw: {
+        ...data,
+        _pgtSpecId: population.specId,
+        _pgtGradeCounts: population.gradeCounts,
+      },
       registry: {
         certNumber: cert,
         cardName,

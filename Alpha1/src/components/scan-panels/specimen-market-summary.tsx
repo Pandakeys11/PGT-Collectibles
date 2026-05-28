@@ -21,6 +21,7 @@ import {
   marketDataReady,
   summarizeSources,
 } from "@/lib/scan/sheet-present";
+import { printIdentityMarketScopeLabel } from "@/lib/scan/print-identity-ui";
 import { cn } from "@/lib/cn";
 
 function catalogStatusLabel(status: ScanSpecimen["context"]["catalogIdentityStatus"]): string {
@@ -53,6 +54,7 @@ export function SpecimenMarketSummary({
   const catalogId = specimen.context.catalogId?.trim() ?? "";
   const useCatalog = catalogMarketEligible(catalogId, specimen.context.catalogIdentityStatus);
   const printingHint = specimen.card.printStamps?.trim() || null;
+  const compScope = printIdentityMarketScopeLabel(specimen);
 
   const { payload: catalogPayload, loading: catalogLoading } = useCatalogMarket(catalogId, {
     enabled: useCatalog,
@@ -151,6 +153,11 @@ export function SpecimenMarketSummary({
               {hero.amount}
             </p>
             {hero.basis ? <p className="mt-0.5 text-[0.6875rem] text-muted">Basis · {hero.basis}</p> : null}
+            {compScope ? (
+              <p className="mt-0.5 text-[0.6875rem] text-violet-300/85" title="Market comps filtered to this print run">
+                Comps scoped to · {compScope}
+              </p>
+            ) : null}
             {dataSource && variant !== "compact" ? (
               <p className="mt-0.5 text-[0.6875rem] text-faint">{dataSource}</p>
             ) : null}

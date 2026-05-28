@@ -1,0 +1,77 @@
+/**
+ * Catalog-driven ambient atmosphere — overrides holo mesh from set logo colors.
+ * Applied via `data-catalog-ambient` + inline custom properties from JS.
+ */
+
+html[data-catalog-ambient="1"] {
+  --holo-a: var(--catalog-ambient-a);
+  --holo-b: var(--catalog-ambient-b);
+  --holo-c: var(--catalog-ambient-c);
+  --gradient-mid: var(--catalog-ambient-mid);
+  --gradient-bloom: var(--catalog-ambient-bloom);
+  --surface-tint: var(--catalog-ambient-a);
+  --surface-tint-2: var(--catalog-ambient-b);
+  --accent-tertiary: var(--catalog-ambient-c);
+  --border-accent: var(--catalog-ambient-c) / 0.28;
+}
+
+html[data-catalog-ambient="1"] .vision-aurora {
+  animation-duration: 28s;
+}
+
+html[data-catalog-ambient="1"] .desk-surface,
+html[data-catalog-ambient="1"] .desk-surface-raised,
+html[data-catalog-ambient="1"] .desk-dock {
+  transition:
+    box-shadow 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.45s ease,
+    background-color 0.45s ease;
+}
+
+html[data-catalog-ambient="1"] .desk-surface:hover,
+html[data-catalog-ambient="1"] .desk-surface-raised:hover {
+  box-shadow:
+    var(--shadow-panel),
+    inset 0 1px 0 rgb(var(--panel-shine)),
+    0 0 52px -18px rgb(var(--holo-a) / 0.22),
+    0 0 36px -14px rgb(var(--holo-b) / 0.14);
+}
+
+html[data-catalog-ambient="1"] .sc-catalog-set-grid button {
+  transition:
+    border-color 0.35s ease,
+    box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.35s ease;
+}
+
+html[data-catalog-ambient="1"] .sc-catalog-set-grid button:hover {
+  border-color: rgb(var(--holo-b) / 0.38);
+  box-shadow:
+    0 0 0 1px rgb(var(--holo-a) / 0.2),
+    0 10px 28px -14px rgb(var(--holo-b) / 0.28);
+}
+
+html[data-catalog-ambient="1"] .sc-catalog-card-grid button {
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.35s ease,
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html[data-catalog-ambient="1"] .sc-catalog-card-grid button:hover {
+  border-color: rgb(var(--holo-a) / 0.32);
+  box-shadow: 0 8px 22px -12px rgb(var(--holo-b) / 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-catalog-ambient="1"] .vision-aurora {
+    animation: none;
+  }
+
+  html[data-catalog-ambient="1"] .desk-surface,
+  html[data-catalog-ambient="1"] .desk-surface-raised,
+  html[data-catalog-ambient="1"] .sc-catalog-set-grid button,
+  html[data-catalog-ambient="1"] .sc-catalog-card-grid button {
+    transition: none;
+  }
+}

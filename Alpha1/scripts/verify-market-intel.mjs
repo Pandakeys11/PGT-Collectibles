@@ -63,7 +63,7 @@ async function main() {
     );
     const json = await res.json();
     console.log(`\n[${res.ok ? "OK" : "WARN"}] GET /api/market/intel → ready=${json.ready} comps=${json.comps?.length ?? 0}`);
-  } catch (e) {
+  } catch {
     console.log("\n[WARN] Dev server not reachable for /api/market/intel (run npm run dev:clean)");
   }
 

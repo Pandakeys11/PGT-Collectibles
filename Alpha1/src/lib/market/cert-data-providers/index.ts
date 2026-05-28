@@ -1,15 +1,17 @@
 import { lookupCertViaWeb } from "@/lib/market/cert-lookup";
 import type { ParsedCertRef } from "@/lib/market/cert-lookup";
 import { apifyPsaCertProvider } from "@/lib/market/cert-data-providers/apify-psa";
+import { brightdataCertProvider } from "@/lib/market/cert-data-providers/brightdata-cert";
 import { gemrateCertProvider } from "@/lib/market/cert-data-providers/gemrate";
 import { psaCertPageProvider } from "@/lib/market/cert-data-providers/psa-cert-page";
 import { psaPublicCertProvider } from "@/lib/market/cert-data-providers/psa-public-api";
 import type { CertDataProvider, CertLookupResult } from "@/lib/market/cert-data-providers/types";
 
-/** Apify last before web — sync actor can take up to ~90s; cert page is faster for enrich. */
+/** Bright Data before raw HTML — bypasses bot walls; Apify last (slow). */
 const ORDERED_PROVIDERS: CertDataProvider[] = [
   gemrateCertProvider,
   psaPublicCertProvider,
+  brightdataCertProvider,
   psaCertPageProvider,
   apifyPsaCertProvider,
 ];
@@ -29,7 +31,7 @@ export function configuredCertProviders(): CertDataProvider[] {
 
 /**
  * Best-available cert lookup:
- * GemRate → PSA Public API → PSA cert page HTML → Apify PSA Pop → DuckDuckGo snippets.
+ * GemRate → PSA Public API → Bright Data → PSA cert page HTML → Apify PSA Pop → DuckDuckGo snippets.
  */
 export async function lookupCertViaProviders(
   ref: ParsedCertRef,

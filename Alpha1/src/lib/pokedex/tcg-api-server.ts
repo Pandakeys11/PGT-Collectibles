@@ -1,6 +1,14 @@
+import { tcgPlayerEmbedFromSnapshot } from "@/lib/market/catalog-raw-fmv";
 import type { TcgCardDetail, TcgCardSummary, TcgPaginated, TcgSetSummary } from "@/lib/pokedex/tcg-api-types";
-import { countCardsInDb, listAllSetsFromDb, listCardsFromDb } from "@/lib/catalog/db-catalog-browse";
-import type { CatalogSetSummary } from "@/lib/catalog/catalog-types";
+import {
+  countCardsInDb,
+  listAllSetsFromDb,
+  listCardsFromDb,
+  resolveSetRecord,
+} from "@/lib/catalog/db-catalog-browse";
+import { hydrateTcgCardSummariesWithLivePrices } from "@/lib/pokedex/tcg-price-hydrate";
+import type { CatalogCardSummary, CatalogSetSummary } from "@/lib/catalog/catalog-types";
+import { enrichCardsWithLiveTcgPrices } from "@/lib/catalog/set-insight-utils";
 import { expandLegendaryCollectionRows, isLegendaryCollectionCatalogExpand } from "@/lib/pokedex/legendary-collection-catalog";
 import {
   buildSetCardsQuery,
@@ -134,6 +142,61 @@ async function fetchSetsPageFromDb(params: {
   };
 }
 
+function catalogRowToTcgSummary(row: CatalogCardSummary): TcgCardSummary {
+  const catalogPrices = row.prices;
+  const tcgEmbed = tcgPlayerEmbedFromSnapshot(catalogPrices);
+  const cm = catalogPrices?.cardMarket;
+  return {
+    id: row.id,
+    name: row.name,
+    number: row.number ?? "",
+    rarity: row.rarity ?? undefined,
+    catalogFinish: row.catalogFinish,
+    catalogVariantKey: row.catalogVariantKey,
+    catalogVariantLabel: row.catalogVariantLabel,
+    sourceCatalogId: row.sourceCatalogId,
+    images: row.images,
+    catalogPrices,
+    set: row.set
+      ? {
+          id: row.set.id,
+          name: row.set.name,
+          releaseDate: row.set.releaseDate ?? undefined,
+        }
+      : undefined,
+    tcgplayer: tcgEmbed,
+    cardmarket: cm
+      ? {
+          url: catalogPrices?.cardMarketUrl ?? undefined,
+          updatedAt: catalogPrices?.cardMarketUpdatedAt ?? undefined,
+          prices: {
+            trendPrice: cm.trendPrice ?? undefined,
+            averageSellPrice: cm.averageSellPrice ?? undefined,
+            lowPrice: cm.lowPrice ?? undefined,
+            avg7: cm.avg7 ?? undefined,
+            avg30: cm.avg30 ?? undefined,
+            reverseHoloTrend: cm.reverseHoloTrend ?? undefined,
+          },
+        }
+      : undefined,
+  };
+}
+
+function tcgSummaryHasMarketPrices(card: TcgCardSummary): boolean {
+  const prices = card.tcgplayer?.prices;
+  if (!prices) return false;
+  return Object.values(prices).some(
+    (p) =>
+      (typeof p?.market === "number" && Number.isFinite(p.market)) ||
+      (typeof p?.mid === "number" && Number.isFinite(p.mid)),
+  );
+}
+
+async function resolveTcgApiSetId(setId: string): Promise<string> {
+  const row = await resolveSetRecord("pokemon", setId);
+  return row?.external_set_id?.trim() || setId.trim();
+}
+
 async function loadSetCardsFromDb(setId: string, variantKey?: string | null): Promise<TcgCardSummary[] | null> {
   const populated = await countCardsInDb("pokemon");
   if (!populated || populated <= 0) return null;
@@ -146,25 +209,16 @@ async function loadSetCardsFromDb(setId: string, variantKey?: string | null): Pr
   });
   if (!db || db.totalCount === 0) return null;
 
-  return db.data.map((row) => ({
-    id: row.id,
-    name: row.name,
-    number: row.number ?? "",
-    rarity: row.rarity ?? undefined,
-    catalogFinish: row.catalogFinish,
-    catalogVariantKey: row.catalogVariantKey,
-    catalogVariantLabel: row.catalogVariantLabel,
-    sourceCatalogId: row.sourceCatalogId,
-    images: row.images,
-    set: row.set
-      ? {
-          id: row.set.id,
-          name: row.set.name,
-          releaseDate: row.set.releaseDate ?? undefined,
-        }
-      : undefined,
-    tcgplayer: row.tcgplayer?.url ? { url: row.tcgplayer.url } : undefined,
-  }));
+  let cards = db.data.map(catalogRowToTcgSummary);
+  const apiSetId = await resolveTcgApiSetId(setId);
+
+  try {
+    cards = await hydrateTcgCardSummariesWithLivePrices(apiSetId, cards, db.data);
+  } catch {
+    /* keep DB rows */
+  }
+
+  return cards;
 }
 
 export async function fetchRarityCountsForSet(setId: string): Promise<Record<RarityBucketId, number> | null> {
@@ -223,7 +277,13 @@ async function fetchCardsForSetPageFromDb(params: {
   const page = Math.max(1, params.page);
   const pageSize = Math.max(1, params.pageSize);
   const start = (page - 1) * pageSize;
-  const data = filtered.slice(start, start + pageSize);
+  let data = filtered.slice(start, start + pageSize);
+  const apiSetId = await resolveTcgApiSetId(params.setId);
+  try {
+    data = await hydrateTcgCardSummariesWithLivePrices(apiSetId, data);
+  } catch {
+    /* keep slice */
+  }
 
   return {
     data,

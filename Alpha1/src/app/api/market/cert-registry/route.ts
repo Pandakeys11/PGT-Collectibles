@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { getPsaApiQuotaStatus } from "@/lib/market/cert-data-providers/psa-api-quota";
 import {
   certRegistryReadySummary,
   getCertRegistryCapabilities,
@@ -16,6 +17,7 @@ export async function GET() {
     ok: ready.hasStructuredProvider || ready.activeChain.includes("psa_cert_page"),
     capabilities,
     activeChain: ready.activeChain,
+    psaApiQuota: getPsaApiQuotaStatus(),
     fallbacksWithoutPartner: certFallbackProvidersWithoutPartner(),
     hint:
       ready.hasStructuredProvider

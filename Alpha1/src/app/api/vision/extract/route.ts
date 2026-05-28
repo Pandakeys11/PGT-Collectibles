@@ -86,7 +86,7 @@ async function runVerifyPassWithFallback(args: {
   skippedProviders: Set<string>;
   timeoutMs: number;
 }): Promise<{ result: VerifyRun | null; warnings: string[] }> {
-  const providers = ["gemini", "openrouter", "openai", "xai"] as const;
+  const providers = ["openrouter", "gemini", "openai", "xai"] as const;
   const warnings: string[] = [];
   for (const id of providers) {
     if (args.skippedProviders.has(id)) continue;
@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
   let appUser;
   try {
     appUser = await syncCurrentAppUser();
-  } catch (err) {
+  } catch {
     // If Clerk/Supabase sync fails, allow extraction to proceed without metering.
     // Metering will be enforced on the next scan when appUser sync is healthy again.
     appUser = null;
@@ -311,7 +311,7 @@ export async function POST(req: NextRequest) {
   const verifyPrompt = verifyEligible
     ? `${prompt}
 
-VERIFY PASS (Gemini):
+VERIFY PASS:
 - Re-read the image carefully and correct any obvious mistakes in name/set/number/year/grader/grade/cert.
 - Do not invent cert numbers on raw cards or when cert is not legible in-frame.
 - Keep the JSON schema identical. Return JSON only.`
@@ -320,7 +320,7 @@ VERIFY PASS (Gemini):
   const verifyCompactPrompt = verifyEligible
     ? `${compactPrompt}
 
-VERIFY PASS (Gemini):
+VERIFY PASS:
 - Re-read the image carefully and correct mistakes.
 - Return JSON only.`
     : null;

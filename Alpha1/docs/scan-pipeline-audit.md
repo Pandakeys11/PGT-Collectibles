@@ -42,6 +42,23 @@ Settings live in `src/lib/scan/liquid-scan-speed.ts` (persisted in `localStorage
 3. **Precision crop wiped catalog** — Background precision pass replaced the whole `ScanCardContext` with an empty context before re-enrich finished, causing a flash of wrong/missing art.
 4. **Strict catalog art gate** — Official art only appeared when identity was “authoritative” (confirmed or high-confidence likely). Review rows showed scan crop or placeholder even when good candidates existed.
 
+### Batch enrich (2026-05-28)
+
+Liquid Scan bulk enrich uses **`POST /api/scan/enrich-batch`** via `runEnrichSessionPipeline` (`src/lib/scan/enrich-session-pipeline.ts`):
+
+- One HTTP request per catalog/market **chunk** (not per card).
+- Rows with strong vision identity (`name` + `set` + `#`) use **`phase: full`** in a single batch call (catalog + market together).
+- Failed batch rows fall back to single `/api/scan/enrich`; catalog failures still try `catalog-candidates`.
+- Client: `enrichExtractedCardsBatch` in `enrich-client.ts` (chunks of 24, retries, phase-scaled timeout).
+
+Manual resync, precision crop re-enrich, and per-row market refresh still use single `/api/scan/enrich`.
+
+### Deferred market + lazy registry (2026-05-28)
+
+- **Catalog first, market async** — After catalog+widen, `enriching` clears so the sheet is interactive; `marketEnriching` runs comps in the background.
+- **`/api/scan/enrich`** — Thin wrapper around `runEnrichForSpecimen` (same logic as batch).
+- **Speed ON** — `skipRegistryOnBulkEnrich: true`; graded slabs hydrate when selected via `/api/scan/registry`.
+
 ### Fixes applied (2026-05)
 
 - Rebalanced Speed ON to moderate parallelism (fewer failed enrich calls).

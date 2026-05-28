@@ -18,12 +18,15 @@ import {
   recordScanObservation,
 } from "@/lib/scan/enrich-client";
 import {
+  runCatalogEnrichSession,
+  runMarketEnrichSession,
+} from "@/lib/scan/enrich-session-pipeline";
+import {
   stabilizeOmniVisionCards,
   normalizeVisionGridLocation,
   pickPrimaryVisionCardFromCrop,
   type VisionGridLocation,
 } from "@/lib/scan/spatial";
-import { MIN_CATALOG_PICK_OPTIONS } from "@/lib/market/ensure-catalog-options";
 import { inferCardFranchise } from "@/lib/scan/franchise";
 import { classifyCardLane } from "@/lib/scan/lane";
 import {
@@ -52,7 +55,6 @@ import {
 } from "@/lib/scan/graded-slab";
 import { normalizeVisionCard } from "@/lib/scan/normalize-extracted-card";
 import {
-  enrichConcurrencyForCardCount,
   getLiquidScanSpeedProfile,
   precisionCropMaxForCardCount,
 } from "@/lib/scan/liquid-scan-speed";
@@ -74,6 +76,13 @@ import {
   runVisionExtraction,
   runVisionOnSingleCardCrop,
 } from "@/lib/scan/vision-client";
+import type { ScanMode } from "@/lib/scanner-chat/types";
+import {
+  scanModeRequestsVisionVerify,
+  scanModeUsesBinderGrid,
+  scanModeUsesBinderUploadPrep,
+  scanModeUsesSingleCardCrop,
+} from "@/lib/scanner-chat/scan-mode-config";
 
 export type ScanLaneMode = "all" | "raw" | "graded";
 
@@ -173,16 +182,19 @@ function buildContextForUserCatalogSelection(
   });
 }
 
-export function useScanSession(options?: { speedOn?: boolean }) {
+export function useScanSession(options?: { speedOn?: boolean; scanMode?: ScanMode }) {
   const { userId } = useAuth();
   const speedOnRef = useRef(options?.speedOn ?? false);
   speedOnRef.current = options?.speedOn ?? false;
+  const scanModeRef = useRef<ScanMode>(options?.scanMode ?? "binder");
+  scanModeRef.current = options?.scanMode ?? "binder";
   const [laneMode, setLaneMode] = useState<ScanLaneMode>("all");
   const [slots, setSlots] = useState<ScanImageSlot[]>([]);
   const [specimens, setSpecimens] = useState<ScanSpecimen[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const [marketEnriching, setMarketEnriching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanLimit, setScanLimit] = useState<ScanLimitPayload | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
@@ -197,11 +209,17 @@ export function useScanSession(options?: { speedOn?: boolean }) {
 
   const specimensRef = useRef(specimens);
   specimensRef.current = specimens;
+
+  useEffect(() => {
+    marketEnrichingRef.current = marketEnriching;
+  }, [marketEnriching]);
   const enrichDebounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
   const enrichRunRef = useRef<Map<string, number>>(new Map());
   const precisionRunRef = useRef(0);
+  const marketEnrichGenRef = useRef(0);
+  const marketEnrichingRef = useRef(false);
   const registryLoadRef = useRef<string | null>(null);
   const rescanRunRef = useRef<Map<string, number>>(new Map());
   /** Synchronous guard — blocks parallel runScan before React state updates. */
@@ -221,7 +239,9 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     enrichDebounceRef.current.forEach((timer) => clearTimeout(timer));
     enrichDebounceRef.current.clear();
     enrichRunRef.current.clear();
+    marketEnrichGenRef.current += 1;
     setEnrichingSpecimenId(null);
+    setMarketEnriching(false);
   }, []);
 
   const cancelEnrichForSpecimen = useCallback((id: string) => {
@@ -254,7 +274,11 @@ export function useScanSession(options?: { speedOn?: boolean }) {
         const res = await fetch("/api/scan/registry", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ card: item.card, specimenId: loadId }),
+          body: JSON.stringify({
+            card: item.card,
+            specimenId: loadId,
+            catalogId: item.context.catalogId,
+          }),
         });
         const data = await readResponseJson<{
           card?: ExtractedCard;
@@ -318,16 +342,23 @@ export function useScanSession(options?: { speedOn?: boolean }) {
   const ingestImageFiles = useCallback(async (files: File[]) => {
     const list = files.filter((file) => file.type.startsWith("image/"));
     if (list.length === 0) return;
-    const binderGridPrep = list.length === 1;
+    const mode = scanModeRef.current;
+    const projectedSlots = slots.length + list.length;
+    const binderPrep = scanModeUsesBinderUploadPrep(mode, projectedSlots, laneMode);
+    const singlePrep =
+      projectedSlots === 1 && scanModeUsesSingleCardCrop(mode, 1, laneMode);
     const next = await Promise.all(
       list.map(async (file) => ({
         id: makeId("slot"),
         file,
-        previewUrl: await readImageFileAsDataUrl(file, { binderGrid: binderGridPrep }),
+        previewUrl: await readImageFileAsDataUrl(file, {
+          binderGrid: binderPrep,
+          singleCard: singlePrep,
+        }),
       })),
     );
     setSlots((current) => [...current, ...next]);
-  }, []);
+  }, [laneMode, slots.length]);
 
   const drainUploadQueue = useCallback(async () => {
     if (uploadDrainRef.current) return;
@@ -413,207 +444,48 @@ export function useScanSession(options?: { speedOn?: boolean }) {
   const enrichSpecimens = useCallback(async (items: ScanSpecimen[]) => {
     if (items.length === 0) return;
     cancelPendingEnrich();
-    setEnriching(true);
+    const marketGen = ++marketEnrichGenRef.current;
     const total = items.length;
-    const catalogById = new Map<string, ScanSpecimen>();
     const profile = getLiquidScanSpeedProfile(speedOnRef.current);
-    const { catalog: catalogConcurrency, market: marketConcurrency } =
-      enrichConcurrencyForCardCount(total, profile);
     const skipRegistryOnBulk = profile.skipRegistryOnBulkEnrich;
-    const enrichConcurrency = Math.max(catalogConcurrency, marketConcurrency);
+
+    setEnriching(true);
+    setMarketEnriching(false);
+
+    let catalogById = new Map<string, ScanSpecimen>();
 
     try {
-      let enrichDone = 0;
-      setProgress(`Matching catalog 0/${total}…`);
-      for (let offset = 0; offset < items.length; offset += enrichConcurrency) {
-        const chunk = items.slice(offset, offset + enrichConcurrency);
-        await Promise.all(
-          chunk.map(async (specimen) => {
-            try {
-              const catalogResult = await enrichExtractedCard({
-                specimenId: specimen.id,
-                card: specimen.card,
-                phase: "catalog",
-              });
-              const base = {
-                ...specimen,
-                card: catalogResult.card,
-                context: catalogResult.context,
-              };
-              catalogById.set(specimen.id, base);
-              setSpecimens((current) =>
-                current.map((entry) => (entry.id === specimen.id ? base : entry)),
-              );
-            } catch {
-              if (hasMinimumIdentityForCatalog(specimen.card)) {
-                try {
-                  const fallback = await fetchCatalogCandidates({
-                    card: specimen.card,
-                    existingCandidates: specimen.context.catalogCandidates,
-                  });
-                  const recovered = {
-                    ...specimen,
-                    context: buildScanCardContext({
-                      specimenId: specimen.id,
-                      card: specimen.card,
-                      catalogId: fallback.catalogId,
-                      catalogIdentityStatus: fallback.catalogIdentityStatus,
-                      catalogConfidence: fallback.catalogConfidence,
-                      catalogCandidates: fallback.candidates,
-                      identityEvidence: fallback.identityEvidence,
-                      catalogImageUrl: fallback.catalogImageUrl,
-                      catalogImageSource: fallback.catalogImageSource ?? null,
-                      catalogImageSourceLabel: fallback.catalogImageSourceLabel ?? null,
-                      catalogImageNeedsReview: fallback.catalogImageNeedsReview ?? false,
-                      marketEvidence: specimen.context.marketEvidence,
-                      marketSourceLinks: specimen.context.marketSourceLinks,
-                      fairValueUsd: specimen.context.fairValueUsd,
-                      fairValueBasis: specimen.context.fairValueBasis,
-                      year: specimen.card.year ?? specimen.context.year,
-                    }),
-                  };
-                  catalogById.set(specimen.id, recovered);
-                  setSpecimens((current) =>
-                    current.map((entry) => (entry.id === specimen.id ? recovered : entry)),
-                  );
-                } catch {
-                  catalogById.set(specimen.id, specimen);
-                }
-              } else {
-                catalogById.set(specimen.id, specimen);
-              }
-            } finally {
-              enrichDone += 1;
-              setProgress(`Matching catalog ${enrichDone}/${total}…`);
-            }
-          }),
-        );
-      }
-
-      const weakCatalog = [...catalogById.values()].filter((entry) => {
-        if (!hasMinimumIdentityForCatalog(entry.card)) return false;
-        if (hasUserCatalogOverride(entry.context)) return false;
-        if (entry.context.catalogIdentityStatus === "confirmed") return false;
-        const pokemon = inferCardFranchise(entry.card).isPokemon;
-        const thinCandidates =
-          entry.context.catalogCandidates.length < MIN_CATALOG_PICK_OPTIONS;
-        const noArt = !entry.context.catalogImageUrl?.trim();
-        const weakStatus =
-          entry.context.catalogIdentityStatus === "failed" ||
-          entry.context.catalogIdentityStatus === "ambiguous";
-        if (pokemon && (thinCandidates || noArt || weakStatus)) return true;
-        return thinCandidates;
+      catalogById = await runCatalogEnrichSession({
+        items,
+        profile,
+        skipRegistryOnBulk,
+        deferMarket: true,
+        onProgress: setProgress,
+        onSpecimensPatch: setSpecimens,
       });
-      if (weakCatalog.length > 0) {
-        let widenDone = 0;
-        const widenTotal = weakCatalog.length;
-        const widenConcurrency = Math.min(3, widenTotal);
-        setProgress(`Widening catalog 0/${widenTotal}…`);
-        for (let offset = 0; offset < weakCatalog.length; offset += widenConcurrency) {
-          const chunk = weakCatalog.slice(offset, offset + widenConcurrency);
-          await Promise.all(
-            chunk.map(async (entry) => {
-              try {
-                const result = await fetchCatalogCandidates({
-                  card: entry.card,
-                  existingCandidates: entry.context.catalogCandidates,
-                });
-                const widened = {
-                  ...entry,
-                  context: buildScanCardContext({
-                    specimenId: entry.id,
-                    card: entry.card,
-                    catalogId: result.catalogId,
-                    catalogIdentityStatus: result.catalogIdentityStatus,
-                    catalogConfidence: result.catalogConfidence,
-                    catalogCandidates: result.candidates,
-                    identityEvidence:
-                      result.identityEvidence.length > 0
-                        ? result.identityEvidence
-                        : entry.context.identityEvidence,
-                    catalogImageUrl:
-                      result.catalogImageUrl ?? entry.context.catalogImageUrl,
-                    catalogImageSource:
-                      result.catalogImageSource ?? entry.context.catalogImageSource,
-                    catalogImageSourceLabel:
-                      result.catalogImageSourceLabel ?? entry.context.catalogImageSourceLabel,
-                    catalogImageNeedsReview:
-                      result.catalogImageNeedsReview ?? entry.context.catalogImageNeedsReview,
-                    marketEvidence: entry.context.marketEvidence,
-                    marketSourceLinks: entry.context.marketSourceLinks,
-                    fairValueUsd: entry.context.fairValueUsd,
-                    fairValueBasis: entry.context.fairValueBasis,
-                    year: entry.card.year ?? entry.context.year,
-                  }),
-                };
-                catalogById.set(entry.id, widened);
-                setSpecimens((current) =>
-                  current.map((row) => (row.id === entry.id ? widened : row)),
-                );
-              } catch {
-                // Keep fast-path catalog row when deep search fails.
-              } finally {
-                widenDone += 1;
-                setProgress(`Widening catalog ${widenDone}/${widenTotal}…`);
-              }
-            }),
-          );
-        }
-      }
-
-      enrichDone = 0;
-      setProgress(`Loading market 0/${total}…`);
-      for (let offset = 0; offset < items.length; offset += enrichConcurrency) {
-        const chunk = items.slice(offset, offset + enrichConcurrency);
-        await Promise.all(
-          chunk.map(async (specimen) => {
-            const base = catalogById.get(specimen.id) ?? specimen;
-            const skipRegistry =
-              skipRegistryOnBulk &&
-              !(
-                base.context.lane === "graded" && hasReadableCertNumber(base.card.cert)
-              );
-            try {
-              const catalogCtx = pickCatalogContext(base.context);
-              const marketResult = await enrichExtractedCard({
-                specimenId: base.id,
-                card: base.card,
-                phase: "market",
-                ...catalogCtx,
-                skipRegistry,
-              });
-              setSpecimens((current) =>
-                current.map((entry) =>
-                  entry.id === base.id
-                    ? {
-                        ...entry,
-                        card: marketResult.card,
-                        context: {
-                          ...marketResult.context,
-                          ...catalogCtx,
-                          catalogId:
-                            catalogCtx.catalogId ?? marketResult.context.catalogId,
-                          catalogImageUrl:
-                            catalogCtx.catalogImageUrl ??
-                            marketResult.context.catalogImageUrl,
-                        },
-                      }
-                    : entry,
-                ),
-              );
-            } catch {
-              // Keep catalog-only row.
-            } finally {
-              enrichDone += 1;
-              setProgress(`Loading market ${enrichDone}/${total}…`);
-            }
-          }),
-        );
-      }
-
     } finally {
       setEnriching(false);
-      setProgress(null);
+    }
+
+    if (marketGen !== marketEnrichGenRef.current) return;
+
+    setProgress("Catalog matched — loading market…");
+    setMarketEnriching(true);
+
+    try {
+      await runMarketEnrichSession({
+        items,
+        profile,
+        skipRegistryOnBulk,
+        catalogById,
+        onProgress: setProgress,
+        onSpecimensPatch: setSpecimens,
+      });
+    } finally {
+      if (marketGen === marketEnrichGenRef.current) {
+        setMarketEnriching(false);
+        setProgress(null);
+      }
       if (userId && total > 0) {
         void trackCompanionQuest(userId, "scan_session", 1);
         void trackCompanionQuest(userId, "cards_scanned", total);
@@ -759,7 +631,7 @@ export function useScanSession(options?: { speedOn?: boolean }) {
   );
 
   const runScan = useCallback(async () => {
-    if (scanLockRef.current) return;
+    if (scanLockRef.current || marketEnrichingRef.current) return;
     if (slots.length === 0) {
       setError("Add at least one image before scanning.");
       return;
@@ -773,7 +645,10 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     setScanLimit(null);
     setSpecimens([]);
     setSelectedId(null);
-    const binderGridScan = slots.length === 1 && laneMode !== "graded";
+    const mode = scanModeRef.current;
+    const binderGridScan = scanModeUsesBinderGrid(mode, slots.length, laneMode);
+    const singleCardCrop = scanModeUsesSingleCardCrop(mode, slots.length, laneMode);
+    const requestVisionVerify = scanModeRequestsVisionVerify(mode);
     setProgress(
       binderGridScan
         ? "Running vision on binder page…"
@@ -802,10 +677,9 @@ export function useScanSession(options?: { speedOn?: boolean }) {
         timeoutMs: getVisionClientTimeoutMs(),
         concurrency: speedProfile.visionConcurrency,
         binderGrid,
+        singleCardCrop,
         gradedFocus: laneMode === "graded",
-        // Keep extraction sharp: always request Gemini verify pass for single-image requests.
-        // (Server still gates verify off for binder grids / multi-image payloads.)
-        visionVerify: true,
+        visionVerify: requestVisionVerify,
         onProgress: (state) => {
           setProgress(
             `Vision ${state.imagesDone}/${state.imagesTotal} (${state.mode})`,
@@ -1669,6 +1543,7 @@ export function useScanSession(options?: { speedOn?: boolean }) {
     setSelectedId,
     scanning,
     enriching,
+    marketEnriching,
     rescanningId,
     enrichingSpecimenId,
     catalogRefreshingId,

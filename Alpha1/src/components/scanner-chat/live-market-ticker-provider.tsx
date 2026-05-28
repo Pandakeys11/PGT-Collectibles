@@ -21,9 +21,8 @@ import type {
   LiveMarketTickerPayload,
   LiveMarketTickerSlide,
 } from "@/lib/market/live-market-ticker-types";
-import { LIVE_MARKET_TICKER_LANE_ORDER } from "@/lib/market/live-market-ticker-types";
 
-const STORAGE_KEY = "pgt.live-market-ticker.v4";
+const STORAGE_KEY = "pgt.live-market-ticker.v5";
 const FETCH_TIMEOUT_MS = 95_000;
 const LANE_CYCLE_MS = 5_500;
 
@@ -77,9 +76,9 @@ export function LiveMarketTickerProvider({ children }: { children: ReactNode }) 
   const pausedRef = useRef(false);
   const loadGen = useRef(0);
 
-  const lanes = payload?.lanes ?? [];
-  const slides = payload?.slides ?? [];
-  const tourLength = maxLaneLength(lanes);
+  const lanes = useMemo(() => payload?.lanes ?? [], [payload]);
+  const slides = useMemo(() => payload?.slides ?? [], [payload]);
+  const tourLength = useMemo(() => maxLaneLength(lanes), [lanes]);
 
   const laneById = useMemo(() => {
     const map = new Map<LiveMarketTickerLaneId, LiveMarketTickerLane>();

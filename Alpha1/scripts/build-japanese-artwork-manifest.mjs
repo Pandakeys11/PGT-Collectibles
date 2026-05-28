@@ -144,17 +144,6 @@ async function resolveCatalogEnSetId(supabase, jaSetId) {
   return null;
 }
 
-function invertSetMap(enToJa) {
-  const jaToEn = new Map();
-  for (const [en, ja] of enToJa) {
-    if (!jaToEn.has(ja)) jaToEn.set(ja, en);
-  }
-  for (const [en, ja] of Object.entries(STATIC_EN_TO_JA_SET)) {
-    if (!jaToEn.has(ja)) jaToEn.set(ja, en);
-  }
-  return jaToEn;
-}
-
 function pickJaShowcaseCard(jaCards) {
   const withImage = jaCards.filter((c) => c?.image && !isJaTrainerOrUtility(c));
   if (!withImage.length) return null;

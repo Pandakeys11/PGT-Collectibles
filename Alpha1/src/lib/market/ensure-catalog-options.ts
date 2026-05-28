@@ -52,6 +52,7 @@ async function withTimeout<T>(
  */
 export async function ensureCatalogMatchOptions(
   card: ExtractedCard,
+  options?: { hintCatalogId?: string | null },
 ): Promise<CatalogMatch | null> {
   if (isNonTcgPokemonCollectible(card)) return null;
 
@@ -59,7 +60,28 @@ export async function ensureCatalogMatchOptions(
   const catalogCard = toCatalogCounterpartCard(card);
   let match = await searchDbCatalog(catalogCard, franchise);
 
-  if (candidateCount(match) < MIN_CATALOG_PICK_OPTIONS || topCandidateHasHardConflict(match)) {
+  const hintCatalogId = options?.hintCatalogId?.trim();
+  if (hintCatalogId && match?.candidates?.length) {
+    const idx = match.candidates.findIndex((c) => c.catalogId === hintCatalogId);
+    if (idx > 0) {
+      const candidates = [...match.candidates];
+      const [hit] = candidates.splice(idx, 1);
+      candidates.unshift(hit);
+      match = { ...match, catalogId: hintCatalogId, candidates };
+    } else if (idx === 0 && !match.catalogId) {
+      match = { ...match, catalogId: hintCatalogId };
+    }
+  }
+
+  const skipBroad =
+    match?.catalogIdentityStatus === "confirmed" &&
+    (match.score ?? 0) >= 85 &&
+    !topCandidateHasHardConflict(match);
+
+  if (
+    !skipBroad &&
+    (candidateCount(match) < MIN_CATALOG_PICK_OPTIONS || topCandidateHasHardConflict(match))
+  ) {
     const dbBroad = await searchDbCatalogBroad(catalogCard, franchise);
     match = mergeCatalogMatches(match, dbBroad);
   }

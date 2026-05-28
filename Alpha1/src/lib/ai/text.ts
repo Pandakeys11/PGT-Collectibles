@@ -9,7 +9,7 @@ import {
   getOpenAITextModel,
   getOpenRouterApiKey,
   getOpenRouterBaseUrl,
-  getOpenRouterTextModel,
+  getOpenRouterTextModelCandidates,
   getTextProviderOrder,
   getTextSkipProviders,
   getXaiApiKey,
@@ -86,9 +86,8 @@ function createProviderRunners(
     runners.openrouter = {
       name: "openrouter",
       run: () =>
-        runOpenAiCompatible(
+        runOpenRouterCompatible(
           new OpenAI({ apiKey: openRouterKey, baseURL: getOpenRouterBaseUrl() }),
-          getOpenRouterTextModel(),
           system,
           user,
           jsonObject,
@@ -201,6 +200,31 @@ function isRequestTooLarge(message: string): boolean {
   return /413|too large|Request too large|tokens per minute.*Requested/i.test(message);
 }
 
+function isOpenRouterModelUnavailable(message: string): boolean {
+  return /404|no endpoints found|model not found|does not exist/i.test(message);
+}
+
+async function runOpenRouterCompatible(
+  client: OpenAI,
+  system: string,
+  user: string,
+  jsonObject?: boolean,
+  maxTokens = 900,
+): Promise<string> {
+  const models = getOpenRouterTextModelCandidates();
+  let lastMessage = "";
+  for (const model of models) {
+    try {
+      return await runOpenAiCompatible(client, model, system, user, jsonObject, maxTokens);
+    } catch (err) {
+      lastMessage = err instanceof Error ? err.message : String(err);
+      if (isOpenRouterModelUnavailable(lastMessage)) continue;
+      throw err;
+    }
+  }
+  throw new Error(lastMessage || "OpenRouter: no text model available");
+}
+
 export type TextStreamEvent =
   | { type: "chunk"; text: string }
   | { type: "done"; provider: string }
@@ -281,7 +305,7 @@ export async function streamPlainText(
   async function* chain() {
     for (const provider of providers) {
       try {
-        let inner: AsyncGenerator<TextStreamEvent>;
+        let inner: AsyncGenerator<TextStreamEvent> | undefined;
         if (provider.name === "gemini") {
           inner = await streamGeminiText(system, user, maxTokens);
         } else {
@@ -291,9 +315,30 @@ export async function streamPlainText(
           const xaiKey = getXaiApiKey();
           let client: OpenAI | null = null;
           let model = "";
+          let innerReady = false;
           if (provider.name === "openrouter" && openRouterKey) {
             client = new OpenAI({ apiKey: openRouterKey, baseURL: getOpenRouterBaseUrl() });
-            model = getOpenRouterTextModel();
+            const orModels = getOpenRouterTextModelCandidates();
+            for (const orModel of orModels) {
+              try {
+                model = orModel;
+                inner = await streamOpenAiCompatible(
+                  client,
+                  model,
+                  system,
+                  user,
+                  maxTokens,
+                  provider.name,
+                );
+                innerReady = true;
+                break;
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                failures.push(`openrouter:${orModel}: ${msg}`);
+                if (!isOpenRouterModelUnavailable(msg)) throw err;
+              }
+            }
+            if (!innerReady) continue;
           } else if (provider.name === "groq" && groqKey) {
             client = new OpenAI({ apiKey: groqKey, baseURL: "https://api.groq.com/openai/v1" });
             model = getGroqTextModel();
@@ -304,16 +349,20 @@ export async function streamPlainText(
             client = new OpenAI({ apiKey: xaiKey, baseURL: getXaiBaseUrl() });
             model = getXaiTextModel();
           }
-          if (!client) continue;
-          inner = await streamOpenAiCompatible(
-            client,
-            model,
-            system,
-            user,
-            maxTokens,
-            provider.name,
-          );
+          if (!innerReady) {
+            if (!client) continue;
+            inner = await streamOpenAiCompatible(
+              client,
+              model,
+              system,
+              user,
+              maxTokens,
+              provider.name,
+            );
+          }
         }
+
+        if (!inner) continue;
 
         let providerName = provider.name;
         for await (const event of inner) {
@@ -328,11 +377,12 @@ export async function streamPlainText(
           }
           if (event.type === "chunk") yield event;
         }
-        return;
+        continue;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         failures.push(`${provider.name}: ${msg}`);
-        if (isBillingOrCreditsFailure(msg) || isRequestTooLarge(msg)) break;
+        // Quota/billing on one provider — try the next (e.g. Groq when OpenAI 429).
+        if (isBillingOrCreditsFailure(msg) || isRequestTooLarge(msg)) continue;
       }
     }
     yield {

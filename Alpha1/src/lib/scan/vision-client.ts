@@ -38,7 +38,7 @@ export function getVisionConcurrency(): number {
 /** Compress + orient photos before preview/vision (critical on mobile camera uploads). */
 export function readImageFileAsDataUrl(
   file: File,
-  options?: { binderGrid?: boolean },
+  options?: { binderGrid?: boolean; singleCard?: boolean },
 ): Promise<string> {
   return prepareScanUploadDataUrl(file, options);
 }
@@ -256,7 +256,7 @@ export async function runVisionExtraction(
 ): Promise<unknown[]> {
   const timeoutMs = options.timeoutMs ?? getVisionClientTimeoutMs();
   if (images.length === 0) return [];
-  const visionVerify = options.visionVerify !== false;
+  const visionVerify = options.visionVerify === true;
 
   const concurrency = Math.min(
     options.concurrency ?? getVisionConcurrency(),
@@ -324,7 +324,7 @@ export async function runVisionOnSingleCardCrop(
     timeoutMs: options.timeoutMs ?? getVisionClientTimeoutMs(),
     singleCardCrop: true,
     gradedFocus: options.gradedSlab === true,
-    visionVerify: true,
+    visionVerify: false,
     concurrency: 1,
   });
 }

@@ -5,12 +5,11 @@ import {
   normalizeCatalogToken,
   scoreNameSetNumber,
 } from "@/lib/market/catalog-match-utils";
-import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { effectiveCatalogSearchName } from "@/lib/scan/card-display";
 import { parseCollectorFraction } from "@/lib/scan/collector-fraction";
 import type { CardFranchise } from "@/lib/scan/franchise";
-import { isJapanesePokemonCard, toCatalogCounterpartCard } from "@/lib/scan/japanese-pokemon";
+import { toCatalogCounterpartCard } from "@/lib/scan/japanese-pokemon";
 import { resolvePrintEdition, type PrintEditionId } from "@/lib/scan/print-edition";
 import type { ExtractedCard, IdentityEvidence } from "@/lib/scan/schemas";
 
@@ -65,7 +64,6 @@ export async function searchDbCatalog(
   const name = effectiveCatalogSearchName(catalogCard);
   if (!name) return null;
 
-  const includeJapaneseSets = isJapanesePokemonCard(card);
   const supabase = getSupabaseAdmin();
   const searchBlob = buildCatalogSearchText([
     name,
@@ -88,11 +86,6 @@ export async function searchDbCatalog(
       .limit(24);
     if (!variantKey) {
       query = query.is("raw_json->>catalogVariantKey", null);
-    }
-    if (!includeJapaneseSets) {
-      // Keep Liquid Scan fast: exclude Japanese-localized catalog rows for non-Japanese scans.
-      // (Japanese overlays are handled separately via tcg_catalog_localized_artwork.)
-      query = query.not("set_name", "ilike", "Japanese %");
     }
     return query;
   };
@@ -301,7 +294,9 @@ async function rowsToMatch(
       cardNumber,
       year: row.year,
     });
-    const prices = parseCatalogPriceSnapshot(row.prices_json);
+    const prices = (row.prices_json ?? {}) as {
+      tcgPlayerUrl?: string | null;
+    };
     const requestedSet = catalogSetKey(card.set);
     const hitSet = catalogSetKey(hitSetName);
     const requestedName = normalizeCatalogToken(card.name ?? card.printedName);
@@ -358,7 +353,14 @@ async function rowsToMatch(
       conflicts,
       imageSmallUrl: row.image_small_url,
       imageLargeUrl: row.image_large_url,
-      prices,
+      prices: {
+        tcgPlayerUrl: prices.tcgPlayerUrl ?? null,
+        tcgPlayerUpdatedAt: null,
+        tcgPlayerPrices: [],
+        cardMarketUrl: null,
+        cardMarketUpdatedAt: null,
+        cardMarket: null,
+      },
     };
   });
 

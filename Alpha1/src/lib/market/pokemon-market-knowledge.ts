@@ -4,6 +4,10 @@ import {
   catalogCardReferenceEvidence,
   parseCatalogPriceSnapshot,
 } from "@/lib/market/catalog-reference-evidence";
+import {
+  catalogRawFmvToFairValueBasis,
+  resolveCatalogRawFmv,
+} from "@/lib/market/catalog-raw-fmv";
 import { deriveFairValueResult, type FairValueBasis } from "@/lib/market/fair-value";
 import {
   analyzeMarketEvidence,
@@ -38,6 +42,12 @@ export type PokemonMarketKnowledge = {
   intelligence: MarketIntelligence;
   fairValueUsd: number | null;
   fairValueBasis: FairValueBasis | null;
+  /** Ungraded headline — TCGPlayer first, then PriceCharting, then sold comps. */
+  rawFmvUsd: number | null;
+  rawFmvBasis: FairValueBasis | null;
+  tcgPlayerUsd: number | null;
+  priceChartingUsd: number | null;
+  rawFmvSourceLabel: string;
   institutionalMemory: boolean;
   dataDepth: {
     persistedComps: number;
@@ -109,11 +119,42 @@ export async function buildPokemonMarketKnowledge(
     options?.gradeCard ??
     (catalogCard ? catalogSummaryToExtractedCard(catalogCard) : null);
 
-  const { fairValueUsd, fairValueBasis } = deriveFairValueResult(marketEvidence, {
-    card: gradeCard,
-    gradeCard: gradeCard ?? undefined,
-    targetGradeBucket: gradeCard ? undefined : "raw",
+  const isRawContext = !gradeCard?.grader && !gradeCard?.grade;
+  const rawFmv = resolveCatalogRawFmv({
+    prices: referencePrices,
+    marketEvidence,
+    catalogFinish: catalogCard?.catalogFinish,
+    rarity: catalogCard?.rarity,
+    identity: catalogCard
+      ? {
+          name: catalogCard.name,
+          number: catalogCard.number,
+          set: catalogCard.set?.name ?? catalogCard.set?.code ?? null,
+        }
+      : gradeCard
+        ? {
+            name: gradeCard.name ?? gradeCard.printedName,
+            number: gradeCard.number,
+            set: gradeCard.set,
+          }
+        : null,
   });
+
+  const { fairValueUsd: compFmv, fairValueBasis: compBasis } = deriveFairValueResult(
+    marketEvidence,
+    {
+      card: gradeCard,
+      gradeCard: gradeCard ?? undefined,
+      targetGradeBucket: gradeCard ? undefined : "raw",
+    },
+  );
+
+  const fairValueUsd = isRawContext
+    ? (rawFmv.usd ?? compFmv)
+    : compFmv;
+  const fairValueBasis = isRawContext
+    ? (catalogRawFmvToFairValueBasis(rawFmv.basis) ?? compBasis)
+    : compBasis;
 
   const intelligence = analyzeMarketEvidence(marketEvidence, {
     card: gradeCard,
@@ -144,6 +185,11 @@ export async function buildPokemonMarketKnowledge(
     intelligence,
     fairValueUsd,
     fairValueBasis,
+    rawFmvUsd: rawFmv.usd,
+    rawFmvBasis: catalogRawFmvToFairValueBasis(rawFmv.basis),
+    tcgPlayerUsd: rawFmv.tcgPlayerUsd,
+    priceChartingUsd: rawFmv.priceChartingUsd,
+    rawFmvSourceLabel: rawFmv.sourceLabel,
     institutionalMemory: hasInstitutionalMarketMemory(marketEvidence),
     dataDepth: {
       persistedComps: intel?.comps.length ?? 0,

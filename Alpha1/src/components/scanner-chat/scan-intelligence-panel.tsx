@@ -29,6 +29,8 @@ export function ScanIntelligencePanel({
   selectedSpecimen,
   selectedSpecimenId,
   enrichingSpecimenId,
+  catalogEnriching = false,
+  marketEnriching = false,
   onSelectSpecimen,
   onConfirmCandidate,
   onRejectCandidate,
@@ -58,6 +60,10 @@ export function ScanIntelligencePanel({
   selectedSpecimen: ScanSpecimen | null;
   selectedSpecimenId: string | null;
   enrichingSpecimenId: string | null;
+  /** Bulk catalog phase for the current scan session. */
+  catalogEnriching?: boolean;
+  /** Background market comps load after catalog. */
+  marketEnriching?: boolean;
   onSelectSpecimen: (id: string) => void;
   onConfirmCandidate: (candidate: CatalogCandidate) => void;
   onRejectCandidate: (catalogId: string) => void;
@@ -104,7 +110,9 @@ export function ScanIntelligencePanel({
   const verified = cards.filter((c) => c.status === "verified").length;
   const review = cards.filter((c) => c.status === "review").length;
   const ambiguous = cards.filter((c) => c.status === "ambiguous").length;
-  const enriching = enrichingSpecimenId === selectedSpecimenId;
+  const rowEnriching = enrichingSpecimenId === selectedSpecimenId;
+  const catalogBusy = catalogEnriching || rowEnriching;
+  const marketLoading = marketEnriching || rowEnriching;
   const rescanning = Boolean(
     selectedSpecimenId && rescanningId === selectedSpecimenId,
   );
@@ -204,8 +212,8 @@ export function ScanIntelligencePanel({
                 editable={Boolean(
                   onUpdateSpecimen && onCommitSpecimenEdit && onRescanSpecimen,
                 )}
-                rowBusy={rescanning || enriching}
-                enriching={enriching}
+                rowBusy={rescanning || rowEnriching}
+                enriching={rowEnriching}
                 onUpdate={onUpdateSpecimen}
                 onCommitEdit={onCommitSpecimenEdit}
                 onRescan={onRescanSpecimen}
@@ -220,7 +228,7 @@ export function ScanIntelligencePanel({
               <CatalogMatchPanel
                 variant="liquid"
                 specimen={selectedSpecimen}
-                busy={enriching}
+                busy={catalogBusy}
                 refreshingCandidates={refreshingCatalogCandidates}
                 onConfirmCandidate={onConfirmCandidate}
                 onRejectCandidate={onRejectCandidate}
@@ -229,7 +237,7 @@ export function ScanIntelligencePanel({
                 panelClassName="rounded-xl border border-amber-500/15 bg-black/20 p-2.5"
               />
 
-              {enriching && !marketReady ? (
+              {marketLoading && !marketReady ? (
                 <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-200/90">
                   Loading market comps, listings, and graded sales…
                 </p>
@@ -241,7 +249,7 @@ export function ScanIntelligencePanel({
                 </p>
                 <SpecimenMarketHub
                   specimen={selectedSpecimen}
-                  enriching={enriching}
+                  enriching={marketLoading}
                   excludedKeys={excludedKeys}
                   onToggleExclude={toggleExclude}
                   compsSectionRef={compsSectionRef}

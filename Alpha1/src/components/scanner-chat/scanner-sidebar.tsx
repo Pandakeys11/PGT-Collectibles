@@ -21,7 +21,6 @@ import {
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { BrandLogo } from "@/components/branding/brand-logo";
-import { ScannerThemeStrip } from "@/components/shell/scanner-theme-strip";
 import type { ScanHistoryItem } from "@/lib/scanner-chat/types";
 import { cn } from "@/lib/cn";
 
@@ -321,14 +320,13 @@ function SidebarContent({
           );
         })}
       </nav>
-      <div className="mt-auto border-t border-white/6 p-3">
-        <ScannerThemeStrip compact={themeStripCompact} />
-        {!themeStripCompact ? (
-          <p className="mt-3 px-1 text-[10px] leading-relaxed text-faint lg:hidden">
+      {!themeStripCompact ? (
+        <div className="mt-auto border-t border-white/6 p-3">
+          <p className="px-1 text-[10px] leading-relaxed text-faint lg:hidden">
             Save scans to reopen from Recent scans. Adjust crop when source images are still loaded.
           </p>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

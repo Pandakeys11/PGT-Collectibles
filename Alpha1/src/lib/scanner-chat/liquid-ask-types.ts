@@ -38,6 +38,9 @@ export type LiquidAskHubLink = {
 
 export type LiquidAskDataCoverage = {
   researchTier: "free" | "pro";
+  /** Sold comps pipeline operational (not browse-only). */
+  ebaySoldReady: boolean;
+  /** @deprecated Use ebaySoldReady */
   ebayConfigured: boolean;
   ebaySoldCount: number;
   ebayActiveCount: number;

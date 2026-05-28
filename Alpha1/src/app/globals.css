@@ -8,6 +8,7 @@
 @import "../styles/theme-spectrum.css";
 @import "../styles/typography.css";
 @import "../styles/desk.css";
+@import "../styles/catalog-ambient.css";
 @import "../styles/neo-energy.css";
 
 @layer base {

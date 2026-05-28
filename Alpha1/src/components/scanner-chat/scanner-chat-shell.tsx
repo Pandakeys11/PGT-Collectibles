@@ -307,6 +307,8 @@ export function ScannerChatShell() {
             selectedSpecimen={chat.selectedSpecimen}
             selectedSpecimenId={chat.selectedSpecimenId}
             enrichingSpecimenId={chat.enrichingSpecimenId}
+            catalogEnriching={chat.enriching}
+            marketEnriching={chat.marketEnriching}
             onSelectSpecimen={chat.setSelectedSpecimenId}
             onConfirmCandidate={chat.handleConfirmCandidate}
             onRejectCandidate={chat.handleRejectCandidate}
@@ -370,6 +372,8 @@ export function ScannerChatShell() {
         selectedSpecimen={chat.selectedSpecimen}
         selectedSpecimenId={chat.selectedSpecimenId}
         enrichingSpecimenId={chat.enrichingSpecimenId}
+        catalogEnriching={chat.enriching}
+        marketEnriching={chat.marketEnriching}
         onSelectSpecimen={chat.setSelectedSpecimenId}
         onConfirmCandidate={chat.handleConfirmCandidate}
         onRejectCandidate={chat.handleRejectCandidate}

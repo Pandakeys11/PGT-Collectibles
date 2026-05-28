@@ -17,6 +17,7 @@ import { CatalogCardThumb } from "@/components/scan-panels/catalog-card-thumb";
 import type { CardMatch } from "@/lib/scanner-chat/types";
 import { buildEbayHubForCard } from "@/lib/market/sources";
 import { isJapanesePokemonCard } from "@/lib/scan/japanese-pokemon";
+import { printEditionBlocker } from "@/lib/scan/print-edition";
 import { cn } from "@/lib/cn";
 
 function statusMeta(status: CardMatch["status"]) {
@@ -84,6 +85,10 @@ export function CardMatchResult({
   const japaneseName = card.extractedCard?.japaneseName ?? card.extractedCard?.printedName;
   const counterpartSet = card.extractedCard?.setNameEnglish;
   const marketConfidence = card.extractedCard?.pricingConfidence;
+  const needsPrintRunConfirm =
+    card.extractedCard &&
+    !card.printVersion &&
+    printEditionBlocker(card.extractedCard, card.graded ? "graded" : "raw") != null;
 
   return (
     <motion.div
@@ -185,6 +190,10 @@ export function CardMatchResult({
             {card.printVersion ? (
               <span className="rounded-md border border-violet-500/25 bg-violet-500/12 px-1.5 py-0.5 text-violet-200/95">
                 {card.printVersion}
+              </span>
+            ) : needsPrintRunConfirm ? (
+              <span className="rounded-md border border-amber-500/30 bg-amber-500/12 px-1.5 py-0.5 text-amber-100">
+                Confirm print run
               </span>
             ) : null}
             {card.printPromo && card.printPromo !== card.printVersion ? (

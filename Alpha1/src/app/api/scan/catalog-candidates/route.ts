@@ -29,6 +29,7 @@ async function catalogPayload(
     card,
     catalog,
     fallbackImageUrl,
+    fastPath: true,
   });
 
   return {

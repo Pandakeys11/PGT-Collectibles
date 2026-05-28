@@ -1,5 +1,6 @@
 /** In-memory server caches (enrich, Pokédex API responses). Cleared on scan reset / Clear session. */
 
+import { clearAiResearchCooldowns } from "@/lib/ai/research-budget";
 import { clearProviderCooldowns } from "@/lib/ai/vision-providers";
 
 const clearHandlers = new Set<() => void>();
@@ -19,3 +20,4 @@ export function flushAllRuntimeCaches(): void {
 }
 
 registerRuntimeCacheClear(clearProviderCooldowns);
+registerRuntimeCacheClear(clearAiResearchCooldowns);

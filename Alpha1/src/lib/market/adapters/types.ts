@@ -5,7 +5,8 @@ export type ApiAdapterId =
   | "ebay_browse"
   | "ebay_sold_scrape"
   | "pricecharting"
-  | "pokemon_tcg_prices";
+  | "pokemon_tcg_prices"
+  | "poketrace";
 
 export type ApiAdapterResult = {
   adapter: ApiAdapterId;

@@ -2,8 +2,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import {
   getGeminiApiKey,
+  isGeminiServiceEnabled,
   getGeminiVisionModel,
-  getGeminiVisionVerifyModel,
   getGroqApiKey,
   getGroqVisionModel,
   getOpenAIApiKey,
@@ -317,7 +317,7 @@ export function isVisionProviderConfigured(id: VisionProviderId): boolean {
     case "groq":
       return Boolean(getGroqApiKey());
     case "gemini":
-      return Boolean(getGeminiApiKey());
+      return isGeminiServiceEnabled();
     case "openrouter":
       return Boolean(getOpenRouterApiKey());
     case "openai":
@@ -395,7 +395,6 @@ export async function runVisionProviderOnce(
   const runPass = async (
     textPrompt: string,
     compact: boolean,
-    dense = false,
   ): Promise<VisionRunResult> => {
     const { text, finishReason } =
       id === "gemini" && geminiModelOverride
@@ -421,7 +420,7 @@ export async function runVisionProviderOnce(
     const truncated = finishReason === "length" || result.salvaged;
     if (truncated && allowCompact && !compact) {
       if (densePrompt) {
-        const denseResult = await runPass(densePrompt, true, true);
+        const denseResult = await runPass(densePrompt, true);
         if (denseResult.cards.length >= result.cards.length) return denseResult;
       }
       const compactResult = await runPass(compactPrompt, true);
@@ -436,7 +435,7 @@ export async function runVisionProviderOnce(
     if (!allowCompact || !isJsonParseFailure(err)) throw err;
     if (densePrompt) {
       try {
-        return await runPass(densePrompt, true, true);
+        return await runPass(densePrompt, true);
       } catch {
         // fall through to plain compact
       }

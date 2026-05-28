@@ -1,8 +1,15 @@
 import { getApifyApiToken } from "@/lib/market/apify-psa-pop";
-import { buildMarketSearchIdentity } from "@/lib/market/market-search-identity";
+import {
+  isApifyEbaySoldBlocked,
+  markApifyEbaySoldBlocked,
+  parseApifyEbaySoldBlockFromBody,
+} from "@/lib/market/provider-health";
+import { enrichEbaySoldEvidence } from "@/lib/market/ebay-evidence-enrich";
+import { filterEbaySoldForCard } from "@/lib/market/ebay-evidence-match";
 import {
   cleanEbaySoldQuery,
   ebaySearchCategoryIdForCard,
+  ebaySoldQueryCandidates,
 } from "@/lib/market/ebay-sold-common";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 
@@ -19,10 +26,15 @@ export function getApifyEbaySoldActorSlug(): string {
   return raw;
 }
 
-/** Apify eBay sold actor (production sold comps). Set `EBAY_SOLD_APIFY=0` to skip. */
-export function isApifyEbaySoldConfigured(): boolean {
+/** Token present (may still be quota-blocked at runtime). */
+export function hasApifyEbaySoldCredentials(): boolean {
   if (process.env.EBAY_SOLD_APIFY === "0") return false;
   return Boolean(getApifyApiToken());
+}
+
+/** Apify eBay sold actor operational for this process. Set `EBAY_SOLD_APIFY=0` to skip. */
+export function isApifyEbaySoldConfigured(): boolean {
+  return hasApifyEbaySoldCredentials() && !isApifyEbaySoldBlocked();
 }
 
 function inferSlabFromTitle(title: string): string | null {
@@ -37,12 +49,7 @@ function inferSlabFromTitle(title: string): string | null {
 }
 
 function parseSoldPriceUsd(row: Record<string, unknown>): number | null {
-  const candidates = [
-    row.totalPrice,
-    row.soldPrice,
-    row.price,
-    row.finalPrice,
-  ];
+  const candidates = [row.totalPrice, row.soldPrice, row.price, row.finalPrice];
   for (const raw of candidates) {
     if (typeof raw === "number" && Number.isFinite(raw) && raw >= 1 && raw < 250_000) {
       return raw;
@@ -83,7 +90,7 @@ function apifyRowToEvidence(row: Record<string, unknown>): MarketEvidence | null
   const priceUsd = parseSoldPriceUsd(row);
   if (priceUsd == null) return null;
 
-  return {
+  return enrichEbaySoldEvidence({
     kind: "sold",
     title: title.slice(0, 240),
     priceUsd,
@@ -92,27 +99,39 @@ function apifyRowToEvidence(row: Record<string, unknown>): MarketEvidence | null
     source: "eBay",
     slab: inferSlabFromTitle(title),
     confidence: 0.88,
-  };
+    saleType: "auction",
+  });
 }
 
-/**
- * Runs Apify eBay sold listings actor (sync dataset) for one keyword.
- * Uses the same search identity as hub links and Liquid Scan FMV.
- */
-export async function fetchApifyEbaySoldForCard(card: ExtractedCard): Promise<MarketEvidence[]> {
-  const token = getApifyApiToken();
-  if (!token || !isApifyEbaySoldConfigured()) return [];
+function dedupeSold(items: MarketEvidence[]): MarketEvidence[] {
+  const seen = new Set<string>();
+  const out: MarketEvidence[] = [];
+  for (const it of items) {
+    const key = `${it.url ?? ""}|${it.title}|${it.priceUsd ?? ""}|${it.observedAt ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(it);
+  }
+  return out;
+}
 
-  const identity = buildMarketSearchIdentity(card);
-  const keyword = cleanEbaySoldQuery(identity.ebayPrimary);
-  if (keyword.length < 3) return [];
+async function fetchApifyEbaySoldForKeyword(
+  card: ExtractedCard,
+  keyword: string,
+): Promise<MarketEvidence[]> {
+  if (!isApifyEbaySoldConfigured()) return [];
+  const token = getApifyApiToken();
+  if (!token) return [];
+
+  const query = cleanEbaySoldQuery(keyword);
+  if (query.length < 3) return [];
 
   const categoryId = ebaySearchCategoryIdForCard(card);
   const count = Math.min(Math.max(Number(process.env.APIFY_EBAY_SOLD_COUNT ?? 40) || 40, 8), 100);
   const daysToScrape = Math.min(Math.max(Number(process.env.APIFY_EBAY_SOLD_DAYS ?? 90) || 90, 7), 120);
 
   const input: Record<string, unknown> = {
-    keywords: [keyword],
+    keywords: [query],
     daysToScrape,
     count,
     ebaySite: process.env.APIFY_EBAY_SOLD_SITE?.trim() || "ebay.com",
@@ -132,41 +151,61 @@ export async function fetchApifyEbaySoldForCard(card: ExtractedCard): Promise<Ma
   );
   const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?timeout=${timeoutSec}`;
 
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(input),
-      cache: "no-store",
-      signal: AbortSignal.timeout((timeoutSec + 20) * 1000),
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      apifyEbayDebugLog(`HTTP ${res.status}`, errText.slice(0, 400));
-      return [];
-    }
-
-    const items = (await res.json()) as unknown;
-    if (!Array.isArray(items) || items.length === 0) {
-      apifyEbayDebugLog("empty dataset");
-      return [];
-    }
-
-    const evidence: MarketEvidence[] = [];
-    for (const row of items) {
-      if (!row || typeof row !== "object") continue;
-      const ev = apifyRowToEvidence(row as Record<string, unknown>);
-      if (ev) evidence.push(ev);
-    }
-    return evidence;
-  } catch (err) {
-    apifyEbayDebugLog(
-      "request failed",
-      err instanceof Error ? err.message : String(err),
-    );
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+    cache: "no-store",
+    signal: AbortSignal.timeout((timeoutSec + 20) * 1000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    apifyEbayDebugLog(`HTTP ${res.status} keyword=${query}`, errText.slice(0, 400));
+    const blockReason = parseApifyEbaySoldBlockFromBody(res.status, errText);
+    if (blockReason) markApifyEbaySoldBlocked(blockReason);
     return [];
   }
+
+  const items = (await res.json()) as unknown;
+  if (!Array.isArray(items) || items.length === 0) {
+    apifyEbayDebugLog(`empty dataset keyword=${query}`);
+    return [];
+  }
+
+  const evidence: MarketEvidence[] = [];
+  for (const row of items) {
+    if (!row || typeof row !== "object") continue;
+    const ev = apifyRowToEvidence(row as Record<string, unknown>);
+    if (ev) evidence.push(ev);
+  }
+  return evidence;
+}
+
+/**
+ * Runs Apify eBay sold listings actor for primary + fallback keyword variants.
+ */
+export async function fetchApifyEbaySoldForCard(card: ExtractedCard): Promise<MarketEvidence[]> {
+  if (!isApifyEbaySoldConfigured()) return [];
+
+  const candidates = ebaySoldQueryCandidates(card).slice(0, 4);
+  const merged: MarketEvidence[] = [];
+
+  for (const keyword of candidates) {
+    try {
+      const rows = await fetchApifyEbaySoldForKeyword(card, keyword);
+      if (rows.length) merged.push(...rows);
+      const filtered = filterEbaySoldForCard(card, dedupeSold(merged));
+      if (filtered.filter((r) => r.kind === "sold").length >= 8) break;
+    } catch (err) {
+      apifyEbayDebugLog(
+        `request failed keyword=${keyword}`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  return filterEbaySoldForCard(card, dedupeSold(merged));
 }

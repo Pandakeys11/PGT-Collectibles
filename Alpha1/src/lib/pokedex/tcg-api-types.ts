@@ -56,6 +56,8 @@ export type TcgCardSummary = {
   catalogVariantKey?: string | null;
   catalogVariantLabel?: string | null;
   sourceCatalogId?: string | null;
+  /** Parsed `tcg_catalog_cards.prices_json` when loaded from master DB. */
+  catalogPrices?: import("@/lib/market/pokemon-catalog").CatalogPriceSnapshot;
 };
 
 /** Full card payload from `GET /v2/cards/:id` (pricing fields used in catalog detail). */

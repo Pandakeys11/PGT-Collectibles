@@ -255,8 +255,8 @@ export function ScannerComposer({
               type="button"
               title={
                 speedOn
-                  ? "Speed on — balanced parallel scan + registry on slabs"
-                  : "Speed off — slower pacing, deeper precision crops, registry on slabs only"
+                  ? "Speed on — higher parallel vision/catalog/market"
+                  : "Speed off — gentler pacing; verify only on Deep Match or weak extraction"
               }
               onClick={() => onSpeedOnChange(!speedOn)}
               disabled={isBusy}

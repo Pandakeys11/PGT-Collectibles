@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { getCurrentAppUser } from "@/lib/auth/app-user";
 import { isProTierPlan } from "@/lib/auth/plans";
-import { streamPlainText } from "@/lib/ai/text";
+import { completePlainText, streamPlainText } from "@/lib/ai/text";
 import {
   getGroqTextMaxTokensReport,
   getLiquidAskMaxTokens,
@@ -25,11 +25,13 @@ import {
 } from "@/lib/scanner-chat/liquid-ask-research-tier";
 import { getMarketCapabilities, marketCapabilitiesSummary } from "@/lib/market/market-capabilities";
 import { buildLiquidChatPayload } from "@/lib/scanner-chat/liquid-chat-context";
+import { buildLocalLiquidScanReport } from "@/lib/scanner-chat/local-liquid-scan-report";
 import {
   buildLiquidScanReportUserPrompt,
   buildScanReportResearchQuery,
   LIQUID_SCAN_REPORT_SYSTEM,
 } from "@/lib/scanner-chat/liquid-scan-report";
+import type { ScanSummary } from "@/lib/scanner-chat/types";
 import { deriveLiquidAskConfidenceHints } from "@/lib/scanner-chat/liquid-ask-confidence";
 import {
   liquidAskResearchForLlm,
@@ -179,6 +181,7 @@ export async function POST(req: NextRequest) {
             contexts,
             focusSpecimenId: isScanReport ? null : focusSpecimenId,
             proTier,
+            scanReport: isScanReport,
           });
         } catch (err) {
           console.error("[liquid-chat] research failed", err);
@@ -210,9 +213,10 @@ export async function POST(req: NextRequest) {
         let user: string;
         let hasScanData: boolean;
         let marketAsOf: string | null;
+        let scanReportSummary: ScanSummary | null = null;
 
         if (isScanReport) {
-          const summary = {
+          scanReportSummary = {
             totalDetected: contexts.length,
             highConfidence: contexts.filter(
               (c) => c.catalogIdentityStatus === "confirmed",
@@ -237,7 +241,7 @@ export async function POST(req: NextRequest) {
           system = LIQUID_SCAN_REPORT_SYSTEM;
           user = buildLiquidScanReportUserPrompt({
             contexts,
-            summary,
+            summary: scanReportSummary,
             researchJson,
           });
           hasScanData = contexts.length > 0;
@@ -258,14 +262,20 @@ export async function POST(req: NextRequest) {
           marketAsOf = payload.marketAsOf;
         }
 
+        const reportMaxTokens = isScanReport
+          ? getGroqTextMaxTokensReport()
+          : getLiquidAskMaxTokens();
+
         const textStream = await streamPlainText(system, user, {
-          maxTokens: isScanReport
-            ? getGroqTextMaxTokensReport()
-            : getLiquidAskMaxTokens(),
+          maxTokens: reportMaxTokens,
         });
         let provider = "unknown";
+        let streamedText = "";
+        let streamFailed: { message: string; cause?: string } | null = null;
+
         for await (const event of textStream) {
           if (event.type === "chunk") {
+            streamedText += event.text;
             send({ type: "text", text: event.text });
           } else if (event.type === "done") {
             provider = event.provider;
@@ -292,10 +302,81 @@ export async function POST(req: NextRequest) {
               confidenceHints,
             });
           } else if (event.type === "error") {
+            streamFailed = { message: event.message, cause: event.cause };
+            break;
+          }
+        }
+
+        if (streamFailed) {
+          send({
+            type: "status",
+            phase: "answer",
+            message: "Retrying report with alternate text provider…",
+          });
+          const fallback = await completePlainText(system, user, {
+            maxTokens: reportMaxTokens,
+          });
+          if (fallback.ok && fallback.text.trim()) {
+            if (!streamedText.trim()) {
+              send({ type: "text", text: fallback.text });
+            }
+            provider = fallback.provider;
+            const focusCtx =
+              focusSpecimenId != null
+                ? contexts.find((c) => c.specimenId === focusSpecimenId) ?? null
+                : null;
+            const confidenceHints = !isScanReport
+              ? deriveLiquidAskConfidenceHints({
+                  research,
+                  focus: focusCtx,
+                  contextCount: contexts.length,
+                })
+              : null;
+            send({
+              type: "done",
+              provider,
+              hasScanData,
+              marketAsOf: research?.researchedAt ?? marketAsOf,
+              researchedAt: research?.researchedAt ?? null,
+              todayUtc: research?.todayUtc ?? null,
+              proTier,
+              research,
+              confidenceHints,
+            });
+          } else if (isScanReport && scanReportSummary && contexts.length > 0) {
+            send({
+              type: "status",
+              phase: "answer",
+              message: "Building desk report from session enrich data…",
+            });
+            const localReport = buildLocalLiquidScanReport({
+              contexts,
+              summary: scanReportSummary,
+              research,
+            });
+            if (!streamedText.trim()) {
+              send({ type: "text", text: localReport });
+            }
+            provider = "local-desk";
+            send({
+              type: "done",
+              provider,
+              hasScanData,
+              marketAsOf: research?.researchedAt ?? marketAsOf,
+              researchedAt: research?.researchedAt ?? null,
+              todayUtc: research?.todayUtc ?? null,
+              proTier,
+              research,
+              confidenceHints: null,
+            });
+          } else {
             send({
               type: "error",
-              message: event.message,
-              detail: event.cause,
+              message: streamFailed.message,
+              detail:
+                fallback.ok === false && fallback.cause
+                  ? `${streamFailed.cause ?? ""} | fallback: ${fallback.cause}`
+                  : streamFailed.cause,
             });
             controller.close();
             return;

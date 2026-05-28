@@ -4,18 +4,19 @@ import type {
   SetInsightPriceCard,
   SetInsightSealedProduct,
 } from "@/lib/catalog/set-insight-payload";
-import { refreshPokemonMarketKnowledge } from "@/lib/market/refresh-pokemon-market-knowledge";
-import { readCatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
+import {
+  isSetInsightAiConfigured,
+  researchSetInsightWithAi,
+} from "@/lib/catalog/set-insight-ai";
 import {
   groqRawToCards,
   groqRawToMomentum,
   groqRawToPromos,
   groqRawToSealed,
-  isSetInsightGroqConfigured,
-  researchSetInsightWithGroq,
 } from "@/lib/catalog/set-insight-groq";
 import {
   cardInsightRow,
+  enrichCardsWithLiveTcgPrices,
   promoCardsInSet,
   rollupSetInsightCards,
   topMomentumCards,
@@ -97,85 +98,6 @@ function catalogRowsToInsight(cards: SetInsightCardSource[]): {
   };
 }
 
-function bestSoldHighUsd(intel: Awaited<ReturnType<typeof readCatalogMarketIntel>>): number | null {
-  if (!intel?.comps?.length) return null;
-  let best: number | null = null;
-  for (const row of intel.comps) {
-    if (row.kind !== "sold") continue;
-    const n = row.priceUsd;
-    if (n == null || !Number.isFinite(n) || n <= 0) continue;
-    if (best == null || n > best) best = n;
-  }
-  return best;
-}
-
-async function attachSoldHighs(args: {
-  setId: string;
-  cards: SetInsightCardSource[];
-  seed: SetInsightPriceCard[];
-}): Promise<SetInsightPriceCard[]> {
-  // Seed is currently derived from catalog price snapshots (TCGPlayer market).
-  // We upgrade it using stored + (optionally) live-ingested sold highs.
-  const seedById = new Map<string, SetInsightPriceCard>();
-  for (const row of args.seed) {
-    const id = row.catalogId?.trim();
-    if (id) seedById.set(id, row);
-  }
-
-  const candidateIds = args.seed
-    .map((r) => r.catalogId ?? "")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .slice(0, 14);
-
-  if (candidateIds.length === 0) return args.seed;
-
-  const intelById = new Map<string, Awaited<ReturnType<typeof readCatalogMarketIntel>>>();
-  await Promise.all(
-    candidateIds.map(async (id) => {
-      const intel = await readCatalogMarketIntel(id, { compLimit: 60 });
-      intelById.set(id, intel);
-    }),
-  );
-
-  const hits = candidateIds
-    .map((id) => ({ id, soldHigh: bestSoldHighUsd(intelById.get(id) ?? null) }))
-    .filter((row) => row.soldHigh != null);
-
-  // If we have almost no sold highs yet, run a small live refresh batch for the top candidates.
-  if (hits.length < 3) {
-    const refreshIds = candidateIds.slice(0, 6);
-    await Promise.allSettled(
-      refreshIds.map((id) => refreshPokemonMarketKnowledge(id, { force: false })),
-    );
-    await Promise.all(
-      refreshIds.map(async (id) => {
-        const intel = await readCatalogMarketIntel(id, { compLimit: 80 });
-        intelById.set(id, intel);
-      }),
-    );
-  }
-
-  const enriched = args.seed.map((row) => {
-    const id = row.catalogId?.trim();
-    if (!id) return row;
-    const intel = intelById.get(id) ?? null;
-    const soldHigh = bestSoldHighUsd(intel);
-    if (soldHigh == null) return row;
-    return {
-      ...row,
-      priceUsd: soldHigh,
-      priceLabel: "Sold high (PGT memory + live)",
-    } satisfies SetInsightPriceCard;
-  });
-
-  // Re-sort by best available price.
-  return enriched
-    .slice()
-    .sort((a, b) => (b.priceUsd ?? 0) - (a.priceUsd ?? 0))
-    .slice(0, 10);
-}
-
 function mergeCardLists(
   catalog: SetInsightPriceCard[],
   groq: SetInsightPriceCard[],
@@ -201,14 +123,40 @@ async function loadSetCards(setId: string): Promise<{
     pageSize: 3000,
     includeVariants: false,
   });
-  if (db?.data.length) {
-    return { cards: db.data, tcgCards: [] };
+  let cards: SetInsightCardSource[] = db?.data.length ? db.data : [];
+  let tcgCards: TcgCardSummary[] = [];
+
+  const pricedBeforeLive = cards.length ? rollupSetInsightCards(cards).pricedSlots : 0;
+  const needsLivePrices =
+    cards.length === 0 ||
+    pricedBeforeLive === 0 ||
+    pricedBeforeLive / cards.length < divisorForLivePriceFetch(cards.length);
+
+  if (needsLivePrices) {
+    try {
+      tcgCards = await fetchAllCardsForSet({
+        setId,
+        select: CATALOG_SET_PRICING_SELECT,
+      });
+    } catch {
+      tcgCards = [];
+    }
   }
-  const tcgCards = await fetchAllCardsForSet({
-    setId,
-    select: CATALOG_SET_PRICING_SELECT,
-  });
-  return { cards: tcgCards, tcgCards };
+
+  if (!cards.length && tcgCards.length) {
+    cards = tcgCards;
+  } else if (cards.length && tcgCards.length) {
+    cards = enrichCardsWithLiveTcgPrices(cards, tcgCards);
+  }
+
+  return { cards, tcgCards };
+}
+
+/** Fetch live TCG API prices when catalog snapshots are sparse. */
+function divisorForLivePriceFetch(cardCount: number): number {
+  if (cardCount <= 30) return 0.15;
+  if (cardCount <= 120) return 0.08;
+  return 0.03;
 }
 
 function sealedFromOverlay(setName: string, products: SealedProductSpec[]): SetInsightSealedProduct[] {
@@ -228,21 +176,24 @@ function sealedFromOverlay(setName: string, products: SealedProductSpec[]): SetI
   });
 }
 
-export async function buildCatalogSetInsight(setId: string): Promise<CatalogSetInsightPayload> {
+export async function buildCatalogSetInsight(
+  setId: string,
+  options?: { refreshAi?: boolean },
+): Promise<CatalogSetInsightPayload> {
   const refreshedAt = new Date().toISOString();
   const set = await fetchSetById(setId);
   const setName = set?.name ?? setId;
   const releaseDate = set?.releaseDate ?? null;
 
   const { cards, tcgCards } = await loadSetCards(setId);
-  const rollupSource = tcgCards.length ? tcgCards : cards;
+  const insightRollup = rollupSetInsightCards(cards);
   const tcgRollup =
-    tcgCards.length > 0
+    tcgCards.length > 0 && insightRollup.pricedSlots === 0
       ? rollupCatalogSetPricing(tcgCards)
       : {
-          cardCount: cards.length,
-          tcgPlayerSumUsd: rollupSetInsightCards(cards).tcgPlayerSumUsd,
-          tcgPlayerPricedSlots: rollupSetInsightCards(cards).pricedSlots,
+          cardCount: insightRollup.cardCount,
+          tcgPlayerSumUsd: insightRollup.tcgPlayerSumUsd,
+          tcgPlayerPricedSlots: insightRollup.pricedSlots,
           cardmarketSumEur: 0,
           cardmarketPricedSlots: 0,
         };
@@ -278,19 +229,31 @@ export async function buildCatalogSetInsight(setId: string): Promise<CatalogSetI
     references.push({ label: "Bulbapedia", url: overlay.bulbapediaUrl });
   }
 
-  if (isSetInsightGroqConfigured()) {
-    const groq = await researchSetInsightWithGroq({
-      setId,
-      setName,
-      releaseDate,
-      cardCount: tcgRollup.cardCount,
-      catalogHints: catalogHints.length ? catalogHints : cards.slice(0, 15).map((c) => c.name),
-      pricedSlots: tcgRollup.tcgPlayerPricedSlots,
-    });
+  const aiEnabled =
+    process.env.CATALOG_SET_INSIGHT_DISABLE_GROQ !== "1" && isSetInsightAiConfigured();
+
+  if (aiEnabled) {
+    const groq = await researchSetInsightWithAi(
+      {
+        setId,
+        setName,
+        releaseDate,
+        cardCount: tcgRollup.cardCount,
+        catalogHints: catalogHints.length ? catalogHints : cards.slice(0, 15).map((c) => c.name),
+        pricedSlots: tcgRollup.tcgPlayerPricedSlots,
+        pricedPct,
+        topValueCount: catalogInsight.topValue.length,
+        momentumCount: catalogInsight.momentum.length,
+      },
+      { forceAi: options?.refreshAi },
+    );
 
     if (groq) {
-      model = groq.model;
-      source = catalogInsight.topValue.length ? "hybrid" : "groq";
+      model = `${groq.provider}:${groq.model}`;
+      source =
+        catalogInsight.topValue.length || groq.provider === "gemini"
+          ? "hybrid"
+          : "groq";
       summary = groq.raw.summary?.trim() ?? null;
       marketPulse = groq.raw.marketPulse?.trim() ?? null;
       chaseNotes = groq.raw.chaseNotes?.trim() ?? chaseNotes;
@@ -316,21 +279,25 @@ export async function buildCatalogSetInsight(setId: string): Promise<CatalogSetI
     }
   }
 
-  // Final pass: prefer real sold highs (stored + live refresh) for "highest value" cards.
-  // This is where chase cards should show up even when TCGPlayer market prices are noisy.
-  topValue = await attachSoldHighs({ setId, cards, seed: topValue });
-
   if (!summary && topValue.length) {
     const lead = topValue[0];
     summary = `${setName}: top catalog signal is ${lead.name}${lead.priceUsd != null ? ` around $${Math.round(lead.priceUsd)}` : ""} (${lead.priceLabel ?? "reference"}).`;
   }
 
+  if (!summary && tcgRollup.tcgPlayerPricedSlots > 0) {
+    summary = `${setName}: ${tcgRollup.tcgPlayerPricedSlots} of ${tcgRollup.cardCount} cards have TCGPlayer prices in catalog (${pricedPct}% coverage).`;
+  } else if (!summary && cards.length > 0) {
+    summary = `${setName}: ${cards.length} cards in catalog — run catalog sync to load TCGPlayer prices, or add GROQ_API_KEY for live set research.`;
+  }
+
   const ready =
-    Boolean(summary) ||
-    topValue.length > 0 ||
-    momentum.length > 0 ||
-    sealedProducts.length > 0 ||
-    Boolean(chaseNotes);
+    cards.length > 0 &&
+    (tcgRollup.tcgPlayerPricedSlots > 0 ||
+      Boolean(summary) ||
+      topValue.length > 0 ||
+      momentum.length > 0 ||
+      sealedProducts.length > 0 ||
+      Boolean(chaseNotes));
 
   return {
     ready,

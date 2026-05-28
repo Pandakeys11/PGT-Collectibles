@@ -3,7 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fraunces } from "next/font/google";
 import localFont from "next/font/local";
-import { MotionProvider } from "@/components/motion/motion-provider";
+import { AppProviders } from "@/components/providers/app-providers";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme-boot";
 import "./globals.css";
 
@@ -55,7 +55,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} font-sans antialiased`}
       >
         <ClerkProvider>
-          <MotionProvider>{children}</MotionProvider>
+          <AppProviders>{children}</AppProviders>
         </ClerkProvider>
         <Analytics />
       </body>

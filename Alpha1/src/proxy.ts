@@ -33,18 +33,6 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
-  // Dev/tunnel ergonomics: allow enrich without Clerk session.
-  // Crop-rescan calls POST /api/scan/enrich from the client; on tunnels/mobile the Clerk
-  // session cookie can be missing/blocked, which manifests as a confusing HTML 404.
-  // Production remains protected by the route matcher below.
-  if (
-    process.env.NODE_ENV !== "production" &&
-    (request.nextUrl.pathname.startsWith("/api/scan/enrich") ||
-      request.nextUrl.pathname.startsWith("/api/catalog/set-insight"))
-  ) {
-    return NextResponse.next();
-  }
-
   if (
     isLegacyScannerRedirectDisabled() &&
     isLegacyScannerRequestPath(request.nextUrl.pathname)

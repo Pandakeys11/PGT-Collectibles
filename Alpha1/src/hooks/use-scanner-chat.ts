@@ -84,13 +84,16 @@ export function useScannerChat() {
     setSpeedOn(on);
   }, []);
 
-  const session = useScanSession({ speedOn });
+  const [scanMode, setScanMode] = useState<ScanMode>("binder");
+
+  const session = useScanSession({ speedOn, scanMode });
   const {
     setLaneMode,
     slots,
     specimens,
     scanning,
     enriching,
+    marketEnriching,
     progress,
     error,
     scanLimit,
@@ -120,7 +123,6 @@ export function useScannerChat() {
     ingestLiveCameraScan,
   } = session;
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_ASSISTANT]);
-  const [scanMode, setScanMode] = useState<ScanMode>("binder");
   const [prompt, setPrompt] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [resultsDrawerOpen, setResultsDrawerOpen] = useState(false);
@@ -250,7 +252,7 @@ export function useScannerChat() {
 
   useEffect(() => {
     if (!activeScanId) return;
-    if (!scanning && !enriching) return;
+    if (!scanning && !enriching && !marketEnriching) return;
     if (specimens.length === 0) return;
 
     const resultCards = specimens.map((s, i) => specimenToCardMatch(s, i));
@@ -259,7 +261,11 @@ export function useScannerChat() {
       progress ??
       (scanning
         ? `Extracting cards from your images…`
-        : `Extracted ${resultCards.length} card${resultCards.length === 1 ? "" : "s"} — matching catalog and market…`);
+        : enriching
+          ? `Extracted ${resultCards.length} card${resultCards.length === 1 ? "" : "s"} — matching catalog…`
+          : marketEnriching
+            ? `Catalog matched — loading market for ${resultCards.length} card${resultCards.length === 1 ? "" : "s"}…`
+            : `Extracted ${resultCards.length} card${resultCards.length === 1 ? "" : "s"} — matching catalog and market…`);
 
     setMessages((prev) => {
       const pending = prev.find((m) => m.id === "pending-result");
@@ -276,7 +282,7 @@ export function useScannerChat() {
           : m,
       );
     });
-  }, [activeScanId, scanning, enriching, specimens, progress]);
+  }, [activeScanId, scanning, enriching, marketEnriching, specimens, progress]);
 
   useEffect(() => {
     if (!activeScanId || finalizedScanRef.current === activeScanId) return;
@@ -441,7 +447,7 @@ export function useScannerChat() {
     if (!isScanAutoReportEnabled()) return;
     if (!shouldAutoSessionReport()) return;
     if (!activeScanId || reportScanRef.current === activeScanId) return;
-    if (scanning || enriching) return;
+    if (scanning || enriching || marketEnriching) return;
     if (specimens.length === 0 || error) return;
     if (activeScanId.startsWith("saved:")) return;
 
@@ -450,6 +456,7 @@ export function useScannerChat() {
     activeScanId,
     scanning,
     enriching,
+    marketEnriching,
     specimens.length,
     error,
     generateScanReport,
@@ -1161,6 +1168,7 @@ export function useScannerChat() {
     isBusy,
     scanning,
     enriching,
+    marketEnriching,
     progress,
     error,
     scanLimit,

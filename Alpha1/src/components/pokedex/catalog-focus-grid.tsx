@@ -1,16 +1,20 @@
 "use client";
 
 import { useCallback, useState, type ReactNode } from "react";
+import { CATALOG_CARD_GRID_DEFAULT } from "@/lib/catalog/catalog-grid-layout";
 import { cn } from "@/lib/cn";
 
 export function CatalogFocusGrid<T>({
   items,
   getKey,
+  gridClassName = CATALOG_CARD_GRID_DEFAULT,
   className,
   renderItem,
 }: {
   items: T[];
   getKey: (item: T) => string;
+  /** Replaces default grid column template (e.g. CATALOG_CARD_GRID_4X4). */
+  gridClassName?: string;
   className?: string;
   renderItem: (item: T, state: { focused: boolean; dimmed: boolean }) => ReactNode;
 }) {
@@ -20,10 +24,7 @@ export function CatalogFocusGrid<T>({
 
   return (
     <div
-      className={cn(
-        "grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5",
-        className,
-      )}
+      className={cn("sc-catalog-card-grid grid", gridClassName, className)}
       onMouseLeave={clearFocus}
     >
       {items.map((item) => {
@@ -36,8 +37,8 @@ export function CatalogFocusGrid<T>({
             key={key}
             className={cn(
               "transition-[transform,opacity,filter] duration-300 ease-out motion-reduce:transition-none",
-              dimmed && "scale-[0.97] opacity-55 blur-[1.5px] motion-reduce:opacity-80 motion-reduce:blur-none",
-              focused && "relative z-[1] scale-[1.02] motion-reduce:scale-100",
+              dimmed && "scale-[0.98] opacity-60 blur-[0.5px] motion-reduce:opacity-85 motion-reduce:blur-none",
+              focused && "relative z-[1] scale-[1.015] motion-reduce:scale-100",
             )}
             onMouseEnter={() => setFocusedKey(key)}
             onFocus={() => setFocusedKey(key)}
