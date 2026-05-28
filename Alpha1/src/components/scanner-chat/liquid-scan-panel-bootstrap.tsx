@@ -11,12 +11,14 @@ export function LiquidScanPanelBootstrap({
   onOpenCompanion,
   onOpenCalculator,
   onOpenLiveMarket,
+  onOpenEbayEnding,
   onCatalogPrefill,
 }: {
   onOpenCatalog: () => void;
   onOpenCompanion: () => void;
   onOpenCalculator: () => void;
   onOpenLiveMarket: () => void;
+  onOpenEbayEnding: () => void;
   onCatalogPrefill: (prefill: CatalogScanPrefill) => void;
 }) {
   const searchParams = useSearchParams();
@@ -42,6 +44,7 @@ export function LiquidScanPanelBootstrap({
     else if (panel === "companion") onOpenCompanion();
     else if (panel === "calculator") onOpenCalculator();
     else if (panel === "live-market" || panel === "market") onOpenLiveMarket();
+    else if (panel === "ebay-ending" || panel === "auctions") onOpenEbayEnding();
     router.replace(LIQUID_SCAN_PATH, { scroll: false });
   }, [
     searchParams,
@@ -50,6 +53,7 @@ export function LiquidScanPanelBootstrap({
     onOpenCompanion,
     onOpenCalculator,
     onOpenLiveMarket,
+    onOpenEbayEnding,
     onCatalogPrefill,
   ]);
 

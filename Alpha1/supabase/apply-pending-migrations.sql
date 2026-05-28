@@ -1,6 +1,6 @@
 -- AUTO-GENERATED — all migrations bundle
--- Run once via: npm run db:apply
--- Regenerate: node scripts/build-pending-sql.mjs
+-- Run once via: npm run db:apply:bundle
+-- Regenerate: npm run db:build-pending
 
 -- ========== 202605180001_auth_profiles_usage.sql ==========
 create extension if not exists pgcrypto;
@@ -1591,4 +1591,368 @@ on conflict (id) do update set
 
 comment on table public.tcg_catalog_cards is 'Cached catalog rows keyed by franchise + external catalog_id';
 comment on column public.tcg_catalog_cards.search_text is 'Lowercased name/set/number blob for full-text and ilike search';
+
+
+-- ========== 202605230001_pgt_registry.sql ==========
+-- PGT Registry Phase 1: canonical card identities, slab cert cache, observation log.
+
+create table if not exists public.pgt_card_identities (
+  id uuid primary key default gen_random_uuid(),
+  identity_hash text not null,
+  franchise text not null default 'pokemon',
+  canonical_name text not null,
+  set_name text,
+  card_number text,
+  year text,
+  variant_key text,
+  lane text not null default 'raw' check (lane in ('raw', 'graded')),
+  grader text,
+  grade text,
+  cert_number text,
+  catalog_id text,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  observation_count integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint pgt_card_identities_hash_unique unique (identity_hash)
+);
+
+create index if not exists pgt_card_identities_franchise_name_idx
+  on public.pgt_card_identities (franchise, lower(canonical_name));
+
+create index if not exists pgt_card_identities_cert_idx
+  on public.pgt_card_identities (grader, cert_number)
+  where cert_number is not null;
+
+create table if not exists public.pgt_slab_registry (
+  id uuid primary key default gen_random_uuid(),
+  grader text not null,
+  cert_number text not null,
+  pgt_card_identity_id uuid references public.pgt_card_identities(id) on delete set null,
+  provider text,
+  registry_json jsonb not null default '{}'::jsonb,
+  population_note text,
+  grade_date text,
+  gemrate_id text,
+  registry_url text,
+  is_verified boolean not null default false,
+  refreshed_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint pgt_slab_registry_grader_cert_unique unique (grader, cert_number)
+);
+
+create index if not exists pgt_slab_registry_identity_idx
+  on public.pgt_slab_registry (pgt_card_identity_id);
+
+create index if not exists pgt_slab_registry_refreshed_idx
+  on public.pgt_slab_registry (refreshed_at desc);
+
+create table if not exists public.pgt_card_observations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.app_users(id) on delete set null,
+  pgt_card_identity_id uuid references public.pgt_card_identities(id) on delete set null,
+  session_id uuid references public.scan_sessions(id) on delete set null,
+  extracted_card_id uuid references public.extracted_cards(id) on delete set null,
+  event_type text not null check (
+    event_type in (
+      'session_save',
+      'registry_hydrate',
+      'enrich_complete',
+      'user_confirm',
+      'user_reject',
+      'user_edit'
+    )
+  ),
+  catalog_identity_status text,
+  confidence numeric(5, 4),
+  fmv_usd numeric(12, 2),
+  grade_bucket text,
+  provider text,
+  payload_json jsonb not null default '{}'::jsonb,
+  observed_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists pgt_card_observations_user_observed_idx
+  on public.pgt_card_observations (user_id, observed_at desc);
+
+create index if not exists pgt_card_observations_identity_idx
+  on public.pgt_card_observations (pgt_card_identity_id, observed_at desc);
+
+create index if not exists pgt_card_observations_event_idx
+  on public.pgt_card_observations (event_type, observed_at desc);
+
+alter table public.extracted_cards
+  add column if not exists pgt_card_identity_id uuid references public.pgt_card_identities(id) on delete set null;
+
+create index if not exists extracted_cards_pgt_identity_idx
+  on public.extracted_cards (pgt_card_identity_id)
+  where pgt_card_identity_id is not null;
+
+drop trigger if exists pgt_card_identities_touch_updated_at on public.pgt_card_identities;
+create trigger pgt_card_identities_touch_updated_at
+before update on public.pgt_card_identities
+for each row execute function public.touch_updated_at();
+
+drop trigger if exists pgt_slab_registry_touch_updated_at on public.pgt_slab_registry;
+create trigger pgt_slab_registry_touch_updated_at
+before update on public.pgt_slab_registry
+for each row execute function public.touch_updated_at();
+
+alter table public.pgt_card_identities enable row level security;
+alter table public.pgt_slab_registry enable row level security;
+alter table public.pgt_card_observations enable row level security;
+
+drop policy if exists "Service role manages pgt_card_identities" on public.pgt_card_identities;
+create policy "Service role manages pgt_card_identities"
+on public.pgt_card_identities for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');
+
+drop policy if exists "Service role manages pgt_slab_registry" on public.pgt_slab_registry;
+create policy "Service role manages pgt_slab_registry"
+on public.pgt_slab_registry for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');
+
+drop policy if exists "Users read own pgt_card_observations" on public.pgt_card_observations;
+create policy "Users read own pgt_card_observations"
+on public.pgt_card_observations for select
+using (
+  user_id in (
+    select id from public.app_users where clerk_user_id = auth.jwt() ->> 'sub'
+  )
+);
+
+drop policy if exists "Service role manages pgt_card_observations" on public.pgt_card_observations;
+create policy "Service role manages pgt_card_observations"
+on public.pgt_card_observations for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');
+
+comment on table public.pgt_card_identities is 'Canonical PGT card identity (raw or graded) keyed by identity_hash';
+comment on table public.pgt_slab_registry is 'Cached grader cert lookups (PSA/CGC/BGS) with population snapshots';
+comment on table public.pgt_card_observations is 'Append-only timeline of extractions, enrich, registry, and user actions';
+
+
+-- ========== 202605260001_companion_starter_rerolls.sql ==========
+alter table public.user_companions
+  add column if not exists starter_rerolls_used integer not null default 0;
+
+alter table public.user_companions
+  drop constraint if exists user_companions_starter_rerolls_cap;
+
+alter table public.user_companions
+  add constraint user_companions_starter_rerolls_cap check (
+    starter_rerolls_used >= 0 and starter_rerolls_used <= 3
+  );
+
+
+-- ========== 202605270001_tcg_catalog_lookup_indexes.sql ==========
+-- Speed up scan-time catalog lookups (set + number).
+-- Safe to re-run due to IF NOT EXISTS.
+
+create index if not exists tcg_catalog_cards_franchise_setcode_number_idx
+  on public.tcg_catalog_cards (franchise, set_code, card_number);
+
+create extension if not exists pg_trgm;
+
+create index if not exists tcg_catalog_cards_franchise_number_name_idx
+  on public.tcg_catalog_cards (franchise, card_number, lower(name));
+
+create index if not exists tcg_catalog_cards_name_trgm_idx
+  on public.tcg_catalog_cards using gin (name gin_trgm_ops);
+
+create index if not exists tcg_catalog_cards_set_name_trgm_idx
+  on public.tcg_catalog_cards using gin (set_name gin_trgm_ops);
+
+
+-- ========== 202605280001_pgt_market_intel.sql ==========
+-- Phase B — shared market intelligence (Pokémon-first; other franchises follow).
+-- Comps and population snapshots are written by enrich/workers in later PRs.
+
+create table if not exists public.pgt_certifications (
+  id uuid primary key default gen_random_uuid(),
+  grader text not null,
+  cert_number text not null,
+  catalog_id text,
+  franchise text not null default 'pokemon',
+  pgt_card_identity_id uuid references public.pgt_card_identities(id) on delete set null,
+  gemrate_id text,
+  grade text,
+  card_name text,
+  set_name text,
+  card_number text,
+  registry_url text,
+  provider text,
+  registry_json jsonb not null default '{}'::jsonb,
+  verified_at timestamptz,
+  refreshed_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint pgt_certifications_grader_cert_unique unique (grader, cert_number)
+);
+
+create index if not exists pgt_certifications_catalog_idx
+  on public.pgt_certifications (catalog_id)
+  where catalog_id is not null;
+
+create table if not exists public.pgt_population_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  catalog_id text not null,
+  franchise text not null default 'pokemon',
+  grader text not null,
+  grade text,
+  population_count integer,
+  population_higher integer,
+  population_note text,
+  source text,
+  captured_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists pgt_population_snapshots_catalog_grader_idx
+  on public.pgt_population_snapshots (catalog_id, grader, captured_at desc);
+
+create table if not exists public.pgt_market_comps (
+  id uuid primary key default gen_random_uuid(),
+  catalog_id text not null,
+  franchise text not null default 'pokemon',
+  grade_bucket text,
+  kind text not null check (kind in ('sold', 'active', 'reference')),
+  title text not null,
+  price_usd numeric(12, 2),
+  observed_at date,
+  url text,
+  source text,
+  slab text,
+  identity_hash text,
+  ingested_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+-- Prevent comp table blow-up: avoid duplicates for the same catalog + evidence key.
+create unique index if not exists pgt_market_comps_dedupe_idx
+  on public.pgt_market_comps (
+    catalog_id,
+    grade_bucket,
+    kind,
+    url,
+    price_usd,
+    observed_at,
+    source,
+    identity_hash
+  );
+
+create index if not exists pgt_market_comps_catalog_observed_idx
+  on public.pgt_market_comps (catalog_id, observed_at desc nulls last);
+
+create index if not exists pgt_market_comps_catalog_grade_idx
+  on public.pgt_market_comps (catalog_id, grade_bucket, kind);
+
+comment on table public.pgt_certifications is 'Phase B cert spine keyed to catalog_id (Pokémon-first).';
+comment on table public.pgt_population_snapshots is 'Time-series grader population by catalog_id.';
+comment on table public.pgt_market_comps is 'Shared historical comps for market card pages and FMV.';
+
+alter table public.pgt_certifications enable row level security;
+alter table public.pgt_population_snapshots enable row level security;
+alter table public.pgt_market_comps enable row level security;
+
+-- Service role writes; authenticated read for market pages (Phase C).
+create policy pgt_market_comps_read_authenticated
+  on public.pgt_market_comps for select
+  to authenticated
+  using (true);
+
+create policy pgt_population_snapshots_read_authenticated
+  on public.pgt_population_snapshots for select
+  to authenticated
+  using (true);
+
+create policy pgt_certifications_read_authenticated
+  on public.pgt_certifications for select
+  to authenticated
+  using (true);
+
+
+-- ========== 202605280002_tcg_catalog_localized_artwork.sql ==========
+-- Localized catalog artwork overlay.
+-- Keeps language-specific images separate from the canonical tcg_catalog_cards spine.
+
+create table if not exists public.tcg_catalog_localized_artwork (
+  id uuid primary key default gen_random_uuid(),
+  franchise text not null,
+  base_catalog_id text not null,
+  language text not null,
+  localized_catalog_id text not null default '',
+  localized_set_code text,
+  localized_set_name text,
+  localized_name text,
+  printed_number text not null default '',
+  counterpart_number text,
+  image_small_url text,
+  image_large_url text,
+  artwork_match_status text not null default 'needs_image_review'
+    check (artwork_match_status in (
+      'exact_japanese_print',
+      'same_art_confirmed',
+      'english_fallback',
+      'needs_image_review'
+    )),
+  match_method text not null default 'manual_review'
+    check (match_method in (
+      'exact_localized_id',
+      'set_number_match',
+      'curated_mapping',
+      'tcgdex_alias',
+      'english_counterpart_fallback',
+      'manual_review'
+    )),
+  match_confidence numeric not null default 0
+    check (match_confidence >= 0 and match_confidence <= 1),
+  source text not null,
+  source_payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (franchise, base_catalog_id, language, localized_catalog_id, printed_number)
+);
+
+create index if not exists tcg_catalog_localized_artwork_lookup_idx
+  on public.tcg_catalog_localized_artwork (franchise, base_catalog_id, lower(language), printed_number);
+
+create index if not exists tcg_catalog_localized_artwork_source_idx
+  on public.tcg_catalog_localized_artwork (source, localized_catalog_id)
+  where localized_catalog_id is not null;
+
+comment on table public.tcg_catalog_localized_artwork is
+  'Language-specific artwork overlay linked to canonical tcg_catalog_cards rows. Does not replace base catalog images.';
+
+comment on column public.tcg_catalog_localized_artwork.base_catalog_id is
+  'Canonical tcg_catalog_cards.catalog_id, e.g. base1-4.';
+
+comment on column public.tcg_catalog_localized_artwork.artwork_match_status is
+  'exact_japanese_print/same_art_confirmed/english_fallback/needs_image_review; controls whether the scanner may trust the image.';
+
+
+-- ========== 202605280003_tcg_catalog_set_insights.sql ==========
+-- Cached Master Catalog set insight payloads (full-set rollups + optional AI narrative).
+-- Keyed by franchise + set_id; refreshed by /api/catalog/set-insight and nightly catalog jobs.
+
+create table if not exists public.tcg_catalog_set_insights (
+  franchise text not null default 'pokemon',
+  set_id text not null,
+  payload jsonb not null,
+  source text,
+  model text,
+  ready boolean not null default false,
+  refreshed_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (franchise, set_id)
+);
+
+create index if not exists tcg_catalog_set_insights_refreshed_idx
+  on public.tcg_catalog_set_insights (refreshed_at desc);
 

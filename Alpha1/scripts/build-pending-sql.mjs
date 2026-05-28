@@ -7,8 +7,8 @@ const files = readdirSync(root)
   .sort();
 
 const header = `-- AUTO-GENERATED — all migrations bundle
--- Run once via: npm run db:apply
--- Regenerate: node scripts/build-pending-sql.mjs
+-- Run once via: npm run db:apply:bundle
+-- Regenerate: npm run db:build-pending
 
 `;
 

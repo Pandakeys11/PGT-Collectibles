@@ -1,4 +1,8 @@
-import { getCardFromDb } from "@/lib/catalog/db-catalog-browse";
+import { getCardFromDb, getCardFromDbBySetNumber } from "@/lib/catalog/db-catalog-browse";
+import {
+  parsePokemonCatalogSku,
+  pokemonCatalogIdFromSku,
+} from "@/lib/catalog/parse-catalog-sku";
 import type { CatalogCardSummary } from "@/lib/catalog/catalog-types";
 import {
   catalogCardReferenceEvidence,
@@ -58,11 +62,27 @@ export type PokemonMarketKnowledge = {
   refreshedAt: string;
 };
 
+function catalogVariantEditionHints(
+  catalogId: string,
+): Pick<ExtractedCard, "printStamps" | "details"> {
+  if (catalogId.includes("__first_edition")) {
+    return { printStamps: "1st Edition", details: "1st Edition" };
+  }
+  if (catalogId.includes("__shadowless")) {
+    return { printStamps: "Shadowless", details: "Shadowless" };
+  }
+  if (catalogId.includes("__unlimited")) {
+    return { printStamps: "Unlimited", details: "Unlimited" };
+  }
+  return {};
+}
+
 export function catalogSummaryToExtractedCard(
   card: CatalogCardSummary,
   options?: { gradeCard?: ExtractedCard | null },
 ): ExtractedCard {
   const grade = options?.gradeCard;
+  const variantEdition = catalogVariantEditionHints(card.id);
   return extractedCardSchema.parse({
     franchise: "pokemon",
     name: card.name,
@@ -74,8 +94,8 @@ export function catalogSummaryToExtractedCard(
     grader: grade?.grader,
     grade: grade?.grade,
     cert: grade?.cert,
-    printStamps: grade?.printStamps,
-    details: grade?.details,
+    printStamps: grade?.printStamps ?? variantEdition.printStamps,
+    details: grade?.details ?? variantEdition.details,
     encapsulation: grade?.encapsulation,
   });
 }
@@ -93,13 +113,29 @@ export async function buildPokemonMarketKnowledge(
     extraEvidence?: MarketEvidence[];
   },
 ): Promise<PokemonMarketKnowledge | null> {
-  const id = catalogId.trim();
-  if (!id) return null;
+  const raw = catalogId.trim();
+  if (!raw) return null;
 
+  const canonical = pokemonCatalogIdFromSku(raw) ?? raw;
   const compLimit = Math.min(100, Math.max(1, options?.compLimit ?? 48));
-  const [catalogCard, loaded] = await Promise.all([
-    getCardFromDb("pokemon", id),
-    loadPersistedMarketEvidence(id, { compLimit }),
+
+  let catalogCard = await getCardFromDb("pokemon", canonical);
+  if (!catalogCard) {
+    const parsed = parsePokemonCatalogSku(raw);
+    if (parsed?.kind === "set_number") {
+      catalogCard = await getCardFromDbBySetNumber(
+        "pokemon",
+        parsed.setCode,
+        parsed.cardNumber,
+      );
+    }
+  }
+
+  const resolvedId = catalogCard?.id ?? canonical;
+
+  const [_, loaded] = await Promise.all([
+    Promise.resolve(catalogCard),
+    loadPersistedMarketEvidence(resolvedId, { compLimit }),
   ]);
 
   const referencePrices = catalogCard?.prices ?? parseCatalogPriceSnapshot(null);
@@ -163,10 +199,10 @@ export async function buildPokemonMarketKnowledge(
 
   const intel =
     loaded.intel ??
-    (await readCatalogMarketIntel(id, { compLimit }));
+    (await readCatalogMarketIntel(resolvedId, { compLimit }));
 
   return {
-    catalogId: id,
+    catalogId: resolvedId,
     card: catalogCard
       ? {
           name: catalogCard.name,

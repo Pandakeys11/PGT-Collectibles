@@ -38,6 +38,8 @@ export type LiveMarketTickerPayload = {
   /** Flattened slides (all lanes) for panel stepping. */
   slides: LiveMarketTickerSlide[];
   setCount: number;
+  /** Sets with a banner-ready top-value highlight. */
+  topValueCount?: number;
   refreshedAt: string;
   error?: string;
 };

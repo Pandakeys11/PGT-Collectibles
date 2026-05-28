@@ -1,6 +1,7 @@
 import { classifyCardLane } from "@/lib/scan/lane";
 import { franchiseSearchPrefix } from "@/lib/scan/franchise";
 import { isJapanesePokemonCard, japaneseMarketIdentityParts } from "@/lib/scan/japanese-pokemon";
+import { resolvePrintEdition } from "@/lib/scan/print-edition";
 import type { ExtractedCard } from "@/lib/scan/schemas";
 
 export function compact(parts: Array<string | null | undefined>): string {
@@ -46,6 +47,22 @@ export function formatGraderGradeLabel(
   return compact([g, raw]) || null;
 }
 
+/** 1st Edition / Unlimited / Shadowless — shared by eBay, Card Ladder, ALT hub queries. */
+export function editionLabelForMarketSearch(
+  card: Pick<ExtractedCard, "printStamps" | "details">,
+): string | null {
+  const edition = resolvePrintEdition(card);
+  if (edition && edition.id !== "unknown" && edition.id !== "promo") {
+    return edition.label;
+  }
+  const hay = `${card.printStamps ?? ""} ${card.details ?? ""}`.toLowerCase();
+  if (/unlimited/.test(hay)) return "Unlimited";
+  if (/1st\s*edition|first\s*edition/.test(hay)) return "1st Edition";
+  if (/shadowless/.test(hay)) return "Shadowless";
+  const stamps = card.printStamps?.trim();
+  return stamps || null;
+}
+
 export type MarketSearchIdentity = {
   /** Raw / NM search identity */
   raw: string;
@@ -65,21 +82,26 @@ export function buildMarketSearchIdentity(card: ExtractedCard): MarketSearchIden
   const prefix = franchiseSearchPrefix(card);
   const lane = classifyCardLane(card as Record<string, unknown>).lane;
   const gradeLabel = formatGraderGradeLabel(card.grader, card.grade);
+  const editionLabel = editionLabelForMarketSearch(card);
   const japanese = isJapanesePokemonCard(card);
   const japaneseParts = japaneseMarketIdentityParts(card);
 
   const head = compact([
     prefix,
     ...(japanese ? japaneseParts : [card.name, card.printedName, card.set]),
+    card.number ? `#${card.number.replace(/^#/, "")}` : null,
     card.rarity,
     japanese ? null : card.year,
+    editionLabel,
   ]);
 
   const graded = compact([
     prefix,
     ...(japanese ? japaneseParts : [card.name, card.set]),
+    card.number ? `#${card.number.replace(/^#/, "")}` : null,
     card.rarity,
     japanese ? null : card.year,
+    editionLabel,
     gradeLabel,
   ]);
 
@@ -93,7 +115,16 @@ export function buildMarketSearchIdentity(card: ExtractedCard): MarketSearchIden
 
   const ebayPrimary =
     lane === "graded" && gradeLabel
-      ? compact([prefix, ...(japanese ? japaneseParts : [card.name, card.set]), card.rarity, japanese ? null : card.year, gradeLabel, japanese ? "sold" : null])
+      ? compact([
+          prefix,
+          ...(japanese ? japaneseParts : [card.name, card.set]),
+          card.number ? `#${card.number.replace(/^#/, "")}` : null,
+          card.rarity,
+          japanese ? null : card.year,
+          editionLabel,
+          gradeLabel,
+          japanese ? "sold" : null,
+        ])
       : head;
 
   return {

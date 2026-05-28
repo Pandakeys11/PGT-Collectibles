@@ -1,5 +1,8 @@
 import { isMissingRelationError } from "@/lib/market/supabase-errors";
-import { inferCardTargetGradeBucket } from "@/lib/market/market-intelligence";
+import {
+  inferCardTargetGradeBucket,
+  inferEvidenceGradeBucket,
+} from "@/lib/market/market-intelligence";
 import { marketIdentityHash } from "@/lib/market/identity-hash";
 import { franchiseLabel } from "@/lib/scan/franchise";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
@@ -174,7 +177,7 @@ export async function persistMarketComps(args: {
   const catalogId = args.catalogId.trim();
   if (!catalogId || args.marketEvidence.length === 0) return;
 
-  const grade_bucket = inferCardTargetGradeBucket(args.card);
+  const defaultBucket = inferCardTargetGradeBucket(args.card);
   const identity_hash = marketIdentityHash(args.card);
   const franchise = franchiseLabel(args.card).toLowerCase();
 
@@ -183,7 +186,8 @@ export async function persistMarketComps(args: {
     .map((ev) => {
       if (!ev.title?.trim()) return null;
       if (!ev.url && ev.priceUsd == null) return null;
-      const key = `${ev.kind}|${ev.url ?? ""}|${ev.title}|${ev.priceUsd ?? ""}|${ev.observedAt ?? ""}`;
+      const grade_bucket = ev.gradeBucket ?? inferEvidenceGradeBucket(ev) ?? defaultBucket;
+      const key = `${grade_bucket}|${ev.kind}|${ev.url ?? ""}|${ev.title}|${ev.priceUsd ?? ""}|${ev.observedAt ?? ""}`;
       if (seen.has(key)) return null;
       seen.add(key);
       return {

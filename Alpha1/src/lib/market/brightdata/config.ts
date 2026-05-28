@@ -1,5 +1,7 @@
 /** Bright Data API — Crawl API + Web Unlocker (population / cert page harvest). */
 
+import { isBrightDataUnlockerBudgetAvailable } from "@/lib/market/brightdata/quota";
+
 export function getBrightDataApiKey(): string | null {
   const raw =
     process.env.BRIGHTDATA_API_KEY?.trim() ||
@@ -40,10 +42,15 @@ export function isBrightDataUnlockerConfigured(): boolean {
   return isBrightDataConfigured() && Boolean(getBrightDataWebUnlockerZone());
 }
 
+/** Unlocker has remaining daily budget (free-tier guard). */
+export function isBrightDataUnlockerOperational(): boolean {
+  return isBrightDataUnlockerConfigured() && isBrightDataUnlockerBudgetAvailable("other");
+}
+
 export function isBrightDataPopHarvestEnabled(): boolean {
   if (process.env.BRIGHTDATA_POP_HARVEST === "0") return false;
   if (process.env.CERT_REGISTRY_BRIGHTDATA === "0") return false;
-  return isBrightDataCrawlConfigured() || isBrightDataUnlockerConfigured();
+  return isBrightDataCrawlConfigured() || isBrightDataUnlockerOperational();
 }
 
 export function brightDataCrawlOutputFormat(): string {

@@ -12,6 +12,7 @@ import {
   buildJpnArtworkTickerSlides,
   validateJpnArtworkTickerBuild,
 } from "@/lib/market/build-jpn-artwork-ticker";
+import { slideBannerPriceUsd, slideHasBannerData } from "@/lib/market/live-market-ticker-display";
 import type {
   LiveMarketTickerLane,
   LiveMarketTickerLaneId,
@@ -92,34 +93,54 @@ async function marketExtrasForCatalogId(catalogId: string): Promise<{
   };
 }
 
-async function hydrateSlideMarket(
+function hydrateSlideFromCatalog(
   slide: LiveMarketTickerSlide,
   row: TickerCardRow,
-): Promise<LiveMarketTickerSlide> {
+): LiveMarketTickerSlide {
   const prices = parseCatalogPriceSnapshot(row.prices_json);
   const tcgMarketUsd = bestCatalogUsd(prices);
-  const extras = await marketExtrasForCatalogId(slide.catalogId);
-  const rawFmvUsd = extras.rawFmvUsd ?? tcgMarketUsd;
-  const displayUsd =
-    slide.lane === "spotlight" && extras.psa10FmvUsd != null
-      ? extras.psa10FmvUsd
-      : rawFmvUsd ?? tcgMarketUsd;
+  const rawFmvUsd = tcgMarketUsd;
+  const displayUsd = rawFmvUsd ?? slide.priceUsd;
   return {
     ...slide,
     priceUsd: displayUsd != null ? Math.round(displayUsd * 100) / 100 : slide.priceUsd,
     tcgMarketUsd,
     rawFmvUsd,
-    psa10FmvUsd: extras.psa10FmvUsd,
     priceLabel:
-      slide.lane === "spotlight" && extras.psa10FmvUsd != null
-        ? "PSA 10 FMV"
-        : slide.lane === "top_value" && rawFmvUsd != null
-          ? "Raw FMV"
-          : slide.priceLabel,
+      slide.lane === "top_value" && rawFmvUsd != null
+        ? "Top value · TCG ref"
+        : slide.priceLabel,
   };
 }
 
-async function listPokemonSetsVintageFirst(): Promise<CatalogSetSummary[]> {
+async function hydrateSlideMarket(
+  slide: LiveMarketTickerSlide,
+  row: TickerCardRow,
+): Promise<LiveMarketTickerSlide> {
+  const catalogFirst = hydrateSlideFromCatalog(slide, row);
+  if (slide.lane !== "top_value") {
+    return catalogFirst;
+  }
+
+  const extras = await marketExtrasForCatalogId(slide.catalogId);
+  const tcgMarketUsd = catalogFirst.tcgMarketUsd ?? bestCatalogUsd(parseCatalogPriceSnapshot(row.prices_json));
+  const rawFmvUsd = extras.rawFmvUsd ?? tcgMarketUsd;
+  const displayUsd = rawFmvUsd ?? tcgMarketUsd ?? catalogFirst.priceUsd;
+  return {
+    ...catalogFirst,
+    priceUsd: displayUsd != null ? Math.round(displayUsd * 100) / 100 : catalogFirst.priceUsd,
+    rawFmvUsd,
+    psa10FmvUsd: extras.psa10FmvUsd,
+    priceLabel:
+      extras.rawFmvUsd != null
+        ? "Top value · Raw FMV"
+        : tcgMarketUsd != null
+          ? "Top value · TCG ref"
+          : catalogFirst.priceLabel,
+  };
+}
+
+export async function listPokemonSetsVintageFirst(): Promise<CatalogSetSummary[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = getSupabaseAdmin();
   const pageSize = 100;
@@ -164,46 +185,44 @@ async function listPokemonSetsVintageFirst(): Promise<CatalogSetSummary[]> {
   return out;
 }
 
-async function fetchPricedCardsForSet(set: CatalogSetSummary): Promise<TickerCardRow[]> {
+async function queryPricedCards(
+  filter: { column: "set_code" | "set_name"; value: string },
+): Promise<TickerCardRow[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = getSupabaseAdmin();
-  const code = set.code?.trim();
-  const name = set.name?.trim();
-
-  let query = supabase
+  const { data, error } = await supabase
     .from("tcg_catalog_cards")
     .select(
       "catalog_id,name,card_number,rarity,image_small_url,image_large_url,prices_json",
     )
     .eq("franchise", "pokemon")
+    .eq(filter.column, filter.value)
     .not("prices_json", "is", null)
     .limit(PRICED_CARD_LIMIT);
-
-  if (code) {
-    query = query.eq("set_code", code);
-  } else if (name) {
-    query = query.eq("set_name", name);
-  } else {
-    return [];
-  }
-
-  const { data, error } = await query;
-  if (error || !data?.length) {
-    if (code && name) {
-      const fallback = await supabase
-        .from("tcg_catalog_cards")
-        .select(
-          "catalog_id,name,card_number,rarity,image_small_url,image_large_url,prices_json",
-        )
-        .eq("franchise", "pokemon")
-        .eq("set_name", name)
-        .not("prices_json", "is", null)
-        .limit(PRICED_CARD_LIMIT);
-      return (fallback.data ?? []) as TickerCardRow[];
-    }
-    return [];
-  }
+  if (error || !data?.length) return [];
   return data as TickerCardRow[];
+}
+
+async function fetchPricedCardsForSet(set: CatalogSetSummary): Promise<TickerCardRow[]> {
+  const code = set.code?.trim();
+  const name = set.name?.trim();
+  const setId = set.id?.trim();
+  const tried = new Set<string>();
+  const candidates: Array<{ column: "set_code" | "set_name"; value: string }> = [];
+
+  if (code) candidates.push({ column: "set_code", value: code });
+  if (setId && setId !== code) candidates.push({ column: "set_code", value: setId });
+  if (name) candidates.push({ column: "set_name", value: name });
+
+  for (const filter of candidates) {
+    const key = `${filter.column}:${filter.value}`;
+    if (tried.has(key)) continue;
+    tried.add(key);
+    const rows = await queryPricedCards(filter);
+    if (rows.length) return rows;
+  }
+
+  return [];
 }
 
 type SetInsights = {
@@ -238,13 +257,20 @@ async function insightsForSet(set: CatalogSetSummary): Promise<SetInsights> {
     });
   }
 
-  const priced = scored
-    .filter((s) => s.price != null)
-    .sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+  const hasImage = (row: TickerCardRow) =>
+    Boolean(row.image_large_url?.trim() || row.image_small_url?.trim());
 
-  const topValue =
+  const priced = scored
+    .filter((s) => s.price != null && (s.price ?? 0) > 0)
+    .sort((a, b) => {
+      const priceDiff = (b.price ?? 0) - (a.price ?? 0);
+      if (priceDiff !== 0) return priceDiff;
+      return Number(hasImage(b.row)) - Number(hasImage(a.row));
+    });
+
+  let topValue =
     priced[0] != null
-      ? rowToSlide(set, "top_value", priced[0].row, priced[0].price, "Raw FMV · TCG ref")
+      ? rowToSlide(set, "top_value", priced[0].row, priced[0].price, "Top value · TCG ref")
       : null;
 
   const topCatalogId = priced[0]?.row.catalog_id ?? null;
@@ -292,25 +318,36 @@ async function insightsForSet(set: CatalogSetSummary): Promise<SetInsights> {
       )
     : null;
 
-  const slides = [topValue, momentum, spotlight].filter(
-    (s): s is LiveMarketTickerSlide => Boolean(s),
-  );
-  const hydrated = await Promise.all(
-    slides.map((slide) => {
-      const row =
-        slide.catalogId === topValue?.catalogId
-          ? priced[0]?.row
-          : slide.catalogId === momentum?.catalogId
-            ? momentumCandidate?.row
-            : spotlightSource?.row;
-      return row ? hydrateSlideMarket(slide, row) : slide;
-    }),
-  );
+  if (topValue && priced[0]) {
+    topValue = await hydrateSlideMarket(topValue, priced[0].row);
+    if (!slideHasBannerData(topValue)) {
+      const runner = priced.find(
+        (p, i) => i > 0 && hasImage(p.row) && (p.price ?? 0) > 0,
+      );
+      if (runner) {
+        topValue = await hydrateSlideMarket(
+          rowToSlide(set, "top_value", runner.row, runner.price, "Top value · TCG ref"),
+          runner.row,
+        );
+      } else {
+        topValue = null;
+      }
+    }
+  }
+
+  const momentumHydrated =
+    momentum && momentumCandidate?.row
+      ? hydrateSlideFromCatalog(momentum, momentumCandidate.row)
+      : momentum;
+  const spotlightHydrated =
+    spotlight && spotlightSource?.row
+      ? hydrateSlideFromCatalog(spotlight, spotlightSource.row)
+      : spotlight;
 
   return {
-    topValue: hydrated.find((s) => s.lane === "top_value") ?? null,
-    momentum: hydrated.find((s) => s.lane === "momentum") ?? null,
-    spotlight: hydrated.find((s) => s.lane === "spotlight") ?? null,
+    topValue: topValue && slideHasBannerData(topValue) ? topValue : null,
+    momentum: momentumHydrated,
+    spotlight: spotlightHydrated,
   };
 }
 
@@ -344,7 +381,12 @@ function buildLanes(
 
   for (const row of insights) {
     const topId = row.topValue?.catalogId ?? null;
-    if (row.topValue) topValueSlides.push(row.topValue);
+    if (row.topValue && slideHasBannerData(row.topValue)) {
+      topValueSlides.push({
+        ...row.topValue,
+        priceUsd: slideBannerPriceUsd(row.topValue) ?? row.topValue.priceUsd,
+      });
+    }
     if (row.momentum && row.momentum.catalogId !== topId) {
       momentumSlides.push(row.momentum);
     } else if (row.spotlight && row.spotlight.catalogId !== topId) {
@@ -361,7 +403,7 @@ function buildLanes(
     {
       id: "top_value",
       label: "Top value",
-      subtitle: "Highest TCGPlayer market per set",
+      subtitle: "Highest-priced card per set · core market pulse",
       slides: topValueSlides,
     },
     {
@@ -422,11 +464,14 @@ export async function buildLiveMarketTicker(): Promise<LiveMarketTickerPayload> 
       console.warn("[live-ticker] JPN artwork validation:", jpnValidation.issues.join(", "));
     }
 
+    const topValueCount = lanes.find((l) => l.id === "top_value")?.slides.length ?? 0;
+
     return {
-      ready: slides.length > 0,
+      ready: topValueCount > 0 || slides.length > 0,
       lanes,
       slides,
       setCount: sets.length,
+      topValueCount,
       refreshedAt,
     };
   } catch (e) {

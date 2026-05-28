@@ -6,7 +6,12 @@ import {
   listCardsFromDb,
   resolveSetRecord,
 } from "@/lib/catalog/db-catalog-browse";
-import { hydrateTcgCardSummariesWithLivePrices } from "@/lib/pokedex/tcg-price-hydrate";
+import { attachRawFmvToTcgCards } from "@/lib/market/catalog-set-fmv";
+import {
+  hydrateTcgCardSummariesWithLivePrices,
+  needsTcgPlayerHydration,
+  tcgSummaryHasFmv,
+} from "@/lib/pokedex/tcg-price-hydrate";
 import type { CatalogCardSummary, CatalogSetSummary } from "@/lib/catalog/catalog-types";
 import { enrichCardsWithLiveTcgPrices } from "@/lib/catalog/set-insight-utils";
 import { expandLegendaryCollectionRows, isLegendaryCollectionCatalogExpand } from "@/lib/pokedex/legendary-collection-catalog";
@@ -218,6 +223,12 @@ async function loadSetCardsFromDb(setId: string, variantKey?: string | null): Pr
     /* keep DB rows */
   }
 
+  try {
+    cards = await attachRawFmvToTcgCards(cards);
+  } catch {
+    /* keep hydrated rows */
+  }
+
   return cards;
 }
 
@@ -279,10 +290,20 @@ async function fetchCardsForSetPageFromDb(params: {
   const start = (page - 1) * pageSize;
   let data = filtered.slice(start, start + pageSize);
   const apiSetId = await resolveTcgApiSetId(params.setId);
+  const needsHydrate =
+    data.some((c) => c.rawFmvUsd == null) || data.some((c) => needsTcgPlayerHydration(c));
+  if (needsHydrate) {
+    try {
+      data = await hydrateTcgCardSummariesWithLivePrices(apiSetId, data);
+    } catch {
+      /* keep slice */
+    }
+  }
+
   try {
-    data = await hydrateTcgCardSummariesWithLivePrices(apiSetId, data);
+    data = await attachRawFmvToTcgCards(data);
   } catch {
-    /* keep slice */
+    /* keep hydrated rows */
   }
 
   return {
@@ -455,7 +476,22 @@ export async function fetchCardsForSetPage(params: {
 
   if (!isLegendaryCollectionCatalogExpand(setId)) {
     try {
-      return await fetchCardsByQuery({ q, page: params.page, pageSize: params.pageSize });
+      const apiSetId = await resolveTcgApiSetId(setId);
+      const page = await fetchCardsByQuery({ q, page: params.page, pageSize: params.pageSize });
+      let data = page.data;
+      if (data.some((c) => c.rawFmvUsd == null) || data.some((c) => needsTcgPlayerHydration(c))) {
+        try {
+          data = await hydrateTcgCardSummariesWithLivePrices(apiSetId, data);
+        } catch {
+          /* keep API rows */
+        }
+      }
+      try {
+        data = await attachRawFmvToTcgCards(data);
+      } catch {
+        /* keep rows */
+      }
+      return { ...page, data };
     } catch {
       const fallback = await fetchCardsForSetPageFromDb({
         setId,
@@ -485,7 +521,20 @@ export async function fetchCardsForSetPage(params: {
   const page = Math.max(1, params.page);
   const pageSize = Math.max(1, params.pageSize);
   const start = (page - 1) * pageSize;
-  const data = expanded.slice(start, start + pageSize);
+  let data = expanded.slice(start, start + pageSize);
+  const apiSetId = await resolveTcgApiSetId(setId);
+  if (data.some((c) => c.rawFmvUsd == null) || data.some((c) => needsTcgPlayerHydration(c))) {
+    try {
+      data = await hydrateTcgCardSummariesWithLivePrices(apiSetId, data);
+    } catch {
+      /* keep slice */
+    }
+  }
+  try {
+    data = await attachRawFmvToTcgCards(data);
+  } catch {
+    /* keep slice */
+  }
 
   return {
     data,

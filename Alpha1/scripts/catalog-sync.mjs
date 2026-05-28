@@ -7,17 +7,25 @@
  *   node scripts/catalog-sync.mjs --franchise=lorcana
  *   node scripts/catalog-sync.mjs --franchise=onepiece
  *   node scripts/catalog-sync.mjs --franchise=all
+ *   node scripts/catalog-sync.mjs --franchise=pokemon --skip-prices
  *
  * Requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in .env.local
  */
 import { createClient } from "@supabase/supabase-js";
 import { loadEnvLocal } from "./load-env-local.mjs";
+import {
+  fetchPokemonSetPriceMap,
+  applyPokemonApiPricesToRows,
+  pokemonTcgHeaders,
+  priceDelayMs,
+} from "./lib/pokemon-set-price-hydrate.mjs";
 
 loadEnvLocal();
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 const franchiseArg = process.argv.find((a) => a.startsWith("--franchise="))?.split("=")[1] ?? "all";
+const skipPrices = process.argv.includes("--skip-prices");
 
 if (!url || !key) {
   console.error("Missing Supabase env vars in .env.local");
@@ -347,10 +355,15 @@ async function syncOnepiece() {
 
 async function syncPokemon() {
   console.log("Sync Pokémon (sets + all cards — slow, use API key if available)...");
-  const key = process.env.POKEMON_TCG_API_KEY?.trim();
-  const headers = key
-    ? { Accept: "application/json", "X-Api-Key": key }
-    : { Accept: "application/json" };
+  if (skipPrices) {
+    console.log("  --skip-prices: storing URL-only prices_json (not recommended)");
+  } else {
+    console.log(
+      "  Prices: live pokemontcg.io per set",
+      process.env.POKEMON_TCG_API_KEY?.trim() ? "(API key set)" : "(no key — slower limits)",
+    );
+  }
+  const headers = pokemonTcgHeaders();
 
   const setsPayload = await fetchJsonWithRetry(
     "https://api.pokemontcg.io/v2/sets?pageSize=250&orderBy=-releaseDate",
@@ -407,8 +420,24 @@ async function syncPokemon() {
       source_id: "pokemontcg.io",
       synced_at: new Date().toISOString(),
     }));
+
+    if (!skipPrices) {
+      try {
+        const apiById = await fetchPokemonSetPriceMap(setCode, {
+          headers,
+          delayMs: priceDelayMs(),
+        });
+        const priced = applyPokemonApiPricesToRows(rows, apiById);
+        process.stdout.write(`  ${setCode}: ${rows.length} cards (${priced} priced)     \r`);
+      } catch (err) {
+        console.warn(`\n  ${setCode}: price hydrate failed — ${err?.message ?? err}`);
+      }
+    }
+
     count += await upsertBatch(rows);
-    process.stdout.write(`  ${setCode}: ${rows.length} cards (${count} total)\r`);
+    if (skipPrices) {
+      process.stdout.write(`  ${setCode}: ${rows.length} cards (${count} total)\r`);
+    }
   }
   await touchSource("pokemontcg.io");
   console.log(`Pokémon: ${count} cards`);

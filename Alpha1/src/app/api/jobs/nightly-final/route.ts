@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runIncrementalCatalogSync } from "@/lib/catalog/sync/incremental-sync";
+import { executeNightlySetInsightRefresh } from "@/lib/catalog/set-insight-nightly";
 import {
   buildNightlyPlatformReport,
   persistNightlyPlatformReport,
@@ -46,12 +47,27 @@ export async function GET(req: NextRequest) {
   const report = await buildNightlyPlatformReport(catalog.results);
   await persistNightlyPlatformReport(report);
 
+  let setInsight: Awaited<ReturnType<typeof executeNightlySetInsightRefresh>> | null = null;
+  if (req.nextUrl.searchParams.get("skipSetInsight") !== "1") {
+    const cursorSet =
+      typeof report?.marketIngest?.setCode === "string"
+        ? report.marketIngest.setCode
+        : null;
+    setInsight = await executeNightlySetInsightRefresh({
+      setIds: cursorSet ? [cursorSet] : undefined,
+      maxSets: Number(req.nextUrl.searchParams.get("setInsightSets") ?? 3) || 3,
+      refreshAi: req.nextUrl.searchParams.get("setInsightAi") === "1",
+    });
+  }
+
   return NextResponse.json({
     ok: catalog.ok,
     finishedAt: new Date().toISOString(),
-    scheduleLabel: "06:10 EST (11:10 UTC) — catalog sync + nightly report",
+    scheduleLabel:
+      "06:10 EST (11:10 UTC) — catalog sync + nightly report + set insight refresh",
     catalog,
     report,
+    setInsight,
   });
 }
 

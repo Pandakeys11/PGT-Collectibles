@@ -6,9 +6,9 @@
  * - DuckDuckGo snippet search
  * - Gemini Google Search grounding (brief + comp rows)
  *
- * Pro (paid / keyed marketplace APIs — enable when billing is funded):
- * - OpenRouter market model (e.g. Perplexity Sonar) open-web brief
- * - eBay sold harvest + full researchCardMarket enrich
+ * Market APIs (all signed-in users when LIQUID_ASK_PRO_RESEARCH is not disabled):
+ * - eBay sold harvest + full researchCardMarket enrich on Ask
+ * - OpenRouter market model brief when configured (optional; still tries free Gemini/Groq first)
  *
  * Cert registry (graded enrich / Ask) — see docs/CERT_REGISTRY_FALLBACKS.md:
  * GemRate → PSA API → Apify PSA → cert page → web (works without partner approval).
@@ -37,7 +37,7 @@ export function isLiquidAskProResearchEnabled(): boolean {
   return true;
 }
 
-export function resolveLiquidAskResearchTier(proTier: boolean): LiquidAskResearchTier {
-  if (!proTier) return "free";
+/** Billing plan no longer gates eBay sold / market enrich — only the env kill-switch does. */
+export function resolveLiquidAskResearchTier(_proTier: boolean): LiquidAskResearchTier {
   return isLiquidAskProResearchEnabled() ? "pro" : "free";
 }

@@ -9,6 +9,7 @@ import type { CatalogFinishBucketId } from "@/lib/pokedex/set-catalog-config";
 import type { PrintingPresetId } from "@/lib/pokedex/printing-presets";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 function parseRarityBucket(raw: string | null): RarityBucketId | undefined {
   if (!raw?.trim()) return undefined;

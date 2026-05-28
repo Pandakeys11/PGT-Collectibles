@@ -58,6 +58,12 @@ export type TcgCardSummary = {
   sourceCatalogId?: string | null;
   /** Parsed `tcg_catalog_cards.prices_json` when loaded from master DB. */
   catalogPrices?: import("@/lib/market/pokemon-catalog").CatalogPriceSnapshot;
+  /** Server-resolved Raw FMV (matches `/api/market/intel` headline). */
+  rawFmvUsd?: number | null;
+  rawFmvSourceLabel?: string | null;
+  rawFmvBasis?: import("@/lib/market/catalog-raw-fmv").CatalogRawFmvBasis | null;
+  tcgPlayerUsd?: number | null;
+  priceChartingUsd?: number | null;
 };
 
 /** Full card payload from `GET /v2/cards/:id` (pricing fields used in catalog detail). */

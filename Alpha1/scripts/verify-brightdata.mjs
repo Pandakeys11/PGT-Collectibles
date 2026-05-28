@@ -60,6 +60,7 @@ console.log("Ready:", Boolean(apiKey && (datasetId || zone)));
 const args = process.argv.slice(2);
 const certIdx = args.indexOf("--cert");
 const catalogIdx = args.indexOf("--catalog");
+const ebayFlag = args.includes("--ebay");
 
 async function testUnlocker() {
   if (!apiKey || !zone) return { skipped: true };
@@ -130,9 +131,65 @@ async function callLocalJob(query) {
   }
 }
 
+async function testEbaySold() {
+  if (!apiKey || !zone) return { skipped: true };
+  const keyword = "Pokemon Charizard Base Set 4 PSA 9";
+  const q = encodeURIComponent(keyword.replace(/[^\w\s-]/g, " ").trim());
+  const url = `https://www.ebay.com/sch/i.html?_nkw=${q}&LH_Complete=1&LH_Sold=1&_sacat=2536&_ipg=40`;
+  const body = { zone, url, format: "raw", country: "us", render: true };
+  const expect = process.env.BRIGHTDATA_EBAY_EXPECT_SELECTOR?.trim();
+  if (expect) {
+    body.headers = { "x-unblock-expect": JSON.stringify({ element: expect }) };
+  }
+  const res = await fetch("https://api.brightdata.com/request?async=false", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(120_000),
+  });
+  const brdStatus = res.headers.get("x-brd-status-code");
+  let text = await res.text();
+  if (text.trim().startsWith("{")) {
+    try {
+      const j = JSON.parse(text);
+      text =
+        (typeof j.body === "string" && j.body) ||
+        (typeof j.response === "string" && j.response) ||
+        text;
+    } catch {
+      /* */
+    }
+  }
+  const sItems = text.match(/class="[^"]*\bs-item\b/gi) ?? [];
+  const itm = text.match(/\/itm\//gi) ?? [];
+  return {
+    ok: res.ok && (!brdStatus || brdStatus === "200"),
+    status: res.status,
+    brdStatus,
+    bytes: text.length,
+    sItemBlocks: sItems.length,
+    itmLinks: itm.length,
+    preview: text.slice(0, 100).replace(/\s+/g, " "),
+  };
+}
+
 const unlocker = await testUnlocker();
 console.log("\n--- Web Unlocker probe (brdtest) ---");
 console.log(unlocker.skipped ? "skipped (need zone)" : unlocker);
+
+if (ebayFlag) {
+  console.log("\n--- eBay sold SERP (Bright Data) ---");
+  const ebay = await testEbaySold();
+  console.log(ebay.skipped ? "skipped" : ebay);
+  if (!ebay.skipped && ebay.sItemBlocks < 3 && ebay.itmLinks < 3) {
+    console.log(
+      "\nHint: enable Premium domains for ebay.com in CP, or set BRIGHTDATA_UNLOCKER_EBAY_RENDER=1",
+    );
+  }
+}
 
 const crawl = await testCrawlTrigger();
 console.log("\n--- Crawl API trigger probe (brdtest) ---");

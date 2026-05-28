@@ -4,7 +4,7 @@ import {
 } from "@/lib/market/brightdata/crawl-client";
 import {
   isBrightDataCrawlConfigured,
-  isBrightDataUnlockerConfigured,
+  isBrightDataUnlockerOperational,
 } from "@/lib/market/brightdata/config";
 import { fetchPageViaBrightDataUnlocker } from "@/lib/market/brightdata/unlocker-client";
 
@@ -19,9 +19,12 @@ export type GraderPageContent = {
  * otherwise Web Unlocker markdown.
  */
 export async function fetchGraderPageContent(url: string): Promise<GraderPageContent | null> {
-  if (isBrightDataUnlockerConfigured()) {
+  if (isBrightDataUnlockerOperational()) {
     try {
-      const page = await fetchPageViaBrightDataUnlocker(url, { dataFormat: "markdown" });
+      const page = await fetchPageViaBrightDataUnlocker(url, {
+        dataFormat: "markdown",
+        quotaBucket: "cert",
+      });
       const content = page.markdown ?? page.html ?? "";
       if (content.trim().length > 80) {
         return { url, content, via: "unlocker" };

@@ -5,6 +5,7 @@ import {
   getMarketNightlyTimeBudgetMs,
 } from "@/lib/ai/env";
 import { runIncrementalCatalogSync } from "@/lib/catalog/sync/incremental-sync";
+import { rebuildSetInsightForSet } from "@/lib/catalog/set-insight-nightly";
 import { executeNightlySetMarketIngest } from "@/lib/pgt-registry/market-ingest-job";
 
 export const maxDuration = 300;
@@ -85,6 +86,21 @@ export async function GET(req: NextRequest) {
       nextCursor: cursor,
       maxCards,
     };
+
+    if (plan?.setCompleteAfterRun && plan.setCode) {
+      try {
+        const setInsight = await rebuildSetInsightForSet(plan.setCode, {
+          refreshAi: false,
+        });
+        (out.market as Record<string, unknown>).setInsight = setInsight;
+      } catch (e) {
+        (out.market as Record<string, unknown>).setInsight = {
+          setId: plan.setCode,
+          insightReady: false,
+          error: e instanceof Error ? e.message : "set_insight_failed",
+        };
+      }
+    }
   }
 
   const catalogOk = (out.catalog as { ok?: boolean })?.ok !== false;

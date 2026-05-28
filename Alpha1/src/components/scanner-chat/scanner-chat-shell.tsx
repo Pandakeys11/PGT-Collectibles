@@ -22,6 +22,7 @@ import { ScannerComposer } from "./scanner-composer";
 import { ScannerHeader } from "./scanner-header";
 import { ScannerSidebar, type SidebarNavId } from "./scanner-sidebar";
 import { LiveMarketTickerBanner } from "./live-market-ticker-banner";
+import { EbayEndingSoonProvider } from "./ebay-ending-soon-provider";
 import { LiveMarketTickerProvider } from "./live-market-ticker-provider";
 import { LiquidScanPanelBootstrap } from "./liquid-scan-panel-bootstrap";
 import { UploadDropzoneOverlay } from "./upload-dropzone";
@@ -154,6 +155,7 @@ export function ScannerChatShell() {
 
   return (
     <LiveMarketTickerProvider>
+    <EbayEndingSoonProvider>
     <div className="scanner-chat-root flex h-[100dvh] w-full max-w-[100vw] flex-col overflow-hidden">
       <Suspense fallback={null}>
         <LiquidScanPanelBootstrap
@@ -161,6 +163,7 @@ export function ScannerChatShell() {
           onOpenCompanion={chat.openCompanionOutput}
           onOpenCalculator={chat.openCalculatorOutput}
           onOpenLiveMarket={chat.openLiveMarketOutput}
+          onOpenEbayEnding={chat.openEbayEndingOutput}
           onCatalogPrefill={(prefill) => void chat.loadCatalogPrefill(prefill)}
         />
       </Suspense>
@@ -199,6 +202,7 @@ export function ScannerChatShell() {
           onNav={(id: SidebarNavId) => {
             if (id === "catalog") chat.openCatalogOutput();
             else if (id === "live-market") chat.openLiveMarketOutput();
+            else if (id === "ebay-ending") chat.openEbayEndingOutput();
             else if (id === "companion") chat.openCompanionOutput();
             else if (id === "calculator") chat.openCalculatorOutput();
             else if (id === "exports") handleExport("csv");
@@ -280,6 +284,7 @@ export function ScannerChatShell() {
             onOpenLiveCamera={() => setLiveCameraOpen(true)}
             onOpenCalculator={() => chat.openCalculatorOutput()}
             onOpenLiveMarket={() => chat.openLiveMarketOutput()}
+            onOpenEbayEnding={() => chat.openEbayEndingOutput()}
             reviewSpecimen={
               chat.selectedSpecimen?.context.catalogIdentityStatus !== "confirmed" ||
               chat.selectedSpecimen?.context.verificationStatus !== "verified"
@@ -392,6 +397,7 @@ export function ScannerChatShell() {
         onOpenMasterCatalog={chat.openCatalogOutput}
       />
     </div>
+    </EbayEndingSoonProvider>
     </LiveMarketTickerProvider>
   );
 }

@@ -11,7 +11,6 @@ export { CardMatchResult } from "./card-match-result";
 export { ExtractedCardsCarousel } from "./extracted-cards-carousel";
 export { ScanResultsSheet } from "./scan-results-sheet";
 export { ScanResultsViewToggle } from "./scan-results-view-toggle";
-export { ScanResultsMobileList } from "./scan-results-sheet";
 export { ScanSummaryPanel, ScanSummaryInline } from "./scan-summary-panel";
 export { CollectorVendorCalculator } from "./collector-vendor-calculator";
 export { CollectorCalculatorDialog } from "./collector-calculator-dialog";

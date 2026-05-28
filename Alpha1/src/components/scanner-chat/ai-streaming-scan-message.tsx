@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Loader2, Sparkles } from "lucide-react";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
@@ -24,22 +24,6 @@ import {
 import type { CardInteractionHandlers } from "./chat-message";
 import { cn } from "@/lib/cn";
 
-const MOBILE_RESULTS_MQ = "(max-width: 1023px)";
-
-function subscribeMobileResultsMq(onStoreChange: () => void) {
-  const mq = window.matchMedia(MOBILE_RESULTS_MQ);
-  mq.addEventListener("change", onStoreChange);
-  return () => mq.removeEventListener("change", onStoreChange);
-}
-
-function getMobileResultsSnapshot() {
-  return window.matchMedia(MOBILE_RESULTS_MQ).matches;
-}
-
-function getMobileResultsServerSnapshot() {
-  return false;
-}
-
 export function AIStreamingScanMessage({
   message,
   specimens = [],
@@ -57,11 +41,6 @@ export function AIStreamingScanMessage({
   onCatalogScanPrefill?: (prefill: CatalogScanPrefill) => void;
   onDismissOutput?: () => void;
 }) {
-  const isMobileSheetList = useSyncExternalStore(
-    subscribeMobileResultsMq,
-    getMobileResultsSnapshot,
-    getMobileResultsServerSnapshot,
-  );
   const [resultsView, setResultsView] = useState<ScanResultsView>("cards");
 
   const isLiveScan = Boolean(message.streaming && !message.scanReport);
@@ -93,7 +72,8 @@ export function AIStreamingScanMessage({
     message.output?.kind === "catalog" ||
     message.output?.kind === "companion" ||
     message.output?.kind === "calculator" ||
-    message.output?.kind === "live-market";
+    message.output?.kind === "live-market" ||
+    message.output?.kind === "ebay-ending";
 
   const calculatorFmv =
     sessionSummary?.estimatedTotal ??
@@ -144,7 +124,7 @@ export function AIStreamingScanMessage({
             statusMessage={message.askStatus}
           />
         ) : showDoneNarrative ? (
-          <div className="rounded-xl rounded-tl-md border border-white/6 sc-glass-raised px-3 py-2.5 sm:rounded-2xl sm:px-4 sm:py-3">
+          <div className="rounded-xl rounded-tl-md border border-white/6 sc-glass-raised px-2.5 py-2 text-xs leading-relaxed sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
             <LiquidAskMarkdown text={message.text} />
           </div>
         ) : null}
@@ -181,7 +161,6 @@ export function AIStreamingScanMessage({
             {resultsView === "sheet" && liveSpecimens.length > 0 ? (
               <ScanResultsSheet
                 specimens={liveSpecimens}
-                variant={isMobileSheetList ? "mobile-list" : "table"}
                 selectedSpecimenId={cardHandlers?.selectedSpecimenId}
                 onRowSelect={cardHandlers?.onSelectSpecimen}
               />
@@ -235,6 +214,8 @@ export function AIStreamingScanMessage({
               onCatalogScanPrefill={onCatalogScanPrefill}
               onDismiss={onDismissOutput}
             />
+          ) : message.output.kind === "ebay-ending" ? (
+            <LiquidChatOutputPanel kind="ebay-ending" onDismiss={onDismissOutput} />
           ) : null
         ) : null}
       </div>

@@ -5,7 +5,7 @@
  *   SUPABASE_DB_PASSWORD=...     (Database password from Supabase dashboard)
  *   SUPABASE_ACCESS_TOKEN=sbp_... (Account → Access Tokens, database:write scope)
  *
- * Usage: npm run db:apply
+ * Usage: npm run db:apply:bundle
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

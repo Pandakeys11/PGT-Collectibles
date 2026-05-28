@@ -30,7 +30,12 @@ All times below are **US Eastern Standard Time (EST, UTC−5)**. Vercel cron exp
 
 1. Incremental **catalog sync** (sets + recent cards)
 2. **Full nightly report** — comps/pop counts in the last ~6h, catalog totals, market-ingest cursor (current set + offset)
-3. Persists report on `tcg_catalog_sources.raw_json.lastNightlyReport`
+3. **Set insight refresh** — TCG price sync + `pgt_market_comps` reference rows + cached set insight (up to 3 modern sets; skip with `?skipSetInsight=1`)
+4. Persists report on `tcg_catalog_sources.raw_json.lastNightlyReport`
+
+`/api/jobs/nightly-platform` (when a full set finishes market ingest):
+
+- **Set insight rebuild** for that set (prices + comps + insight cache)
 
 Local:
 
@@ -54,3 +59,11 @@ Requires `CRON_SECRET` in `.env.local` / Vercel (Bearer token on cron invocation
 Full-set rotation vintage → modern. See env vars in `.env.example` (`MARKET_INGEST_*`, `MARKET_NIGHTLY_AI_ORDER`, `GEMINI_API_KEY`).
 
 Report window stats: `compsIngested`, `popSnapshots`, `catalogCards`, `pokemonSets`, current `marketIngest.setCode`.
+
+## Bulk catalog price backfills (manual)
+
+Run on a machine with `.env.local` (not Vercel cron):
+
+1. **Raw TCGPlayer FMV (Pokémon)** — `npm run catalog:backfill:prices` (checkpoint `.tmp/pokemon-price-backfill.json`)
+2. **Raw TCGPlayer FMV (other franchises)** — `npm run catalog:sync:justtcg-prices` for magic / yugioh / lorcana / onepiece (requires `JUSTTCG_API_KEY`)
+3. **PSA 10 comps** — `npm run catalog:backfill:psa10` after raw completes (see [catalog-psa10-backfill.md](./catalog-psa10-backfill.md))

@@ -164,9 +164,10 @@ if (findingAppId && env.EBAY_DISABLE_FINDING !== "1") {
         Authorization: `Bearer ${bdKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ zone: bdZone, url, format: "raw", country: "us" }),
-      signal: AbortSignal.timeout(90_000),
+      body: JSON.stringify({ zone: bdZone, url, format: "raw", country: "us", render: true }),
+      signal: AbortSignal.timeout(120_000),
     });
+    const brdStatus = unlock.headers.get("x-brd-status-code");
     let unlocked = await unlock.text();
     if (unlock.ok && unlocked.trim().startsWith("{")) {
       try {
@@ -180,7 +181,7 @@ if (findingAppId && env.EBAY_DISABLE_FINDING !== "1") {
         /* keep raw */
       }
     }
-    if (unlock.ok && unlocked.length > 2000) {
+    if (unlock.ok && brdStatus === "200" && unlocked.length > 2000) {
       html = unlocked;
       via = "brightdata";
       htmlBlocked = /captcha|just a moment/i.test(html);
@@ -188,6 +189,8 @@ if (findingAppId && env.EBAY_DISABLE_FINDING !== "1") {
       console.log(
         "\nBright Data unlocker:",
         unlock.status,
+        "brd",
+        brdStatus,
         "bytes",
         unlocked.length,
         unlocked.slice(0, 120),
@@ -195,14 +198,15 @@ if (findingAppId && env.EBAY_DISABLE_FINDING !== "1") {
     }
   }
 
-  const items = html.match(/class="[^"]*\bs-item\b/gi) ?? [];
-  htmlCount = items.length;
+  const listingIds = html.match(/data-listingid="\d{9,}"/gi) ?? [];
+  const sItems = html.match(/class="[^"]*\bs-item\b/gi) ?? [];
+  htmlCount = Math.max(listingIds.length, sItems.length);
   console.log(
     "\nHTML completed:",
     res.status,
     "via",
     via,
-    "s-item blocks",
+    "listing cards",
     htmlCount,
     htmlBlocked ? "(blocked?)" : "",
   );

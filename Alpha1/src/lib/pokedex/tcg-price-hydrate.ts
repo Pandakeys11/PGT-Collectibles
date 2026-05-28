@@ -1,6 +1,10 @@
 import type { CatalogCardSummary } from "@/lib/catalog/catalog-types";
 import { bestCatalogUsd } from "@/lib/market/catalog-price-utils";
-import { tcgPlayerEmbedFromSnapshot } from "@/lib/market/catalog-raw-fmv";
+import {
+  catalogPriceSnapshotFromCardInput,
+  primaryTcgPlayerFromSnapshot,
+  tcgPlayerEmbedFromSnapshot,
+} from "@/lib/market/catalog-raw-fmv";
 import {
   enrichCardsWithLiveTcgPrices,
   priceSnapshotFromTcgCard,
@@ -31,6 +35,21 @@ function normalizeCardKey(name: string, number: string | null | undefined): stri
   const raw = (number ?? "").replace(/^#/, "").trim();
   const primary = (raw.split("/")[0] ?? raw).replace(/^0+/, "").trim() || raw;
   return `${n}|${primary}`;
+}
+
+/** True when live TCGPlayer market should still be merged from the Pokémon TCG API. */
+export function needsTcgPlayerHydration(card: TcgCardSummary): boolean {
+  const prices = catalogPriceSnapshotFromCardInput({
+    catalogPrices: card.catalogPrices,
+    tcgplayer: card.tcgplayer,
+    cardmarket: card.cardmarket,
+  });
+  return (
+    primaryTcgPlayerFromSnapshot(prices, {
+      catalogFinish: card.catalogFinish,
+      rarity: card.rarity,
+    }) == null
+  );
 }
 
 export function tcgSummaryHasFmv(card: TcgCardSummary): boolean {
@@ -226,7 +245,7 @@ export async function hydrateTcgCardSummariesWithLivePrices(
       const byApiId = new Map(liveSet.map((l) => [l.id, l]));
       const byKey = new Map(liveSet.map((l) => [normalizeCardKey(l.name, l.number), l]));
       working = working.map((c) => {
-        if (tcgSummaryHasFmv(c)) return c;
+        if (!needsTcgPlayerHydration(c)) return c;
         const apiId = pokemonApiCardId(c);
         const hit =
           (apiId ? byApiId.get(apiId) : undefined) ??
@@ -259,7 +278,7 @@ export async function hydrateTcgCardSummariesWithLivePrices(
   const byKey = new Map(liveCards.map((l) => [normalizeCardKey(l.name, l.number), l]));
 
   return working.map((c) => {
-    if (tcgSummaryHasFmv(c)) return c;
+    if (!needsTcgPlayerHydration(c)) return c;
     const apiId = pokemonApiCardId(c);
     const hit =
       (apiId ? byApiId.get(apiId) : undefined) ??

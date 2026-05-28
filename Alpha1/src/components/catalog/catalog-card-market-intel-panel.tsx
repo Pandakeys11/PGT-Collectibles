@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { marketPokemonHref } from "@/lib/app-routes";
+import { resolveCatalogGradedGuide } from "@/lib/market/catalog-graded-guide";
 import { formatCatalogFmvUsd } from "@/lib/market/catalog-raw-fmv";
 import type { FairValueBasis } from "@/lib/market/fair-value";
 import {
@@ -256,6 +257,11 @@ export function CatalogCardMarketIntelPanel({
     );
   }, [knowledge]);
 
+  const gradedGuide = useMemo(
+    () => resolveCatalogGradedGuide(knowledge?.referencePrices, knowledge?.intel),
+    [knowledge?.referencePrices, knowledge?.intel],
+  );
+
   const displayComps = useMemo(() => {
     const comps = knowledge?.intel?.comps ?? [];
     if (!knowledge?.card) return sortCompsForDisplay(comps, isSheet ? 5 : 12);
@@ -378,6 +384,26 @@ export function CatalogCardMarketIntelPanel({
                 <p className="font-mono text-sm leading-tight text-primary">
                   {fmtUsd(row.medianSoldUsd ?? row.medianActiveUsd)}
                 </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : gradedGuide.tiers.length > 0 ? (
+        <div>
+          <p className="mb-1 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">
+            Graded guide (PSA 8–10)
+          </p>
+          <div className="flex gap-1 overflow-x-auto pb-0.5 sm:grid sm:grid-cols-3">
+            {gradedGuide.tiers.map((tier) => (
+              <div
+                key={tier.label}
+                className="min-w-[4.25rem] shrink-0 rounded-lg border border-violet-400/20 bg-violet-500/[0.08] px-2 py-1.5 text-center"
+              >
+                <p className="text-[8px] font-semibold uppercase tracking-wide text-violet-200/80">
+                  {tier.label}
+                </p>
+                <p className="font-mono text-sm leading-tight text-primary">{fmtUsd(tier.usd)}</p>
+                <p className="text-[7px] text-faint">{tier.source}</p>
               </div>
             ))}
           </div>

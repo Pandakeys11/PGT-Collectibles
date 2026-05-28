@@ -24,6 +24,7 @@ import { useCatalogAmbientOptional } from "@/components/effects/catalog-ambient-
 import { CatalogSetTileGrid } from "@/components/catalog/catalog-set-tile-grid";
 import type { CatalogSetTileModel } from "@/components/catalog/catalog-set-tile";
 import { CatalogCardFmvRibbon } from "@/components/catalog/catalog-card-fmv-badge";
+import { tcgPlayerEmbedFromSnapshot } from "@/lib/market/catalog-raw-fmv";
 import { CatalogFocusGrid } from "@/components/pokedex/catalog-focus-grid";
 import { useCatalogMobileLayout } from "@/hooks/use-catalog-mobile-layout";
 import { ScanThisCardButton } from "@/components/pokedex/scan-this-card-button";
@@ -359,6 +360,7 @@ export function GenericCatalogBrowser({
                       {franchise === "pokemon" ? (
                         <CatalogCardFmvRibbon
                           catalogPrices={card.prices}
+                          tcgplayer={tcgPlayerEmbedFromSnapshot(card.prices)}
                           catalogFinish={card.catalogFinish}
                           rarity={card.rarity}
                           name={card.name}

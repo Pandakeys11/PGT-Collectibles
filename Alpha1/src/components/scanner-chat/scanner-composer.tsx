@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Calculator, Camera, ChevronDown, Loader2, Scan, TrendingUp, Upload, Zap } from "lucide-react";
+import { Calculator, Camera, ChevronDown, Gavel, Loader2, Scan, TrendingUp, Upload, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SCAN_MODE_OPTIONS } from "@/lib/scanner-chat/scan-mode-labels";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
@@ -38,6 +38,7 @@ export function ScannerComposer({
   onOpenLiveCamera,
   onOpenCalculator,
   onOpenLiveMarket,
+  onOpenEbayEnding,
   supportsLiveCamera,
   reviewSpecimen,
   onConfirmCatalogCandidate,
@@ -66,6 +67,7 @@ export function ScannerComposer({
   onOpenLiveCamera: () => void;
   onOpenCalculator?: () => void;
   onOpenLiveMarket?: () => void;
+  onOpenEbayEnding?: () => void;
   supportsLiveCamera?: boolean;
   reviewSpecimen?: ScanSpecimen | null;
   onConfirmCatalogCandidate?: (specimenId: string, candidate: CatalogCandidate) => void;
@@ -115,7 +117,7 @@ export function ScannerComposer({
     ? "Optional note for scan…"
     : hasScanResults
       ? "Ask about FMV or comps…"
-      : "Ask PGT AI or add images…";
+      : "Ask PGT…";
 
   const activeMode = SCAN_MODE_OPTIONS.find((o) => o.id === scanMode);
 
@@ -167,7 +169,7 @@ export function ScannerComposer({
             }}
             rows={1}
             placeholder={placeholder}
-            className="sc-composer-input max-h-[5.5rem] min-h-[2.35rem] w-full resize-none bg-transparent px-2 py-1 text-base leading-snug text-slate-100 placeholder:text-slate-600 focus:outline-none sm:min-h-[2.5rem] sm:text-sm"
+            className="sc-composer-input max-h-[4.5rem] min-h-[2.125rem] w-full resize-none bg-transparent px-2 py-1 text-base leading-snug text-slate-100 placeholder:text-slate-500 focus:outline-none sm:min-h-[2.5rem] sm:max-h-[5.5rem] sm:text-sm"
             disabled={isBusy}
             aria-label="Message or scan instructions"
           />
@@ -210,6 +212,18 @@ export function ScannerComposer({
                 title="Live market — trending sets"
               >
                 <TrendingUp className="h-4 w-4" />
+              </button>
+            ) : null}
+            {onOpenEbayEnding ? (
+              <button
+                type="button"
+                onClick={onOpenEbayEnding}
+                disabled={isBusy}
+                className="sc-composer-icon-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/5 hover:text-rose-200 disabled:opacity-40 touch-manipulation lg:hidden"
+                aria-label="Open eBay ending soon auctions"
+                title="eBay — Pokémon auctions ending soon"
+              >
+                <Gavel className="h-4 w-4" />
               </button>
             ) : null}
             {onOpenCalculator ? (

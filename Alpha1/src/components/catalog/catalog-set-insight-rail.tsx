@@ -1,14 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  ExternalLink,
-  Loader2,
-  RefreshCw,
-  Sparkles,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { rollupSetInsightCards, type SetInsightCardSource } from "@/lib/catalog/set-insight-utils";
 import type {
   CatalogSetInsightPayload,
@@ -83,6 +76,7 @@ export function CatalogSetInsightRail({
   const [insight, setInsight] = useState<CatalogSetInsightPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedSetIdRef = useRef<string | null>(null);
 
   const inViewRollup = useMemo(() => rollupSetInsightCards(cards), [cards]);
   const inViewPct =
@@ -103,8 +97,7 @@ export function CatalogSetInsightRail({
           throw new Error(body.error ?? `Request failed (${res.status})`);
         }
         const pricedFromApi = (body.setWide?.pricedSlots ?? 0) > 0;
-        const pricedInView = inViewRollup.pricedSlots > 0;
-        if (!body.ready && !pricedFromApi && !pricedInView) {
+        if (!body.ready && !pricedFromApi) {
           throw new Error(
             body.error === "insight_empty"
               ? "No prices loaded for this set — confirm POKEMON_TCG_API_KEY and run catalog sync."
@@ -119,37 +112,35 @@ export function CatalogSetInsightRail({
                 ready: true,
                 summary:
                   body.summary ??
-                  (pricedFromApi
-                    ? `${setName}: ${body.setWide.pricedSlots} of ${body.setWide.cardCount} cards priced from catalog.`
-                    : `${inViewRollup.pricedSlots} of ${inViewRollup.cardCount} visible cards priced in this filter.`),
-                setWide: pricedFromApi
-                  ? body.setWide
-                  : {
-                      cardCount: inViewRollup.cardCount,
-                      tcgPlayerSumUsd: inViewRollup.tcgPlayerSumUsd,
-                      pricedSlots: inViewRollup.pricedSlots,
-                      pricedPct: inViewPct,
-                    },
+                  `${setName}: ${body.setWide.pricedSlots} of ${body.setWide.cardCount} cards priced from catalog.`,
+                setWide: body.setWide,
               },
         );
+        loadedSetIdRef.current = setId;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load set insight");
-        setInsight(null);
+        if (loadedSetIdRef.current !== setId) {
+          setInsight(null);
+        }
       } finally {
         setLoading(false);
       }
     },
-    [setId, setName, inViewRollup, inViewPct],
+    [setId, setName],
   );
 
   useEffect(() => {
-    setInsight(null);
+    if (loadedSetIdRef.current === setId && insight?.setId === setId) {
+      return;
+    }
+    if (insight?.setId && insight.setId !== setId) {
+      setInsight(null);
+    }
     void load(false);
-  }, [load]);
+  }, [setId, load, insight?.setId]);
 
   const setWide = insight?.setWide;
   const topValue = insight?.topValue ?? [];
-  const momentum = insight?.momentum ?? [];
   const promos = insight?.promos ?? [];
   const sealed = insight?.sealedProducts ?? [];
 
@@ -185,17 +176,18 @@ export function CatalogSetInsightRail({
           <div className="rounded-lg border border-white/8 bg-black/25 px-2 py-1.5">
             <p className="text-[8px] font-semibold uppercase tracking-wide text-faint">Set catalog sum</p>
             <p className="font-mono text-sm font-semibold text-amber-200">
-              {fmtUsd(setWide?.tcgPlayerSumUsd ?? inViewRollup.tcgPlayerSumUsd)}
+              {fmtUsd(setWide?.tcgPlayerSumUsd)}
             </p>
             <p className="text-[9px] text-muted">
-              {setWide?.pricedSlots ?? inViewRollup.pricedSlots} priced ·{" "}
-              {setWide?.pricedPct ?? inViewPct}%
+              {setWide?.pricedSlots ?? 0} priced · {setWide?.pricedPct ?? 0}%
             </p>
           </div>
           <div className="rounded-lg border border-white/8 bg-black/25 px-2 py-1.5">
             <p className="text-[8px] font-semibold uppercase tracking-wide text-faint">In view</p>
             <p className="font-mono text-sm font-semibold text-primary">{inViewRollup.cardCount}</p>
-            <p className="text-[9px] text-muted">cards this filter</p>
+            <p className="text-[9px] text-muted">
+              {inViewRollup.pricedSlots} priced · {inViewPct}% this filter
+            </p>
           </div>
         </div>
       </header>
@@ -205,7 +197,7 @@ export function CatalogSetInsightRail({
           <div className="flex flex-col items-center justify-center gap-2 px-2 py-8 text-center">
             <Loader2 className="h-5 w-5 animate-spin text-amber-300" aria-hidden />
             <p className="text-[11px] text-muted">Researching {setName}…</p>
-            <p className="text-[9px] text-faint">AI web research + catalog merge</p>
+            <p className="text-[9px] text-faint">Full-set catalog + optional AI research</p>
           </div>
         ) : error && !insight ? (
           <div className="flex flex-col items-center gap-2 px-2 py-6 text-center">
@@ -236,11 +228,37 @@ export function CatalogSetInsightRail({
               </section>
             ) : null}
 
-            {insight.chaseNotes ? (
+            {insight.chaseCard ? (
               <section className="mb-3">
-                <p className="px-1 text-[9px] font-semibold uppercase tracking-wide text-faint">Chase & demand</p>
+                <p className="px-1 text-[9px] font-semibold uppercase tracking-wide text-faint">Chase card</p>
+                <InsightCardRow
+                  row={insight.chaseCard}
+                  onClick={
+                    insight.chaseCard.catalogId && onSelectCard
+                      ? () => onSelectCard(insight.chaseCard!.catalogId!)
+                      : undefined
+                  }
+                  trailing={
+                    <div className="text-right">
+                      <span className="font-mono text-[12px] font-semibold text-amber-200">
+                        {fmtUsd(insight.chaseCard.priceUsd)}
+                      </span>
+                      {insight.chaseSku ? (
+                        <p className="font-mono text-[8px] text-faint">{insight.chaseSku}</p>
+                      ) : null}
+                    </div>
+                  }
+                />
+              </section>
+            ) : null}
+
+            {insight.editorialNotes || insight.chaseNotes ? (
+              <section className="mb-3">
+                <p className="px-1 text-[9px] font-semibold uppercase tracking-wide text-faint">
+                  Collector notes
+                </p>
                 <p className="mt-1 rounded-lg border border-white/8 bg-black/20 px-2 py-1.5 text-[10px] leading-snug text-primary/90">
-                  {insight.chaseNotes}
+                  {insight.editorialNotes ?? insight.chaseNotes}
                 </p>
               </section>
             ) : null}
@@ -272,53 +290,6 @@ export function CatalogSetInsightRail({
                       }
                     />
                   ))}
-                </div>
-              )}
-            </section>
-
-            <section className="mb-3">
-              <p className="px-1 text-[9px] font-semibold uppercase tracking-wide text-faint">Price momentum</p>
-              <p className="px-1 text-[9px] text-muted">Recent move vs trailing avg (web + catalog)</p>
-              {momentum.length === 0 ? (
-                <p className="px-1 py-2 text-[10px] text-muted">No strong movers flagged.</p>
-              ) : (
-                <div className="mt-1 space-y-0.5">
-                  {momentum.map((row) => {
-                    const up = (row.momentumPct ?? 0) >= 0;
-                    return (
-                      <InsightCardRow
-                        key={`mom-${row.catalogId ?? row.name}`}
-                        row={row}
-                        onClick={
-                          row.catalogId && onSelectCard
-                            ? () => onSelectCard(row.catalogId!)
-                            : undefined
-                        }
-                        trailing={
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-0.5 font-mono text-[10px] font-semibold",
-                              up ? "text-emerald-300" : "text-rose-300",
-                            )}
-                          >
-                            {row.momentumPct != null ? (
-                              <>
-                                {up ? (
-                                  <TrendingUp className="h-3 w-3" aria-hidden />
-                                ) : (
-                                  <TrendingDown className="h-3 w-3" aria-hidden />
-                                )}
-                                {row.momentumPct > 0 ? "+" : ""}
-                                {row.momentumPct}%
-                              </>
-                            ) : (
-                              <span className="text-muted">{fmtUsd(row.priceUsd)}</span>
-                            )}
-                          </span>
-                        }
-                      />
-                    );
-                  })}
                 </div>
               )}
             </section>

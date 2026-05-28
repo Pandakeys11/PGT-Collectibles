@@ -6,9 +6,11 @@ import {
 import { isApifyPsaPopConfigured } from "@/lib/market/apify-psa-pop";
 import { psaPublicApiConfigured } from "@/lib/market/cert-data-providers/psa-api-token";
 import { isEbayFindingAvailable } from "@/lib/market/ebay-finding-completed";
+import { isEbayBrightDataSoldReady } from "@/lib/market/brightdata/ebay-sold-unlocker";
+import { getBrightDataQuotaSnapshot } from "@/lib/market/brightdata/quota";
 import {
   hasEbaySoldCredentials,
-  isEbaySoldHtmlFallbackReady,
+  isEbaySoldBrightDataEnabled,
   isEbaySoldProductionReady,
 } from "@/lib/market/ebay-sold-readiness";
 import { isEbayMarketplaceInsightsConfigured } from "@/lib/market/ebay-marketplace-insights";
@@ -32,7 +34,8 @@ export type MarketCapabilities = {
   ebayFinding: boolean;
   apifyEbaySold: boolean;
   apifyEbaySoldCredentials: boolean;
-  ebaySoldHtml: boolean;
+  ebaySoldBrightData: boolean;
+  brightDataQuotaRemaining: number;
   ebayInsights: boolean;
   poketraceRest: boolean;
   poketraceWs: boolean;
@@ -58,8 +61,9 @@ export function getMarketCapabilities(): MarketCapabilities {
     if (getEbayFindingAppId() && !isEbayFindingAvailable()) {
       gaps.push("eBay Finding API in cooldown (rate limit)");
     }
-    if (isEbaySoldHtmlFallbackReady()) {
-      gaps.push("Bright Data HTML fallback configured but primary sold APIs are down");
+    if (isEbaySoldBrightDataEnabled() && !isEbayBrightDataSoldReady()) {
+      const q = getBrightDataQuotaSnapshot();
+      gaps.push(`Bright Data daily budget used (${q.remainingTotal}/${q.dailyBudget} left)`);
     }
     if (!hasEbaySoldCredentials()) {
       gaps.push("No eBay sold credentials (Apify token or EBAY_FINDING_APP_ID)");
@@ -73,7 +77,8 @@ export function getMarketCapabilities(): MarketCapabilities {
     ebayFinding: isEbayFindingAvailable(),
     apifyEbaySold: isApifyEbaySoldConfigured(),
     apifyEbaySoldCredentials: apifyCreds,
-    ebaySoldHtml: isEbaySoldHtmlFallbackReady(),
+    ebaySoldBrightData: isEbayBrightDataSoldReady(),
+    brightDataQuotaRemaining: getBrightDataQuotaSnapshot().remainingTotal,
     ebayInsights: isEbayMarketplaceInsightsConfigured(),
     poketraceRest: isPokeTraceConfigured(),
     poketraceWs: isPokeTraceWsEnabled(),
@@ -92,7 +97,7 @@ export function marketCapabilitiesSummary(caps: MarketCapabilities): string {
   if (caps.ebaySoldReady) {
     if (caps.apifyEbaySold) parts.push("eBay sold (Apify)");
     else if (caps.ebayFinding) parts.push("eBay sold (Finding)");
-    else if (caps.ebaySoldHtml) parts.push("eBay sold (HTML+unlocker)");
+    else if (caps.ebaySoldBrightData) parts.push("eBay sold (Bright Data)");
   } else if (caps.ebayBrowseReady) {
     parts.push("eBay listings only (no sold pipeline)");
   } else {

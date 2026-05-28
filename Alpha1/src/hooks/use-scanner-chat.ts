@@ -879,6 +879,14 @@ export function useScannerChat() {
     );
   }, [pushChatOutput]);
 
+  const openEbayEndingOutput = useCallback(() => {
+    pushChatOutput(
+      "ebay-ending",
+      "Open eBay ending soon",
+      "Live **Pokémon TCG auctions** ending soon on eBay (US). Countdowns refresh from the Browse API — tap a card to bid on eBay.",
+    );
+  }, [pushChatOutput]);
+
   const loadCatalogPrefill = useCallback(
     async (prefill: CatalogScanPrefill) => {
       if (isBusy) return;
@@ -1049,6 +1057,15 @@ export function useScannerChat() {
         openLiveMarketOutput();
         return;
       }
+      if (
+        lower.includes("ending soon") ||
+        lower.includes("ebay auction") ||
+        lower.includes("ebay ending") ||
+        (lower.includes("auction") && lower.includes("ebay"))
+      ) {
+        openEbayEndingOutput();
+        return;
+      }
       if (lower.includes("export") && lower.includes("csv")) {
         if (specimens.length === 0) {
           setMessages((prev) => [
@@ -1079,6 +1096,7 @@ export function useScannerChat() {
       openCatalogOutput,
       openCompanionOutput,
       openLiveMarketOutput,
+      openEbayEndingOutput,
       sendLiquidAsk,
       specimens,
     ],
@@ -1224,6 +1242,7 @@ export function useScannerChat() {
     openCompanionOutput,
     openCalculatorOutput,
     openLiveMarketOutput,
+    openEbayEndingOutput,
     loadCatalogPrefill,
     rescanSpecimen,
     setUserEvidenceCrop,

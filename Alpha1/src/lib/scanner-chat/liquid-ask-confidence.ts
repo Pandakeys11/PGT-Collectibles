@@ -89,7 +89,7 @@ export function deriveLiquidAskConfidenceHints(args: {
 
   if (sold >= 6 && live) {
     market = 0.88;
-    marketReason = `${sold} sold comp(s) from live research (${ebaySold} eBay sold when Pro).`;
+    marketReason = `${sold} sold comp(s) from live research (${ebaySold} eBay sold).`;
   } else if (sold >= 3 && live) {
     market = 0.72;
     marketReason = `${sold} sold comp(s); consider more grade-matched sales for graded cards.`;

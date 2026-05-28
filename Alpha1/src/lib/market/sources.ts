@@ -81,6 +81,8 @@ export function buildEbaySoldSearchUrl(query: string): string {
   return `https://www.ebay.com/sch/i.html?${params.toString()}`;
 }
 
+export { EBAY_ENDING_SOON_HUB_URL } from "@/lib/market/ebay-ending-soon-types";
+
 export function buildEbayActiveSearchUrl(query: string): string {
   const params = new URLSearchParams({
     _nkw: query.trim(),
@@ -270,7 +272,8 @@ export const MARKET_SOURCES: MarketSourceDefinition[] = [
     id: "alt",
     label: "ALT",
     domain: "alt.xyz",
-    soldUrl: (query) => `https://app.alt.xyz/browse?q=${encodeURIComponent(query)}`,
+    soldUrl: (query) =>
+      `https://app.alt.xyz/browse?q=${encodeURIComponent(`${query.trim()} sold comps`.replace(/\s+/g, " ").trim())}`,
     activeUrl: (query) => `https://app.alt.xyz/browse?q=${encodeURIComponent(query)}`,
     soldSearchQuery: (card) => gradedIdentity(card) || identity(card),
     activeSearchQuery: (card) => gradedIdentity(card) || identity(card),

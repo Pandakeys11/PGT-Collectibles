@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bookmark,
+  ChevronDown,
+  ChevronUp,
   FileSpreadsheet,
   FileText,
   Lock,
@@ -16,7 +18,7 @@ import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { CatalogCandidate } from "@/lib/scan/schemas";
 import type { CardMatch, ScanSummary } from "@/lib/scanner-chat/types";
 import { ExtractedCardsCarousel } from "./extracted-cards-carousel";
-import { ScanResultsMobileList } from "./scan-results-sheet";
+import { ScanResultsSheet } from "./scan-results-sheet";
 import { ScanIntelligencePanel } from "./scan-intelligence-panel";
 import type { CardInteractionHandlers } from "./chat-message";
 import { cn } from "@/lib/cn";
@@ -89,10 +91,10 @@ function MobileDrawerFooter({
           type="button"
           onClick={() => onExport("pdf")}
           className={cn(
-            "flex flex-col items-center gap-1 rounded-xl border py-2 text-[10px]",
+            "flex flex-col items-center gap-1 rounded-xl border py-2 text-[10px] touch-manipulation",
             isPro
-              ? "border-white/8 text-muted touch-manipulation"
-              : "border-warning/25 bg-warning/5 text-warning/90 touch-manipulation",
+              ? "border-white/8 text-muted"
+              : "border-warning/25 bg-warning/5 text-warning/90",
           )}
         >
           {isPro ? <FileText className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
@@ -183,10 +185,14 @@ export function MobileResultsDrawer({
   onOpenMasterCatalog?: () => void;
 }) {
   const reviewCount = cards.filter((c) => c.status === "review").length;
-  const [drawerTab, setDrawerTab] = useState<"detail" | "list">("detail");
+  const [drawerTab, setDrawerTab] = useState<"detail" | "sheet">("detail");
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    if (open) setDrawerTab("detail");
+    if (open) {
+      setDrawerTab("detail");
+      setExpanded(false);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -214,34 +220,58 @@ export function MobileResultsDrawer({
             role="dialog"
             aria-modal="true"
             aria-label="Scan results"
+            data-expanded={expanded ? "true" : "false"}
+            data-drawer-tab={drawerTab}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 34, stiffness: 400 }}
-            className="sc-mobile-drawer-sheet fixed inset-x-0 bottom-0 z-[100] flex max-h-[94dvh] flex-col rounded-t-2xl border-t border-white/10 sc-glass lg:hidden"
+            className={cn(
+              "sc-mobile-drawer-sheet sc-glass fixed inset-x-0 bottom-0 z-[100] flex flex-col border-t border-white/10 lg:hidden",
+              expanded ? "top-0 max-h-[100dvh] rounded-none" : "max-h-[94dvh] rounded-t-2xl",
+            )}
           >
             <div className="flex shrink-0 items-center justify-center pt-2 pb-1">
               <div className="h-1 w-10 rounded-full bg-white/20" aria-hidden />
             </div>
 
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/6 px-4 pb-3">
+            <div className="flex shrink-0 items-start justify-between gap-2 border-b border-white/6 px-4 pb-3">
               <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-primary">Scan results</h2>
-                <p className="truncate text-[10px] text-muted">
-                  {summary.totalDetected} cards · ${summary.estimatedTotal.toLocaleString()} FMV
-                  {summary.needsReview > 0
-                    ? ` · ${summary.needsReview} need review`
-                    : ""}
+                <h2 className="text-sm font-semibold text-primary">Market intelligence</h2>
+                <p className="mt-0.5 text-[10px] leading-snug text-muted">
+                  {summary.totalDetected} cards · ${summary.estimatedTotal.toLocaleString()} session
+                  FMV
+                  {summary.needsReview > 0 ? ` · ${summary.needsReview} need review` : ""}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-white/5 touch-manipulation"
-                aria-label="Close results"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setExpanded((v) => !v)}
+                  className="flex h-9 items-center gap-1 rounded-lg px-2 text-[10px] font-medium text-muted hover:bg-white/5 touch-manipulation"
+                  aria-expanded={expanded}
+                >
+                  {expanded ? (
+                    <>
+                      <ChevronDown className="h-3.5 w-3.5" />
+                      Collapse
+                    </>
+                  ) : (
+                    <>
+                      <ChevronUp className="h-3.5 w-3.5" />
+                      Expand
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-white/5 touch-manipulation"
+                  aria-label="Close results"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="flex shrink-0 gap-1 border-b border-white/6 px-3 py-2">
@@ -259,19 +289,26 @@ export function MobileResultsDrawer({
               </button>
               <button
                 type="button"
-                onClick={() => setDrawerTab("list")}
+                onClick={() => setDrawerTab("sheet")}
                 className={cn(
                   "min-h-9 flex-1 rounded-lg text-xs font-medium transition touch-manipulation",
-                  drawerTab === "list"
+                  drawerTab === "sheet"
                     ? "bg-success/15 text-primary ring-1 ring-success/30"
                     : "text-muted hover:bg-white/5",
                 )}
               >
-                Sheet ({cards.length})
+                Scan sheet ({cards.length})
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scanner-chat-scrollbar">
+            <div
+              className={cn(
+                "sc-mobile-drawer-body min-h-0 flex-1",
+                drawerTab === "sheet"
+                  ? "flex flex-col overflow-hidden"
+                  : "overflow-y-auto overflow-x-hidden scanner-chat-scrollbar",
+              )}
+            >
               {drawerTab === "detail" && cards.length > 0 ? (
                 <div className="border-b border-white/6 px-3 py-3">
                   <ExtractedCardsCarousel
@@ -294,10 +331,11 @@ export function MobileResultsDrawer({
                   />
                 </div>
               ) : null}
-              {drawerTab === "list" && specimens.length > 0 ? (
-                <div className="p-3">
-                  <ScanResultsMobileList
+              {drawerTab === "sheet" && specimens.length > 0 ? (
+                <div className="flex min-h-0 flex-1 flex-col p-3 pt-2">
+                  <ScanResultsSheet
                     specimens={specimens}
+                    fillHeight
                     selectedSpecimenId={selectedSpecimenId}
                     onRowSelect={(id) => {
                       onSelectSpecimen(id);
@@ -306,36 +344,36 @@ export function MobileResultsDrawer({
                   />
                 </div>
               ) : drawerTab === "detail" ? (
-              <ScanIntelligencePanel
-                layoutMode="drawer"
-                summary={summary}
-                cards={cards}
-                selectedSpecimen={selectedSpecimen}
-                selectedSpecimenId={selectedSpecimenId}
-                enrichingSpecimenId={enrichingSpecimenId}
-                catalogEnriching={catalogEnriching}
-                marketEnriching={marketEnriching}
-                onSelectSpecimen={onSelectSpecimen}
-                onConfirmCandidate={onConfirmCandidate}
-                onRejectCandidate={onRejectCandidate}
-                onRefreshCatalogCandidates={onRefreshCatalogCandidates}
-                refreshingCatalogCandidates={refreshingCatalogCandidates}
-                onExport={onExport}
-                onNewScan={onNewScan}
-                onReviewUncertain={onReviewUncertain}
-                onSaveCollection={onSaveCollection}
-                onRequestAdjustCrop={onRequestAdjustCrop}
-                onRescanSpecimen={onRescanSpecimen}
-                rescanningId={rescanningId}
-                saveStatus={saveStatus}
-                saving={saving}
-                loadedSessionId={loadedSessionId}
-                historyRefreshKey={historyRefreshKey}
-                compsSectionRef={compsSectionRef}
-                isPro={isPro}
-                onOpenMasterCatalog={onOpenMasterCatalog}
-                className="min-h-0 border-0 bg-transparent shadow-none"
-              />
+                <ScanIntelligencePanel
+                  layoutMode="drawer"
+                  summary={summary}
+                  cards={cards}
+                  selectedSpecimen={selectedSpecimen}
+                  selectedSpecimenId={selectedSpecimenId}
+                  enrichingSpecimenId={enrichingSpecimenId}
+                  catalogEnriching={catalogEnriching}
+                  marketEnriching={marketEnriching}
+                  onSelectSpecimen={onSelectSpecimen}
+                  onConfirmCandidate={onConfirmCandidate}
+                  onRejectCandidate={onRejectCandidate}
+                  onRefreshCatalogCandidates={onRefreshCatalogCandidates}
+                  refreshingCatalogCandidates={refreshingCatalogCandidates}
+                  onExport={onExport}
+                  onNewScan={onNewScan}
+                  onReviewUncertain={onReviewUncertain}
+                  onSaveCollection={onSaveCollection}
+                  onRequestAdjustCrop={onRequestAdjustCrop}
+                  onRescanSpecimen={onRescanSpecimen}
+                  rescanningId={rescanningId}
+                  saveStatus={saveStatus}
+                  saving={saving}
+                  loadedSessionId={loadedSessionId}
+                  historyRefreshKey={historyRefreshKey}
+                  compsSectionRef={compsSectionRef}
+                  isPro={isPro}
+                  onOpenMasterCatalog={onOpenMasterCatalog}
+                  className="sc-mobile-drawer-intel min-h-0 border-0 bg-transparent shadow-none"
+                />
               ) : null}
             </div>
 

@@ -22,7 +22,7 @@ import type {
   LiveMarketTickerSlide,
 } from "@/lib/market/live-market-ticker-types";
 
-const STORAGE_KEY = "pgt.live-market-ticker.v5";
+const STORAGE_KEY = "pgt.live-market-ticker.v6";
 const FETCH_TIMEOUT_MS = 95_000;
 const LANE_CYCLE_MS = 5_500;
 

@@ -80,7 +80,8 @@ function DataCoverageBanner({
           ) : null}
           {coverage.proMarketSkipped ? (
             <p className="text-amber-100/85">
-              eBay sold API enrich is available on Pro — this answer used web search and Gemini grounding.
+              Automated eBay sold ingest is off for this environment — open the platform links below for
+              sold comps (queries match card, set, edition, and grade).
             </p>
           ) : null}
           {coverage.ebaySoldCount > 0 ? (
@@ -112,8 +113,9 @@ function DataCoverageBanner({
             </p>
           )}
           <p className="text-slate-500">
-            Card Ladder and ALT hold the deepest graded sales history — use the platform buttons below for full
-            sold history, live auctions, and listings. Snippet rows are search highlights, not full databases.
+            Card Ladder and ALT links below are pre-filled for this card, set, edition, and grade — open them
+            for full sold history and listings (we do not have partner API access). Snippet rows are highlights
+            only.
           </p>
         </div>
       </div>

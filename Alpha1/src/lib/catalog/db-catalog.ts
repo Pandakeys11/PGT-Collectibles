@@ -565,6 +565,27 @@ export type CatalogCardUpsert = {
   sourceId: string;
 };
 
+/** Update prices_json only — preserves source_id and identity columns (PSA10 / FMV enrich). */
+export async function patchCatalogCardPricesJson(
+  franchise: CardFranchise | "sports",
+  catalogId: string,
+  pricesJson: Record<string, unknown>,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const id = catalogId.trim();
+  if (!id) return;
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("tcg_catalog_cards")
+    .update({
+      prices_json: pricesJson,
+      synced_at: new Date().toISOString(),
+    })
+    .eq("franchise", franchise)
+    .eq("catalog_id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function upsertCatalogCards(rows: CatalogCardUpsert[]): Promise<number> {
   if (!isSupabaseConfigured() || rows.length === 0) return 0;
   const supabase = getSupabaseAdmin();

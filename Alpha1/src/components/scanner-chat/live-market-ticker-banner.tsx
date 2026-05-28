@@ -16,7 +16,8 @@ export function LiveMarketTickerBanner({
   className?: string;
 }) {
   const ticker = useLiveMarketTicker();
-  const { loading, error, paused, setPaused, bannerPills } = ticker;
+  const { loading, error, paused, setPaused, bannerPills, payload } = ticker;
+  const topValueTotal = payload?.topValueCount ?? payload?.lanes.find((l) => l.id === "top_value")?.slides.length ?? 0;
 
   if (loading && bannerPills.length === 0) {
     return (
@@ -27,7 +28,7 @@ export function LiveMarketTickerBanner({
         )}
       >
         <TrendingUp className="mr-2 h-3.5 w-3.5 animate-pulse text-sky-400" aria-hidden />
-        Loading live market pulse…
+        Loading top-value market pulse…
       </div>
     );
   }
@@ -83,7 +84,9 @@ export function LiveMarketTickerBanner({
         onClick={onOpenFull}
         className="sc-live-market-banner-open mt-1.5 w-full rounded-lg border border-sky-500/20 bg-sky-500/10 py-1 text-center text-[10px] font-semibold text-sky-200 transition hover:bg-sky-500/15"
       >
-        Open full market tour
+        {topValueTotal > 0
+          ? `Tour ${topValueTotal} set top values`
+          : "Open full market tour"}
       </button>
     </div>
   );

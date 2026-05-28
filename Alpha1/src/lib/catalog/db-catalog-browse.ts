@@ -315,6 +315,41 @@ export async function getCardFromDb(
   });
 }
 
+export async function getCardFromDbBySetNumber(
+  franchise: CatalogFranchiseId,
+  setCode: string,
+  cardNumber: string,
+): Promise<CatalogCardSummary | null> {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = getSupabaseAdmin();
+  const code = setCode.trim().toLowerCase();
+  const num = cardNumber.replace(/^#/, "").trim();
+  const primary = (num.split("/")[0] ?? num).replace(/^0+/, "") || num;
+
+  const attempts = [num, primary, primary.padStart(3, "0")];
+  for (const attempt of [...new Set(attempts)]) {
+    const { data } = await supabase
+      .from("tcg_catalog_cards")
+      .select(
+        "catalog_id,name,printed_name,set_name,set_code,card_number,year,rarity,image_small_url,image_large_url,prices_json,raw_json",
+      )
+      .eq("franchise", franchise)
+      .eq("set_code", code)
+      .eq("card_number", attempt)
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      const row = data as DbCardRow;
+      return dbCardToSummary(franchise, row, {
+        id: row.set_code ?? row.set_name ?? "unknown",
+        name: row.set_name ?? "Unknown set",
+        code: row.set_code,
+      });
+    }
+  }
+  return null;
+}
+
 export async function countCardsInDb(franchise: CatalogFranchiseId): Promise<number | null> {
   if (!isSupabaseConfigured()) return null;
   const supabase = getSupabaseAdmin();

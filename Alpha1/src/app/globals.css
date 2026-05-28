@@ -10,6 +10,7 @@
 @import "../styles/desk.css";
 @import "../styles/catalog-ambient.css";
 @import "../styles/neo-energy.css";
+@import "../styles/omega-music.css";
 
 @layer base {
   * {

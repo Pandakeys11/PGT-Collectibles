@@ -133,6 +133,13 @@ export function parseCatalogPriceSnapshot(
     priceChartingUrl: typeof p.priceChartingUrl === "string" ? p.priceChartingUrl : null,
     priceChartingUpdatedAt:
       typeof p.priceChartingUpdatedAt === "string" ? p.priceChartingUpdatedAt : null,
+    priceChartingPsa10Usd: asNumber(p.priceChartingPsa10Usd),
+    priceChartingPsa10Url:
+      typeof p.priceChartingPsa10Url === "string" ? p.priceChartingPsa10Url : null,
+    priceChartingPsa10UpdatedAt:
+      typeof p.priceChartingPsa10UpdatedAt === "string" ? p.priceChartingPsa10UpdatedAt : null,
+    priceChartingPsa9Usd: asNumber(p.priceChartingPsa9Usd),
+    priceChartingPsa8Usd: asNumber(p.priceChartingPsa8Usd),
     pokeTrace,
   };
 }

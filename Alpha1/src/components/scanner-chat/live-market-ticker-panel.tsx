@@ -19,6 +19,7 @@ import { marketPokemonHref } from "@/lib/app-routes";
 import type { LiveMarketTickerLaneId } from "@/lib/market/live-market-ticker-types";
 import { LIVE_MARKET_TICKER_PANEL_LANE_ORDER } from "@/lib/market/live-market-ticker-types";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import { WeeklyMoversStrip } from "@/components/market/weekly-movers-strip";
 import { cn } from "@/lib/cn";
 
 function fmtUsd(n: number | null | undefined): string {
@@ -75,7 +76,9 @@ export function LiveMarketTickerPanel({
               Live market pulse
             </p>
             <p className="truncate text-[10px] text-slate-500">
-              {lane?.subtitle ?? "Vintage → modern · full set tour"}
+              {activeLane === "top_value" && ticker.payload?.topValueCount
+                ? `${ticker.payload.topValueCount} sets · highest card each`
+                : (lane?.subtitle ?? "Vintage → modern · full set tour")}
             </p>
           </div>
         </div>
@@ -279,6 +282,10 @@ export function LiveMarketTickerPanel({
             </button>
           </>
         ) : null}
+      </div>
+
+      <div className="shrink-0 border-t border-white/6 px-2 py-2">
+        <WeeklyMoversStrip compact />
       </div>
 
       {lane && lane.slides.length > 0 ? (

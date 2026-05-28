@@ -69,6 +69,14 @@ export type CatalogPriceSnapshot = {
   priceChartingLooseUsd?: number | null;
   priceChartingUrl?: string | null;
   priceChartingUpdatedAt?: string | null;
+  /** Cached PriceCharting PSA 10 guide (bulk PSA10 backfill / ingest). */
+  priceChartingPsa10Usd?: number | null;
+  priceChartingPsa10Url?: string | null;
+  priceChartingPsa10UpdatedAt?: string | null;
+  /** PriceCharting grade-9 guide (`cib-price` on Pokémon cards). */
+  priceChartingPsa9Usd?: number | null;
+  /** PriceCharting grade-8 guide (`new-price` on Pokémon cards). */
+  priceChartingPsa8Usd?: number | null;
   /** PokeTrace 24/7 price spine (when POKETRACE_API_KEY is set). */
   pokeTrace?: PokeTraceCatalogMeta | null;
 };

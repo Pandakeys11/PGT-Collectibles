@@ -37,6 +37,12 @@ export type CatalogSetInsightPayload = {
   marketPulse?: string | null;
   /** Collector / chase angle. */
   chaseNotes?: string | null;
+  /** Editorial context (overlay notes + AI collector pulse). */
+  editorialNotes?: string | null;
+  /** Top chase card for set header / hero. */
+  chaseCard?: SetInsightPriceCard | null;
+  /** Canonical SKU label for the set lead chase (e.g. `me4-116`). */
+  chaseSku?: string | null;
 
   setWide: {
     cardCount: number;

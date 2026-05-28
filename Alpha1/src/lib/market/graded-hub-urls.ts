@@ -1,7 +1,11 @@
 import type { ExtractedCard } from "@/lib/scan/schemas";
 import { buildMarketSearchIdentity } from "@/lib/market/market-search-identity";
 import { buildEbayHubForCard } from "@/lib/market/sources";
-import { buildCardLadderSearchUrlForCert, cardLadderHubUrls } from "@/lib/market/cardladder-urls";
+import {
+  buildCardLadderCardPageUrl,
+  buildCardLadderSearchUrlForCert,
+  cardLadderHubUrls,
+} from "@/lib/market/cardladder-urls";
 
 export type GradedHubLink = {
   platform: "ebay_sold" | "ebay_active" | "cardladder" | "alt" | "goldin" | "registry";
@@ -10,8 +14,10 @@ export type GradedHubLink = {
   lane: "sold" | "active" | "reference";
 };
 
-export function buildAltBrowseUrl(query: string): string {
-  return `https://app.alt.xyz/browse?q=${encodeURIComponent(query)}`;
+export function buildAltBrowseUrl(query: string, lane: "sold" | "active" = "active"): string {
+  const trimmed = query.trim() || "Pokemon";
+  const q = lane === "sold" ? `${trimmed} sold comps`.replace(/\s+/g, " ").trim() : trimmed;
+  return `https://app.alt.xyz/browse?q=${encodeURIComponent(q)}`;
 }
 
 export function buildGoldinSearchUrl(query: string): string {
@@ -41,9 +47,10 @@ export function buildGradedHubLinks(
   });
 
   const cl = cardLadderHubUrls(card);
+  const clDeep = Boolean(buildCardLadderCardPageUrl(card));
   links.push({
     platform: "cardladder",
-    label: "Card Ladder sales",
+    label: clDeep ? "Card Ladder · grade page" : "Card Ladder · sold comps",
     url: cl.sold,
     lane: "sold",
   });
@@ -51,18 +58,26 @@ export function buildGradedHubLinks(
   const certDigits = card.cert?.replace(/\D/g, "") ?? "";
   if (certDigits.length >= 6) {
     const certUrl = buildCardLadderSearchUrlForCert(card.grader ?? "PSA", certDigits);
-    links.push({
-      platform: "cardladder",
-      label: "Card Ladder · cert search",
-      url: certUrl,
-      lane: "sold",
-    });
+    if (certUrl !== cl.sold) {
+      links.push({
+        platform: "cardladder",
+        label: "Card Ladder · cert search",
+        url: certUrl,
+        lane: "sold",
+      });
+    }
   }
 
   links.push({
     platform: "alt",
-    label: "ALT marketplace",
-    url: buildAltBrowseUrl(searchId.platform),
+    label: "ALT · sold comps",
+    url: buildAltBrowseUrl(searchId.platform, "sold"),
+    lane: "sold",
+  });
+  links.push({
+    platform: "alt",
+    label: "ALT · listings",
+    url: buildAltBrowseUrl(searchId.platform, "active"),
     lane: "active",
   });
 

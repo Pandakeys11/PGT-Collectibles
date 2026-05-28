@@ -55,7 +55,9 @@ Rules:
 - momentumPct is Cardmarket-style % move vs recent average when you find it; else null.
 - sealedProducts: booster box, ETB, booster bundle, PC ETB, etc. with realistic street ranges.
 - references: 2–4 authoritative URLs you actually used (TCGPlayer set page, Bulbapedia, etc.).
-- Be concise, institutional, and accurate — no hype.`;
+- Be concise, institutional, and accurate — no hype.
+- Catalog TCGPlayer anchors in the prompt are authoritative for raw singles unless your web sold data is clearly fresher (label SOLD/ACTIVE).
+- Sealed prices: street ranges only; label ACTIVE or SOLD when known.`;
 
 function buildUserPrompt(input: {
   setId: string;

@@ -15,7 +15,7 @@ import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 /** Same scope string for Sandbox and Production OAuth. */
 const EBAY_CLIENT_CREDENTIALS_SCOPE = "https://api.ebay.com/oauth/api_scope";
 
-function ebayHosts(env: EbayApiEnv): { tokenUrl: string; searchUrl: string; itemBaseUrl: string } {
+export function ebayBrowseHosts(env: EbayApiEnv): { tokenUrl: string; searchUrl: string; itemBaseUrl: string } {
   if (env === "sandbox") {
     return {
       tokenUrl: "https://api.sandbox.ebay.com/identity/v1/oauth2/token",
@@ -38,7 +38,9 @@ function compactQuery(card: ExtractedCard): string {
   return q.length > 120 ? q.slice(0, 120).trim() : q;
 }
 
-async function fetchAccessToken(env: EbayApiEnv): Promise<{ token: string | null; oauthHint: string | null }> {
+export async function fetchEbayBrowseAccessToken(
+  env: EbayApiEnv,
+): Promise<{ token: string | null; oauthHint: string | null }> {
   const clientId = getEbayClientId();
   const clientSecret = getEbayClientSecret();
   if (!clientId || !clientSecret) return { token: null, oauthHint: null };
@@ -48,7 +50,7 @@ async function fetchAccessToken(env: EbayApiEnv): Promise<{ token: string | null
     return { token: cached.accessToken, oauthHint: null };
   }
 
-  const { tokenUrl } = ebayHosts(env);
+  const { tokenUrl } = ebayBrowseHosts(env);
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const body = new URLSearchParams({
     grant_type: "client_credentials",
@@ -200,7 +202,7 @@ export const ebayBrowseAdapter: MarketApiAdapter = {
   async collect(card: ExtractedCard): Promise<ApiAdapterResult> {
     const warnings: string[] = [];
     const env = getEbayApiEnv();
-    const { searchUrl, itemBaseUrl } = ebayHosts(env);
+    const { searchUrl, itemBaseUrl } = ebayBrowseHosts(env);
 
     if (!getEbayClientId() || !getEbayClientSecret()) {
       if (env === "sandbox") {
@@ -209,7 +211,7 @@ export const ebayBrowseAdapter: MarketApiAdapter = {
       return { adapter: "ebay_browse", evidence: [], warnings: warnings.length ? warnings : undefined };
     }
 
-    const { token, oauthHint } = await fetchAccessToken(env);
+    const { token, oauthHint } = await fetchEbayBrowseAccessToken(env);
     if (!token) {
       const base =
         env === "sandbox"

@@ -4,11 +4,14 @@
  * Scheduled: GET /api/catalog/sync (CRON_SECRET)
  */
 
+import { pricesJsonForPokemonCatalogCard } from "@/lib/catalog/catalog-price-snapshot";
+import { syncSetCatalogPricesFromTcgApi } from "@/lib/catalog/catalog-set-price-sync";
 import { upsertCatalogCards, touchCatalogSourceSync } from "@/lib/catalog/db-catalog";
 import type { CatalogSetUpsert } from "@/lib/catalog/db-catalog-browse";
 import { upsertCatalogSets } from "@/lib/catalog/db-catalog-browse";
 import type { CatalogFranchiseId } from "@/lib/catalog/catalog-types";
 import type { CatalogCardUpsert } from "@/lib/catalog/db-catalog";
+import { fetchAllCardsForSet, CATALOG_SET_PRICING_SELECT } from "@/lib/pokedex/tcg-api-server";
 
 const USER_AGENT = "PGTVision/1.0 catalog-sync";
 
@@ -274,17 +277,34 @@ async function syncPokemonRecentSets(): Promise<SyncResult> {
 
     const recentSets = allSets.filter((s) => isRecentRelease(s.releaseDate?.replace(/\//g, "-")));
     const cardRows: CatalogCardUpsert[] = [];
+    const setsToPrice: string[] = [];
+
     for (const set of recentSets.slice(0, 12)) {
+      setsToPrice.push(set.id);
+      let apiCards: Awaited<ReturnType<typeof fetchAllCardsForSet>> = [];
+      try {
+        apiCards = await fetchAllCardsForSet({
+          setId: set.id,
+          select: CATALOG_SET_PRICING_SELECT,
+        });
+      } catch {
+        apiCards = [];
+      }
+      const apiById = new Map(apiCards.map((c) => [c.id, c]));
+
       const pageCards = await fetchJsonWithRetry<Array<Record<string, unknown>>>(
         `https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master/cards/en/${set.id}.json`,
         { headers: githubHeaders },
         { label: `PokemonTCG data ${set.id}`, timeoutMs: 60_000 },
       ).catch(() => []);
+
       for (const card of pageCards) {
         const images = card.images as { small?: string; large?: string } | undefined;
+        const pokemonId = String(card.id);
+        const apiCard = apiById.get(pokemonId);
         cardRows.push({
           franchise: "pokemon",
-          catalogId: String(card.id),
+          catalogId: pokemonId,
           name: String(card.name ?? "Unknown"),
           setName: set.name,
           setCode: set.id,
@@ -293,14 +313,28 @@ async function syncPokemonRecentSets(): Promise<SyncResult> {
           rarity: String(card.rarity ?? "") || null,
           imageSmallUrl: images?.small ?? null,
           imageLargeUrl: images?.large ?? null,
-          pricesJson: {},
-          rawJson: { pokemonId: card.id },
+          pricesJson: pricesJsonForPokemonCatalogCard(
+            { id: pokemonId, tcgplayer: card.tcgplayer as { url?: string } | undefined },
+            apiCard ?? null,
+          ),
+          rawJson: { pokemonId },
           sourceId: "pokemontcg.io",
         });
       }
     }
+
     result.cardsUpserted = await upsertCatalogCards(cardRows);
     await touchCatalogSourceSync("pokemontcg.io");
+
+    if (process.env.CATALOG_SYNC_SKIP_PRICE_HYDRATE !== "1") {
+      for (const setId of setsToPrice.slice(0, 4)) {
+        try {
+          await syncSetCatalogPricesFromTcgApi(setId);
+        } catch {
+          /* non-fatal — rows already have API merge when fetch succeeded */
+        }
+      }
+    }
   } catch (e) {
     result.error = e instanceof Error ? e.message : String(e);
   }

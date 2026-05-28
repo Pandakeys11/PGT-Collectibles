@@ -19,7 +19,7 @@ export const SCANNER_PATH = LEGACY_SCANNER_PATH;
 /** @deprecated Use LIQUID_SCAN_PATH */
 export const SCANNER_CHAT_PATH = LIQUID_SCAN_PATH;
 
-export type LiquidScanPanel = "catalog" | "companion" | "calculator" | "live-market";
+export type LiquidScanPanel = "catalog" | "companion" | "calculator" | "live-market" | "ebay-ending";
 
 /** Maps legacy `/scanner?view=*` bookmarks to Liquid Scan panels. */
 export function legacyScannerRedirectUrl(searchParams: URLSearchParams): string {
@@ -30,6 +30,7 @@ export function legacyScannerRedirectUrl(searchParams: URLSearchParams): string 
   else if (view === "ai") out.set("panel", "companion");
   else if (view === "calculator") out.set("panel", "calculator");
   else if (view === "market" || view === "live-market") out.set("panel", "live-market");
+  else if (view === "ebay-ending" || view === "auctions") out.set("panel", "ebay-ending");
   const q = out.toString();
   return q ? `${LIQUID_SCAN_PATH}?${q}` : LIQUID_SCAN_PATH;
 }
@@ -39,6 +40,7 @@ export function liquidScanHref(panel?: LiquidScanPanel): string {
   if (panel === "companion") return `${LIQUID_SCAN_PATH}?panel=companion`;
   if (panel === "calculator") return `${LIQUID_SCAN_PATH}?panel=calculator`;
   if (panel === "live-market") return `${LIQUID_SCAN_PATH}?panel=live-market`;
+  if (panel === "ebay-ending") return `${LIQUID_SCAN_PATH}?panel=ebay-ending`;
   return LIQUID_SCAN_PATH;
 }
 

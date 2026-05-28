@@ -2,6 +2,8 @@
 
 Alpha1 uses **Bright Data Crawl API** and/or **Web Unlocker** to fetch grader population pages, parse PSA 10→1 (and BGS/CGC grade rows), and write **`pgt_population_snapshots`** in Supabase.
 
+**Free trial budget:** see [brightdata-free-tier.md](./brightdata-free-tier.md) for daily unlocker caps and eBay sold setup.
+
 ## Setup (trial / production)
 
 Bright Data does **not** let trial API keys create zones via API — you create both resources in the **Control Panel**, then paste IDs into `.env.local`.

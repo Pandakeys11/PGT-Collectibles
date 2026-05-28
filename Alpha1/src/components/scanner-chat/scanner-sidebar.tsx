@@ -16,6 +16,7 @@ import {
   Star,
   Trash2,
   TrendingUp,
+  Gavel,
   X,
 } from "lucide-react";
 import { useEffect } from "react";
@@ -29,6 +30,7 @@ export type SidebarNavId =
   | "calculator"
   | "catalog"
   | "live-market"
+  | "ebay-ending"
   | "companion"
   | "history"
   | "collections"
@@ -46,6 +48,7 @@ const NAV: {
   { id: "calculator", label: "Deal calculator", icon: Calculator },
   { id: "catalog", label: "Master catalog", icon: BookOpen },
   { id: "live-market", label: "Live market pulse", icon: TrendingUp },
+  { id: "ebay-ending", label: "eBay ending soon", icon: Gavel },
   { id: "companion", label: "Companion", icon: Sparkles },
   { id: "history", label: "Recent scans", icon: History },
   { id: "collections", label: "Saved Collections", icon: Bookmark, href: "/saved" },

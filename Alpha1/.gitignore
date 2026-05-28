@@ -15,16 +15,32 @@
 .vercel
 .clerk/
 *.tsbuildinfo
+.eslintcache
+.swc/
+.turbo/
+
+# Runtime caches (Bright Data, harvest checkpoints)
+.cache/
+
+# Local scratch — never commit captures (see _scratch/README.md)
+_scratch/*
+!_scratch/README.md
+.tmp/
+.tmp
+.tmp-*
+.tmp-*.*
+tmp-*.log
+tmp-*.out.log
+tmp-*.err.log
 
 # Generated
 /reports/
 /vendor/
 
-# Debug logs
+# Debug logs (npm/yarn; dev scratch logs go under _scratch/)
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-*.log
 
 # Misc
 .DS_Store
@@ -36,8 +52,3 @@ yarn-error.log*
 
 # Optional local catalog export drops (see CATALOG_*_PATH in .env.example)
 /catalog-exports/
-
-# Local probe / harvest scratch (PSA pop HTML, Bright Data tests, etc.)
-.tmp
-.tmp-*
-.tmp-*.*

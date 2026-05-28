@@ -2,8 +2,10 @@ import type { CatalogCardSummary } from "@/lib/catalog/catalog-types";
 import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
 import { bestCatalogUsd } from "@/lib/market/catalog-price-utils";
+import { primaryTcgPlayerFromSnapshot } from "@/lib/market/catalog-raw-fmv";
 import { resolveCatalogRawFmv } from "@/lib/market/catalog-raw-fmv";
 import type { TcgCardSetEmbed, TcgCardSummary } from "@/lib/pokedex/tcg-api-types";
+import type { MarketEvidence } from "@/lib/scan/schemas";
 
 /** Cards from master catalog DB or live TCG API — both feed set insight rollups. */
 export type SetInsightCardSource = CatalogCardSummary | TcgCardSummary;
@@ -109,7 +111,10 @@ export function catalogMomentumPct(prices: CatalogPriceSnapshot): number | null 
   return Math.round(((cm.trendPrice - cm.avg7) / cm.avg7) * 1000) / 10;
 }
 
-export function cardInsightRow(card: SetInsightCardSource): SetInsightCardRow {
+export function cardInsightRow(
+  card: SetInsightCardSource,
+  marketEvidence?: MarketEvidence[],
+): SetInsightCardRow {
   const prices = pricesForInsightCard(card);
   const number = card.number ?? null;
   const rarity = card.rarity ?? null;
@@ -117,6 +122,7 @@ export function cardInsightRow(card: SetInsightCardSource): SetInsightCardRow {
     "catalogFinish" in card && card.catalogFinish === "reverse_holo" ? "reverse_holo" : undefined;
   const fmv = resolveCatalogRawFmv({
     prices,
+    marketEvidence,
     catalogFinish,
     rarity,
     identity: { name: card.name, number, set: card.set?.name ?? null },
@@ -130,6 +136,27 @@ export function cardInsightRow(card: SetInsightCardSource): SetInsightCardRow {
     priceUsd: fmv.usd ?? bestTcgUsd(prices),
     momentumPct: catalogMomentumPct(prices),
   };
+}
+
+export function cardInsightPriceLabel(
+  card: SetInsightCardSource,
+  marketEvidence?: MarketEvidence[],
+): string {
+  const prices = pricesForInsightCard(card);
+  const catalogFinish =
+    "catalogFinish" in card && card.catalogFinish === "reverse_holo" ? "reverse_holo" : undefined;
+  const fmv = resolveCatalogRawFmv({
+    prices,
+    marketEvidence,
+    catalogFinish,
+    rarity: card.rarity ?? null,
+    identity: {
+      name: card.name,
+      number: card.number ?? null,
+      set: card.set?.name ?? null,
+    },
+  });
+  return fmv.sourceLabel;
 }
 
 /** Fill missing TCGPlayer/Cardmarket snapshots from live Pokémon TCG API rows. */
@@ -148,7 +175,13 @@ export function enrichCardsWithLiveTcgPrices(
 
   return catalogCards.map((card) => {
     const existing = pricesForInsightCard(card);
-    if (bestCatalogUsd(existing) != null) return card;
+    const finish =
+      "catalogFinish" in card && card.catalogFinish === "reverse_holo"
+        ? "reverse_holo"
+        : undefined;
+    if (primaryTcgPlayerFromSnapshot(existing, { catalogFinish: finish, rarity: card.rarity }) != null) {
+      return card;
+    }
 
     const apiId =
       ("sourceCatalogId" in card && card.sourceCatalogId?.trim()) ||
@@ -180,14 +213,16 @@ export function enrichCardsWithLiveTcgPrices(
   });
 }
 
-export function rollupSetInsightCards(cards: SetInsightCardSource[]): SetInsightRollup {
+export function rollupSetInsightCards(
+  cards: SetInsightCardSource[],
+  evidenceByCatalogId?: Map<string, MarketEvidence[]>,
+): SetInsightRollup {
   let tcgPlayerSumUsd = 0;
   let pricedSlots = 0;
   for (const card of cards) {
-    const prices = pricesForInsightCard(card);
-    const usd = bestTcgUsd(prices);
-    if (usd != null) {
-      tcgPlayerSumUsd += usd;
+    const row = cardInsightRow(card, evidenceByCatalogId?.get(card.id));
+    if (row.priceUsd != null) {
+      tcgPlayerSumUsd += row.priceUsd;
       pricedSlots += 1;
     }
   }
@@ -209,26 +244,38 @@ export function isPromoLikeCard(card: SetInsightCardSource): boolean {
   );
 }
 
-export function topValueCards(cards: SetInsightCardSource[], limit = 5): SetInsightCardRow[] {
+export function topValueCards(
+  cards: SetInsightCardSource[],
+  limit = 5,
+  evidenceByCatalogId?: Map<string, MarketEvidence[]>,
+): SetInsightCardRow[] {
   return cards
-    .map(cardInsightRow)
+    .map((c) => cardInsightRow(c, evidenceByCatalogId?.get(c.id)))
     .filter((r) => r.priceUsd != null)
     .sort((a, b) => (b.priceUsd ?? 0) - (a.priceUsd ?? 0))
     .slice(0, limit);
 }
 
-export function topMomentumCards(cards: SetInsightCardSource[], limit = 4): SetInsightCardRow[] {
+export function topMomentumCards(
+  cards: SetInsightCardSource[],
+  limit = 4,
+  evidenceByCatalogId?: Map<string, MarketEvidence[]>,
+): SetInsightCardRow[] {
   return cards
-    .map(cardInsightRow)
+    .map((c) => cardInsightRow(c, evidenceByCatalogId?.get(c.id)))
     .filter((r) => r.momentumPct != null && Math.abs(r.momentumPct!) >= 3)
     .sort((a, b) => Math.abs(b.momentumPct ?? 0) - Math.abs(a.momentumPct ?? 0))
     .slice(0, limit);
 }
 
-export function promoCardsInSet(cards: SetInsightCardSource[], limit = 5): SetInsightCardRow[] {
+export function promoCardsInSet(
+  cards: SetInsightCardSource[],
+  limit = 5,
+  evidenceByCatalogId?: Map<string, MarketEvidence[]>,
+): SetInsightCardRow[] {
   return cards
     .filter(isPromoLikeCard)
-    .map(cardInsightRow)
+    .map((c) => cardInsightRow(c, evidenceByCatalogId?.get(c.id)))
     .sort((a, b) => (b.priceUsd ?? 0) - (a.priceUsd ?? 0))
     .slice(0, limit);
 }

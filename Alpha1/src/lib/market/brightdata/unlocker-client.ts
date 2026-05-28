@@ -3,6 +3,11 @@ import {
   getBrightDataWebUnlockerZone,
   isBrightDataUnlockerConfigured,
 } from "@/lib/market/brightdata/config";
+import {
+  isBrightDataUnlockerBudgetAvailable,
+  recordBrightDataUnlockerUse,
+} from "@/lib/market/brightdata/quota";
+import { unwrapBrightDataResponseBody } from "@/lib/market/brightdata/unlocker-response";
 
 const REQUEST_URL = "https://api.brightdata.com/request";
 
@@ -18,10 +23,18 @@ export type BrightDataPageFetch = {
  */
 export async function fetchPageViaBrightDataUnlocker(
   url: string,
-  options?: { dataFormat?: "markdown" | "screenshot" },
+  options?: {
+    dataFormat?: "markdown" | "screenshot";
+    quotaBucket?: "ebay" | "cert" | "other";
+  },
 ): Promise<BrightDataPageFetch> {
   if (!isBrightDataUnlockerConfigured()) {
     throw new Error("brightdata_unlocker_not_configured");
+  }
+
+  const bucket = options?.quotaBucket ?? "cert";
+  if (!isBrightDataUnlockerBudgetAvailable(bucket)) {
+    throw new Error("brightdata_unlocker_daily_budget_exceeded");
   }
 
   const key = getBrightDataApiKey();
@@ -60,33 +73,10 @@ export async function fetchPageViaBrightDataUnlocker(
     throw new Error(`brightdata_unlocker_${res.status}: ${text.slice(0, 400)}`);
   }
 
-  const trimmed = text.trim();
+  recordBrightDataUnlockerUse(bucket);
+  const trimmed = unwrapBrightDataResponseBody(text);
   if (!trimmed) {
     return { url, markdown: null, html: null };
-  }
-
-  if (trimmed.startsWith("{")) {
-    try {
-      const json = JSON.parse(trimmed) as Record<string, unknown>;
-      const inner =
-        (typeof json.body === "string" && json.body) ||
-        (typeof json.response === "string" && json.response) ||
-        (typeof json.content === "string" && json.content) ||
-        null;
-      if (options?.dataFormat === "markdown" && inner) {
-        return { url, markdown: inner, html: null };
-      }
-      if (inner) {
-        const isHtml = /<html[\s>]/i.test(inner) || /<body[\s>]/i.test(inner);
-        return {
-          url,
-          markdown: options?.dataFormat === "markdown" ? inner : null,
-          html: isHtml ? inner : null,
-        };
-      }
-    } catch {
-      /* fall through */
-    }
   }
 
   const isHtml = /<html[\s>]/i.test(trimmed) || /<body[\s>]/i.test(trimmed);

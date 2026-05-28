@@ -94,3 +94,24 @@ export function isPokeTraceHistoryEnabled(): boolean {
   if (flag === "0" || flag === "false") return false;
   return true;
 }
+
+const JUSTTCG_DEFAULT_BASE = "https://api.justtcg.com/v1";
+
+export function getJustTcgApiKey(): string | null {
+  return firstConfiguredEnv(
+    "JUSTTCG_API_KEY",
+    "Just_Pokemon_TCG_API_KEY",
+    "JUST_POKEMON_TCG_API_KEY",
+  );
+}
+
+export function getJustTcgBaseUrl(): string {
+  return (
+    firstConfiguredEnv("JUSTTCG_BASE_URL")?.replace(/\/$/, "") ?? JUSTTCG_DEFAULT_BASE
+  );
+}
+
+export function isJustTcgConfigured(): boolean {
+  if (process.env.JUSTTCG_ENABLED === "0") return false;
+  return Boolean(getJustTcgApiKey());
+}

@@ -187,8 +187,16 @@
   width: 100%;
 }
 
-.scanner-chat-root .sc-catalog-set-insight-rail {
+.scanner-chat-root .sc-catalog-set-insight-rail,
+.scanner-chat-root .sc-catalog-market-intelligence-rail {
   border-radius: 0.75rem;
+}
+
+.scanner-chat-root .sc-catalog-market-intelligence-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-gutter: stable;
 }
 
 .scanner-chat-root .sc-catalog-set-insight-scroll {
@@ -433,7 +441,8 @@
     max-width: none;
   }
 
-  .sc-live-market-embed-panel.sc-chat-output-panel {
+  .sc-live-market-embed-panel.sc-chat-output-panel,
+  .sc-ebay-ending-embed-panel.sc-chat-output-panel {
     max-height: min(calc(100dvh - 12rem), 640px);
   }
 }
@@ -498,10 +507,32 @@
     max-height: 100dvh;
     max-height: 100svh;
     overflow: hidden;
-    font-size: 13px;
-    line-height: 1.45;
+    --sc-composer-height: 6.25rem;
+    font-size: 12px;
+    line-height: 1.4;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Embedded workspace (catalog, companion, etc.) — fit above composer, no overlap */
+  .scanner-chat-root:has(.sc-chat-output-panel) {
+    --sc-composer-height: 5.75rem;
+  }
+
+  .scanner-chat-root:has(.sc-chat-output-panel) .sc-mobile-feed {
+    padding-bottom: 0.25rem;
+  }
+
+  .scanner-chat-root:has(.sc-chat-output-panel) .sc-mobile-results-fab {
+    display: none;
+  }
+
+  .scanner-chat-root .sc-chat-output-panel {
+    max-height: min(52dvh, calc(100dvh - var(--sc-composer-height) - 7.5rem));
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel.sc-chat-output-panel {
+    max-height: min(58dvh, calc(100dvh - var(--sc-composer-height) - 7rem));
   }
 
   /* Symmetric edge padding — avoids left-heavy chat avatar gutter on wide embeds */
@@ -592,6 +623,7 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    padding-bottom: calc(var(--sc-composer-height, 6.25rem) + 0.35rem);
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
     overscroll-behavior-x: none;
@@ -605,12 +637,34 @@
   /* 16px inputs prevent iOS zoom-on-focus */
   .sc-composer-input {
     font-size: 16px !important;
+    min-height: 2.125rem !important;
+    max-height: 4.5rem !important;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .sc-composer-input::placeholder {
+    font-size: 0.8125rem;
   }
 
   @media (min-width: 640px) {
     .sc-composer-input {
       font-size: 0.875rem !important;
     }
+  }
+
+  .sc-composer-panel {
+    padding: 0.375rem;
+  }
+
+  .sc-composer-icon-btn {
+    height: 2.25rem;
+    width: 2.25rem;
+  }
+
+  .sc-composer-submit {
+    min-height: 2.25rem;
+    height: 2.25rem;
   }
 
   .sc-composer-modes {
@@ -627,16 +681,19 @@
     max-width: 100%;
   }
 
-  .sc-scan-sheet-scroll {
-    max-height: min(56dvh, 24rem);
+  .sc-scan-sheet-scroll,
+  .sc-scan-sheet-table-scroll {
+    overflow: auto;
     -webkit-overflow-scrolling: touch;
-    overflow-x: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
   }
 
-  .sc-scan-table {
-    min-width: 36rem;
+  .sc-scan-sheet-scroll {
+    max-height: min(56dvh, 28rem);
   }
 
+  /* Same pinned columns as desktop — scroll happens on .sc-scan-sheet-scroll only */
   .sc-scan-sticky-col {
     position: sticky;
     z-index: 2;
@@ -657,8 +714,9 @@
     box-shadow: 4px 0 8px -4px rgb(0 0 0 / 0.45);
   }
 
-  .sc-scan-mobile-list li button {
-    min-height: 3.25rem;
+  .sc-scan-th.sc-scan-sticky-col {
+    z-index: 3;
+    background: rgb(12, 16, 22);
   }
 
   /* Card identity panel — align with scan sheet density */
@@ -686,8 +744,12 @@
   }
 
   .sc-mobile-composer {
-    --sc-composer-height: 6.75rem;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 45;
+  }
+
+  .sc-composer-stack {
+    z-index: 45;
   }
 
   .sc-mobile-composer-inner {
@@ -703,17 +765,44 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  .sc-mobile-drawer-sheet .grid-cols-4 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.375rem;
+  .sc-mobile-drawer-sheet[data-expanded="true"] {
+    max-height: 100dvh;
+    max-height: 100svh;
+    border-radius: 0;
   }
 
-  .sc-mobile-drawer-sheet .grid-cols-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .sc-mobile-drawer-sheet .sc-scan-sheet {
+    border-radius: 0.75rem;
   }
 
-  .sc-mobile-drawer-sheet [class*="grid-cols-2"]:not(.grid-cols-4) {
-    grid-template-columns: minmax(0, 1fr);
+  .sc-mobile-drawer-sheet[data-drawer-tab="sheet"] .sc-mobile-drawer-body {
+    overflow: hidden;
+  }
+
+  .sc-mobile-drawer-sheet .sc-scan-sheet--fill {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .sc-mobile-drawer-sheet .sc-scan-sheet--fill .sc-scan-sheet-table-scroll {
+    max-height: none;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  /* Match desktop sheet typography inside drawer */
+  .sc-mobile-drawer-sheet .sc-scan-table td,
+  .sc-mobile-drawer-sheet .sc-scan-table th {
+    font-size: 11px;
+  }
+
+  .sc-mobile-drawer-sheet .sc-scan-th {
+    font-size: 9px;
+  }
+
+  .sc-mobile-drawer-intel .sc-glass-raised {
+    border-radius: 0.75rem;
   }
 
   /* Touch targets */

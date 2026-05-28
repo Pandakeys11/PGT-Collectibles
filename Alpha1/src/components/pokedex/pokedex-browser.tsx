@@ -36,6 +36,13 @@ import {
 import { CatalogFocusGrid } from "@/components/pokedex/catalog-focus-grid";
 import { CatalogVariantImage } from "@/components/pokedex/catalog-variant-image";
 import { CatalogCardFmvRibbon } from "@/components/catalog/catalog-card-fmv-badge";
+import { CatalogCardGradedRibbon } from "@/components/catalog/catalog-card-graded-ribbon";
+import { CatalogSetHeaderBand } from "@/components/catalog/catalog-set-header-band";
+import {
+  sortCatalogCards,
+  type CatalogCardSortId,
+} from "@/lib/catalog/catalog-card-sort";
+import { formatPokemonCatalogSkuLabel } from "@/lib/catalog/parse-catalog-sku";
 import {
   CatalogCardDetailActions,
   CatalogCardDetailBody,
@@ -44,6 +51,7 @@ import {
 import { marketPokemonHref } from "@/lib/app-routes";
 import { ScanThisCardButton } from "@/components/pokedex/scan-this-card-button";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import { CatalogMarketIntelligenceRail } from "@/components/catalog/catalog-market-intelligence-rail";
 import { CatalogSetInsightRail } from "@/components/catalog/catalog-set-insight-rail";
 import { PokedexSetOverviewPanel } from "@/components/pokedex/pokedex-set-overview-panel";
 import { hasCatalogSetOverlay } from "@/lib/pokedex/catalog-set-overlay";
@@ -227,6 +235,7 @@ export function PokedexBrowser({
   const [cardsMeta, setCardsMeta] = useState({ totalCount: 0, pageSize: CATALOG_PAGE_SIZE, count: 0 });
   const [cardsLoading, setCardsLoading] = useState(false);
   const [cardsError, setCardsError] = useState<string | null>(null);
+  const [cardSort, setCardSort] = useState<CatalogCardSortId>("number");
 
   const [detail, setDetail] = useState<TcgCardSummary | null>(null);
   const [variantArtworkOverlay, setVariantArtworkOverlay] = useState<CatalogVariantOverlayByCardId | null>(null);
@@ -483,6 +492,11 @@ export function PokedexBrowser({
     [cardsMeta.totalCount, cardsMeta.pageSize],
   );
 
+  const displayCards = useMemo(
+    () => sortCatalogCards(cards, cardSort),
+    [cards, cardSort],
+  );
+
   const catalogScanPrefill = useMemo((): CatalogScanPrefill | null => {
     if (!detail) return null;
     const setName =
@@ -621,6 +635,10 @@ export function PokedexBrowser({
       image,
       badges,
       extraRows: [
+        {
+          label: "Catalog SKU",
+          value: formatPokemonCatalogSkuLabel(detail.id, detail.number),
+        },
         { label: "Print run", value: printRunLabel },
         {
           label: "Finish",
@@ -710,7 +728,7 @@ export function PokedexBrowser({
               ? cn(
                   "mt-1 flex min-h-0 flex-1 flex-col overflow-hidden",
                   embeddedSetOpen &&
-                    "sc-pokedex-catalog-grid--set-open lg:grid lg:max-h-full lg:grid-cols-[minmax(0,1fr)_minmax(200px,260px)] lg:grid-rows-1 lg:items-stretch lg:gap-2 [&>*]:min-h-0 [&>*]:max-h-full",
+                    "sc-pokedex-catalog-grid--set-open lg:grid lg:max-h-full lg:grid-cols-[minmax(0,1fr)_minmax(220px,280px)] lg:grid-rows-1 lg:items-stretch lg:gap-2 [&>*]:min-h-0 [&>*]:max-h-full",
                   !embeddedSetOpen && selectedSetId === null && "lg:grid lg:grid-cols-1",
                 )
               : "mt-8 grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:gap-4",
@@ -878,6 +896,20 @@ export function PokedexBrowser({
                   </Button>
                 </div>
 
+                {selectedSetId && selectedSetName ? (
+                  <CatalogSetHeaderBand
+                    setId={selectedSetId}
+                    setName={selectedSetName}
+                    cardSort={cardSort}
+                    onCardSortChange={setCardSort}
+                    onSelectChase={(catalogId) => {
+                      const hit = cards.find((c) => c.id === catalogId);
+                      if (hit) setDetail(hit);
+                    }}
+                    className="mt-2 shrink-0"
+                  />
+                ) : null}
+
                 <div className="mt-3 shrink-0">
                   <RarityFilterTabs
                     value={rarityBucket}
@@ -905,11 +937,18 @@ export function PokedexBrowser({
                   </div>
                 ) : null}
 
-                {embeddedSetOpen && mobileStepped ? (
-                  <div className="mt-2 shrink-0 lg:hidden">
+                {embeddedSetOpen && mobileStepped && selectedSetId && selectedSetName ? (
+                  <div className="mt-2 shrink-0 space-y-2 lg:hidden">
+                    <CatalogMarketIntelligenceRail
+                      setId={selectedSetId}
+                      setName={selectedSetName}
+                      cards={cards}
+                      onSelectCard={openCardDetailByCatalogId}
+                      className="max-h-[min(38vh,300px)]"
+                    />
                     <CatalogSetInsightRail
-                      setId={selectedSetId!}
-                      setName={selectedSetName ?? "Set"}
+                      setId={selectedSetId}
+                      setName={selectedSetName}
                       cards={cards}
                       onSelectCard={openCardDetailByCatalogId}
                       className="max-h-[min(42vh,320px)]"
@@ -931,7 +970,7 @@ export function PokedexBrowser({
                     </div>
                   ) : cardsError ? (
                     <p className="text-sm text-danger">{cardsError}</p>
-                  ) : cards.length === 0 ? (
+                  ) : displayCards.length === 0 ? (
                     <p className="py-16 text-center text-sm text-muted">
                       {rarityBucket === "all"
                         ? "No cards were returned for this set."
@@ -939,7 +978,7 @@ export function PokedexBrowser({
                     </p>
                   ) : (
                     <CatalogFocusGrid
-                      items={cards}
+                      items={displayCards}
                       getKey={(c) => `${c.id}-${c.catalogFinish ?? "std"}`}
                       gridClassName={
                         embedded && mobileStepped ? CATALOG_CARD_GRID_MOBILE_STEP : CATALOG_CARD_GRID_4X4
@@ -996,6 +1035,11 @@ export function PokedexBrowser({
                                   </span>
                                 ) : null}
                               </div>
+                              <CatalogCardGradedRibbon
+                                catalogPrices={c.catalogPrices}
+                                tcgplayer={c.tcgplayer}
+                                cardmarket={c.cardmarket}
+                              />
                               <CatalogCardFmvRibbon
                                 catalogPrices={c.catalogPrices}
                                 tcgplayer={c.tcgplayer}
@@ -1005,6 +1049,8 @@ export function PokedexBrowser({
                                 name={c.name}
                                 number={c.number}
                                 setName={c.set?.name}
+                                rawFmvUsd={c.rawFmvUsd}
+                                rawFmvSourceLabel={c.rawFmvSourceLabel}
                               />
                             </div>
                             <div className={CATALOG_CARD_FOOTER}>
@@ -1054,14 +1100,23 @@ export function PokedexBrowser({
           </Card>
           ) : null}
 
-          {embeddedSetOpen && selectedSetId ? (
-            <CatalogSetInsightRail
-              setId={selectedSetId}
-              setName={selectedSetName ?? "Set"}
-              cards={cards}
-              onSelectCard={openCardDetailByCatalogId}
-              className="hidden min-h-0 rounded-xl lg:flex"
-            />
+          {embeddedSetOpen && selectedSetId && selectedSetName ? (
+            <div className="hidden min-h-0 max-h-full flex-col gap-2 lg:flex">
+              <CatalogMarketIntelligenceRail
+                setId={selectedSetId}
+                setName={selectedSetName}
+                cards={cards}
+                onSelectCard={openCardDetailByCatalogId}
+                className="max-h-[min(46vh,380px)] shrink-0"
+              />
+              <CatalogSetInsightRail
+                setId={selectedSetId}
+                setName={selectedSetName}
+                cards={cards}
+                onSelectCard={openCardDetailByCatalogId}
+                className="min-h-0 flex-1 rounded-xl"
+              />
+            </div>
           ) : null}
         </div>
       </div>

@@ -24,6 +24,13 @@ import {
   defaultFranchiseMeta,
   sortFranchiseMetas,
 } from "@/lib/catalog/franchise-registry";
+import {
+  getCardFromDbBySetNumber,
+} from "@/lib/catalog/db-catalog-browse";
+import {
+  parsePokemonCatalogSku,
+  pokemonCatalogIdFromSku,
+} from "@/lib/catalog/parse-catalog-sku";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 const FRANCHISE_IDS: CatalogFranchiseId[] = [
@@ -166,7 +173,20 @@ export async function getCatalogCard(
   franchise: CatalogFranchiseId,
   catalogId: string,
 ): Promise<CatalogCardSummary | null> {
-  const fromDb = await getCardFromDb(franchise, catalogId);
+  const canonical =
+    franchise === "pokemon" ? (pokemonCatalogIdFromSku(catalogId) ?? catalogId.trim()) : catalogId.trim();
+
+  let fromDb = await getCardFromDb(franchise, canonical);
+  if (!fromDb && franchise === "pokemon") {
+    const parsed = parsePokemonCatalogSku(catalogId);
+    if (parsed?.kind === "set_number") {
+      fromDb = await getCardFromDbBySetNumber(
+        franchise,
+        parsed.setCode,
+        parsed.cardNumber,
+      );
+    }
+  }
   if (fromDb) return fromDb;
 
   if (franchise === "magic") {

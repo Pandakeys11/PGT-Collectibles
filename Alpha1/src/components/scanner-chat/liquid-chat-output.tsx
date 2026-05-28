@@ -1,6 +1,7 @@
 "use client";
 
 import { BookOpen, Calculator, Sparkles, X } from "lucide-react";
+import { EbayEndingSoonPanel } from "@/components/scanner-chat/ebay-ending-soon-panel";
 import { LiveMarketTickerPanel } from "@/components/scanner-chat/live-market-ticker-panel";
 import { CollectorVendorCalculator } from "@/components/scanner-chat/collector-vendor-calculator";
 import { CompanionPanel } from "@/components/companion/companion-panel";
@@ -32,7 +33,7 @@ export function LiquidChatOutputPanel({
     return (
       <div
         className={cn(
-          "sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(85dvh,560px)] flex-col overflow-hidden rounded-xl border border-emerald-500/20 sc-glass-raised lg:min-h-[min(40vh,420px)] lg:max-h-[min(calc(100dvh-11rem),640px)]",
+          "sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(52dvh,520px)] flex-col overflow-hidden rounded-xl border border-emerald-500/20 sc-glass-raised max-lg:max-h-[min(52dvh,calc(100dvh-14rem))] lg:min-h-[min(40vh,420px)] lg:max-h-[min(calc(100dvh-11rem),640px)]",
           className,
         )}
       >
@@ -70,7 +71,7 @@ export function LiquidChatOutputPanel({
     return (
       <div
         className={cn(
-          "sc-live-market-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(88dvh,720px)] flex-col overflow-hidden rounded-xl border border-sky-500/25 sc-glass-raised lg:max-h-[min(calc(100dvh-12rem),680px)]",
+          "sc-live-market-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(54dvh,560px)] flex-col overflow-hidden rounded-xl border border-sky-500/25 sc-glass-raised max-lg:max-h-[min(54dvh,calc(100dvh-14rem))] lg:max-h-[min(calc(100dvh-12rem),680px)]",
           className,
         )}
       >
@@ -82,12 +83,25 @@ export function LiquidChatOutputPanel({
     );
   }
 
+  if (kind === "ebay-ending") {
+    return (
+      <div
+        className={cn(
+          "sc-ebay-ending-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(54dvh,560px)] flex-col overflow-hidden rounded-xl border border-rose-500/25 sc-glass-raised max-lg:max-h-[min(54dvh,calc(100dvh-14rem))] lg:max-h-[min(calc(100dvh-12rem),680px)]",
+          className,
+        )}
+      >
+        <EbayEndingSoonPanel onDismiss={onDismiss} className="min-h-0 flex-1" />
+      </div>
+    );
+  }
+
   if (kind === "companion") {
     if (!companion) return null;
     return (
       <div
         className={cn(
-          "sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(85dvh,640px)] flex-col overflow-hidden rounded-xl border border-violet-500/20 sc-glass-raised lg:min-h-[min(52vh,480px)] lg:max-h-[min(calc(100dvh-11rem),720px)]",
+          "sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(52dvh,540px)] flex-col overflow-hidden rounded-xl border border-violet-500/20 sc-glass-raised max-lg:max-h-[min(52dvh,calc(100dvh-14rem))] lg:min-h-[min(52vh,480px)] lg:max-h-[min(calc(100dvh-11rem),720px)]",
           className,
         )}
       >
@@ -121,7 +135,7 @@ export function LiquidChatOutputPanel({
   return (
     <div
       className={cn(
-        "sc-catalog-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(92dvh,880px)] flex-col overflow-hidden rounded-xl border border-amber-500/20 sc-glass-raised max-lg:max-h-[min(94dvh,920px)] lg:min-h-[min(70vh,680px)] lg:max-h-[min(calc(100dvh-10rem),940px)]",
+        "sc-catalog-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(58dvh,640px)] flex-col overflow-hidden rounded-xl border border-amber-500/20 sc-glass-raised max-lg:max-h-[min(58dvh,calc(100dvh-13rem))] lg:min-h-[min(70vh,680px)] lg:max-h-[min(calc(100dvh-10rem),940px)]",
         className,
       )}
     >

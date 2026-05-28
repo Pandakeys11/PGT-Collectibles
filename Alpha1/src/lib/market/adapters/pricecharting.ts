@@ -69,6 +69,16 @@ export const priceChartingAdapter: MarketApiAdapter = {
           pickUsd(payload["psa-10-price"]) ??
           pickUsd(payload["psa10"]);
 
+        const psa9Guide =
+          pickUsd(payload["cib-price"]) ??
+          pickUsd(payload["cibPrice"]) ??
+          pickUsd(payload["grade-9-price"]);
+
+        const psa8Guide =
+          pickUsd(payload["new-price"]) ??
+          pickUsd(payload["newPrice"]) ??
+          pickUsd(payload["grade-8-price"]);
+
         const productPageUrl = (() => {
           const u = rawProductUrl?.trim();
           if (!u) return `https://www.pricecharting.com/search-products?q=${encodeURIComponent(q)}&type=prices`;
@@ -89,9 +99,13 @@ export const priceChartingAdapter: MarketApiAdapter = {
           });
         };
 
-        if (graded != null) pushRef(`${productName} (graded guide)`, graded, "reference");
-        else if (cib != null) pushRef(`${productName} (complete guide)`, cib, "reference");
-        else if (loose != null) pushRef(`${productName} (loose guide)`, loose, "reference");
+        if (graded != null) pushRef(`${productName} (PSA 10 guide)`, graded, "reference");
+        if (psa9Guide != null) pushRef(`${productName} (PSA 9 guide)`, psa9Guide, "reference");
+        if (psa8Guide != null) pushRef(`${productName} (PSA 8 guide)`, psa8Guide, "reference");
+        if (evidence.length === 0 && cib != null)
+          pushRef(`${productName} (complete guide)`, cib, "reference");
+        if (evidence.length === 0 && loose != null)
+          pushRef(`${productName} (loose guide)`, loose, "reference");
         else if (Object.keys(payload).length > 0) {
           pushRef(String(productName), null, "reference");
         }

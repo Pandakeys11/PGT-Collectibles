@@ -31,7 +31,7 @@ function UserMessage({ message }: { message: Extract<ChatMessage, { role: "user"
     >
       <div className="max-w-[min(100%,42rem)] space-y-2">
         {message.text ? (
-          <div className="rounded-xl rounded-tr-md bg-sky-500/15 px-3 py-2.5 text-[13px] text-slate-100 ring-1 ring-sky-400/20 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
+          <div className="rounded-xl rounded-tr-md bg-sky-500/15 px-2.5 py-2 text-xs leading-snug text-slate-100 ring-1 ring-sky-400/20 max-lg:max-w-[min(100%,20rem)] sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
             {message.text}
           </div>
         ) : null}
@@ -112,7 +112,7 @@ export function ChatMessageList({
   const showTimeline = systemSteps.length > 0 && systemSteps.some((s) => s.active || s.done);
 
   return (
-    <div className={cn("space-y-4 sm:space-y-6", className)}>
+    <div className={cn("space-y-2.5 sm:space-y-4 lg:space-y-6", className)}>
       {messages.map((msg) => {
         if (msg.role === "user") {
           return <UserMessage key={msg.id} message={msg} />;

@@ -65,6 +65,16 @@ export const LIQUID_SCAN_SHEET_COLUMNS: LiquidScanSheetColumn[] = [
   { key: "status", label: "Status", minWidth: "4.5rem" },
 ];
 
+/** Sum of column min-widths — table must be at least this wide to show every column. */
+export function liquidScanSheetTableMinWidth(): string {
+  let sumRem = 0;
+  for (const col of LIQUID_SCAN_SHEET_COLUMNS) {
+    const n = Number.parseFloat(col.minWidth);
+    sumRem += Number.isFinite(n) ? n : 4;
+  }
+  return `${Math.ceil(sumRem + 0.5)}rem`;
+}
+
 function sheetCondition(specimen: ScanSpecimen): string {
   if (specimen.context.lane === "graded") {
     const tag = formatGradedSlabTag(

@@ -2,6 +2,7 @@
 
 import { TrendingDown, TrendingUp } from "lucide-react";
 import type { LiveMarketTickerLaneId, LiveMarketTickerSlide } from "@/lib/market/live-market-ticker-types";
+import { slideBannerPriceUsd } from "@/lib/market/live-market-ticker-display";
 import { cn } from "@/lib/cn";
 
 function fmtUsd(n: number | null | undefined): string {
@@ -38,6 +39,8 @@ export function LiveMarketTickerPill({
   const accent = LANE_ACCENT[slide.lane];
   const momentum = slide.momentumPct;
   const up = momentum != null && momentum >= 0;
+  const bannerPrice = slideBannerPriceUsd(slide);
+  const isTopValue = slide.lane === "top_value";
 
   const inner = (
     <>
@@ -63,7 +66,7 @@ export function LiveMarketTickerPill({
           {slide.cardName}
         </p>
         <p className="truncate text-[9px] leading-tight text-muted">
-          {laneLabel}
+          {isTopValue ? "Top value" : laneLabel}
           {slide.lane === "jpn_art" ? (
             <span className="ml-1 font-mono text-violet-200/90">{fmtUsd(slide.priceUsd)}</span>
           ) : slide.lane === "momentum" && momentum != null ? (
@@ -79,8 +82,8 @@ export function LiveMarketTickerPill({
             </span>
           ) : (
             <span className="ml-1 font-mono text-sky-200/90">
-              {fmtUsd(slide.rawFmvUsd ?? slide.priceUsd)}
-              {slide.psa10FmvUsd != null && slide.lane === "top_value" ? (
+              {fmtUsd(bannerPrice)}
+              {isTopValue && slide.psa10FmvUsd != null ? (
                 <span className="text-faint">
                   {" "}
                   · PSA10 {fmtUsd(slide.psa10FmvUsd)}

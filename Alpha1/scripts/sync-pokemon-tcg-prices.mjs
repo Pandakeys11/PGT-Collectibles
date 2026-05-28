@@ -12,6 +12,10 @@
  * Recommended: POKEMON_TCG_API_KEY (free dev key — higher rate limits)
  */
 import { createClient } from "@supabase/supabase-js";
+import {
+  priceSnapshotFromPokemonApiCard,
+  priceSnapshotToPricesJson,
+} from "./lib/catalog-price-snapshot.mjs";
 import { loadEnvLocal } from "./load-env-local.mjs";
 
 loadEnvLocal();
@@ -34,36 +38,7 @@ if (!url || !key) {
 const supabase = createClient(url, key, { auth: { persistSession: false } });
 
 function priceSnapshotFromApiCard(card) {
-  const tp = card.tcgplayer;
-  const tcgPlayerPrices = tp?.prices
-    ? Object.entries(tp.prices).map(([variant, block]) => ({
-        variant,
-        market: block?.market ?? null,
-        mid: block?.mid ?? null,
-        low: block?.low ?? null,
-        high: block?.high ?? null,
-        directLow: block?.directLow ?? null,
-      }))
-    : [];
-  const cm = card.cardmarket?.prices;
-  const cardMarket = cm
-    ? {
-        averageSellPrice: cm.averageSellPrice ?? null,
-        trendPrice: cm.trendPrice ?? null,
-        lowPrice: cm.lowPrice ?? null,
-        avg7: cm.avg7 ?? null,
-        avg30: cm.avg30 ?? null,
-        reverseHoloTrend: cm.reverseHoloTrend ?? null,
-      }
-    : null;
-  return {
-    tcgPlayerUrl: tp?.url ?? null,
-    tcgPlayerUpdatedAt: tp?.updatedAt ?? null,
-    tcgPlayerPrices,
-    cardMarketUrl: card.cardmarket?.url ?? null,
-    cardMarketUpdatedAt: card.cardmarket?.updatedAt ?? null,
-    cardMarket,
-  };
+  return priceSnapshotToPricesJson(priceSnapshotFromPokemonApiCard(card));
 }
 
 function needsPriceRefresh(pricesJson) {

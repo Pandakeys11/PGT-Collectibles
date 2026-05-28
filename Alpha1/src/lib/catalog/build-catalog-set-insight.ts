@@ -1,3 +1,5 @@
+import { syncSetCatalogPricesFromTcgApi } from "@/lib/catalog/catalog-set-price-sync";
+import { loadSetMarketEvidenceMap } from "@/lib/catalog/set-insight-comps";
 import { listCardsFromDb } from "@/lib/catalog/db-catalog-browse";
 import type {
   CatalogSetInsightPayload,
@@ -15,6 +17,7 @@ import {
   groqRawToSealed,
 } from "@/lib/catalog/set-insight-groq";
 import {
+  cardInsightPriceLabel,
   cardInsightRow,
   enrichCardsWithLiveTcgPrices,
   promoCardsInSet,
@@ -23,11 +26,13 @@ import {
   topValueCards,
   type SetInsightCardSource,
 } from "@/lib/catalog/set-insight-utils";
+import type { MarketEvidence } from "@/lib/scan/schemas";
 import {
   getCatalogSetOverlay,
   hasCatalogSetOverlay,
   type SealedProductSpec,
 } from "@/lib/pokedex/catalog-set-overlay";
+import { formatPokemonCatalogSkuLabel } from "@/lib/catalog/parse-catalog-sku";
 import { buildMarketSourceLinks } from "@/lib/market/sources";
 import { rollupCatalogSetPricing } from "@/lib/pokedex/set-pricing-aggregate";
 import {
@@ -75,26 +80,42 @@ function attachCatalogIds(
   });
 }
 
-function catalogRowsToInsight(cards: SetInsightCardSource[]): {
+function catalogRowsToInsight(
+  cards: SetInsightCardSource[],
+  evidenceByCatalogId?: Map<string, MarketEvidence[]>,
+): {
   topValue: SetInsightPriceCard[];
   momentum: SetInsightPriceCard[];
   promos: SetInsightPriceCard[];
 } {
-  const mapRow = (r: ReturnType<typeof cardInsightRow>): SetInsightPriceCard => ({
-    catalogId: r.catalogId,
-    name: r.name,
-    number: r.number,
-    rarity: r.rarity,
-    imageUrl: r.imageUrl,
-    priceUsd: r.priceUsd,
-    priceLabel: "TCGPlayer market",
-    momentumPct: r.momentumPct,
-  });
+  const mapRow = (card: SetInsightCardSource): SetInsightPriceCard => {
+    const ev = evidenceByCatalogId?.get(card.id);
+    const r = cardInsightRow(card, ev);
+    return {
+      catalogId: r.catalogId,
+      name: r.name,
+      number: r.number,
+      rarity: r.rarity,
+      imageUrl: r.imageUrl,
+      priceUsd: r.priceUsd,
+      priceLabel: cardInsightPriceLabel(card, ev),
+      momentumPct: r.momentumPct,
+    };
+  };
 
   return {
-    topValue: topValueCards(cards, 8).map(mapRow),
-    momentum: topMomentumCards(cards, 6).map(mapRow),
-    promos: promoCardsInSet(cards, 6).map(mapRow),
+    topValue: topValueCards(cards, 8, evidenceByCatalogId).map((r) => {
+      const card = cards.find((c) => c.id === r.catalogId);
+      return card ? mapRow(card) : { ...r, priceLabel: "TCGPlayer market" };
+    }),
+    momentum: topMomentumCards(cards, 6, evidenceByCatalogId).map((r) => {
+      const card = cards.find((c) => c.id === r.catalogId);
+      return card ? mapRow(card) : { ...r, priceLabel: "TCGPlayer market" };
+    }),
+    promos: promoCardsInSet(cards, 6, evidenceByCatalogId).map((r) => {
+      const card = cards.find((c) => c.id === r.catalogId);
+      return card ? mapRow(card) : { ...r, priceLabel: "TCGPlayer market" };
+    }),
   };
 }
 
@@ -114,7 +135,8 @@ function mergeCardLists(
   return out.slice(0, 10);
 }
 
-async function loadSetCards(setId: string): Promise<{
+/** Full-set cards + live TCG price enrichment (set insight, market movers). */
+export async function loadSetCardsForCatalogInsight(setId: string): Promise<{
   cards: SetInsightCardSource[];
   tcgCards: TcgCardSummary[];
 }> {
@@ -185,8 +207,28 @@ export async function buildCatalogSetInsight(
   const setName = set?.name ?? setId;
   const releaseDate = set?.releaseDate ?? null;
 
-  const { cards, tcgCards } = await loadSetCards(setId);
-  const insightRollup = rollupSetInsightCards(cards);
+  let { cards, tcgCards } = await loadSetCardsForCatalogInsight(setId);
+  let insightRollup = rollupSetInsightCards(cards);
+  let evidenceByCatalogId = new Map<string, MarketEvidence[]>();
+  const pricedPctEarly =
+    insightRollup.cardCount > 0
+      ? insightRollup.pricedSlots / insightRollup.cardCount
+      : 0;
+
+  if (pricedPctEarly < 0.5 && process.env.CATALOG_SET_INSIGHT_SKIP_PRICE_SYNC !== "1") {
+    try {
+      await syncSetCatalogPricesFromTcgApi(setId);
+      const reloaded = await loadSetCardsForCatalogInsight(setId);
+      cards = reloaded.cards;
+      tcgCards = reloaded.tcgCards;
+      insightRollup = rollupSetInsightCards(cards);
+    } catch {
+      /* continue with partial catalog */
+    }
+  }
+
+  evidenceByCatalogId = await loadSetMarketEvidenceMap(cards.map((c) => c.id));
+  insightRollup = rollupSetInsightCards(cards, evidenceByCatalogId);
   const tcgRollup =
     tcgCards.length > 0 && insightRollup.pricedSlots === 0
       ? rollupCatalogSetPricing(tcgCards)
@@ -203,8 +245,8 @@ export async function buildCatalogSetInsight(
       ? Math.round((100 * tcgRollup.tcgPlayerPricedSlots) / tcgRollup.cardCount)
       : 0;
 
-  const catalogInsight = catalogRowsToInsight(cards);
-  const catalogHints = topValueCards(cards, 15).map((r) =>
+  const catalogInsight = catalogRowsToInsight(cards, evidenceByCatalogId);
+  const catalogHints = topValueCards(cards, 15, evidenceByCatalogId).map((r) =>
     [r.name, r.number ? `#${r.number}` : null, r.rarity].filter(Boolean).join(" · "),
   );
 
@@ -290,6 +332,18 @@ export async function buildCatalogSetInsight(
     summary = `${setName}: ${cards.length} cards in catalog — run catalog sync to load TCGPlayer prices, or add GROQ_API_KEY for live set research.`;
   }
 
+  const chaseCard = topValue[0] ?? null;
+  const chaseSku =
+    chaseCard?.catalogId != null
+      ? formatPokemonCatalogSkuLabel(chaseCard.catalogId, chaseCard.number)
+      : null;
+
+  const editorialNotes =
+    [marketPulse?.trim(), chaseNotes?.trim()]
+      .filter((s, i, arr) => Boolean(s) && arr.indexOf(s) === i)
+      .join(" · ")
+      .trim() || chaseNotes;
+
   const ready =
     cards.length > 0 &&
     (tcgRollup.tcgPlayerPricedSlots > 0 ||
@@ -310,6 +364,9 @@ export async function buildCatalogSetInsight(
     summary,
     marketPulse,
     chaseNotes,
+    editorialNotes,
+    chaseCard,
+    chaseSku,
     setWide: {
       cardCount: tcgRollup.cardCount,
       tcgPlayerSumUsd: Math.round(tcgRollup.tcgPlayerSumUsd * 100) / 100,

@@ -1,6 +1,10 @@
-import { buildMarketSearchIdentity } from "@/lib/market/market-search-identity";
+import {
+  buildMarketSearchIdentity,
+  editionLabelForMarketSearch,
+} from "@/lib/market/market-search-identity";
 import type { ExtractedCard } from "@/lib/scan/schemas";
 import { inferCardFranchise } from "@/lib/scan/franchise";
+import { resolvePrintEdition } from "@/lib/scan/print-edition";
 
 function compact(parts: Array<string | null | undefined>): string {
   return parts
@@ -40,13 +44,27 @@ export function normalizePsaSlugGrade(grade: string | undefined): string | null 
   return m ? m[1] : null;
 }
 
+function ladderEditionSlug(card: ExtractedCard): string {
+  const edition = resolvePrintEdition(card);
+  if (edition?.id === "unlimited") return "unlimited";
+  if (edition?.id === "first_edition") return "1st-edition";
+  if (edition?.id === "shadowless") return "shadowless";
+  const hay = `${card.printStamps ?? ""} ${card.details ?? ""}`.toLowerCase();
+  if (/unlimited/.test(hay)) return "unlimited";
+  if (/1st\s*edition|first\s*edition/.test(hay)) return "1st-edition";
+  if (/shadowless/.test(hay)) return "shadowless";
+  return "";
+}
+
 function ladderNameSetTail(card: ExtractedCard, nameSlug: string, numHead: string): string {
+  const editionPart = ladderEditionSlug(card);
+  const editionSeg = editionPart ? `${editionPart}-` : "";
   const hay = `${card.printStamps ?? ""} ${card.details ?? ""} ${card.rarity ?? ""}`.toLowerCase();
   if (/reverse\s*(holo|foil|hol\s*foil)/.test(hay) || /\breverse\b/i.test(card.rarity ?? "")) {
-    return `${nameSlug}-reverse-holo-${numHead}`;
+    return `${nameSlug}-${editionSeg}reverse-holo-${numHead}`;
   }
-  if (/\bholo\b/.test(hay) && !/reverse/.test(hay)) return `${nameSlug}-holo-${numHead}`;
-  return `${nameSlug}-${numHead}`;
+  if (/\bholo\b/.test(hay) && !/reverse/.test(hay)) return `${nameSlug}-${editionSeg}holo-${numHead}`;
+  return `${nameSlug}-${editionSeg}${numHead}`;
 }
 
 export function buildCardLadderLadderSearchUrl(searchQuery: string): string {
@@ -65,7 +83,13 @@ export function cardLadderLadderSearchQuery(card: ExtractedCard): string {
   const identity = buildMarketSearchIdentity(card);
   const deep = buildCardLadderCardPageUrl(card);
   if (deep) {
-    return compact([card.year, card.set, card.name, identity.gradeLabel]);
+    return compact([
+      card.year,
+      card.set,
+      card.name,
+      editionLabelForMarketSearch(card),
+      identity.gradeLabel,
+    ]);
   }
   return identity.platform || identity.graded || identity.raw;
 }

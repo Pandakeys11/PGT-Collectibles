@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSetInsightCacheTtlMs } from "@/lib/ai/research-budget";
 import { buildCatalogSetInsight } from "@/lib/catalog/build-catalog-set-insight";
 import type { CatalogSetInsightPayload } from "@/lib/catalog/set-insight-payload";
+import {
+  persistSetInsight,
+  readPersistedSetInsight,
+} from "@/lib/catalog/set-insight-persist";
 import { cleanId } from "@/lib/http/params";
 import { registerRuntimeCacheClear } from "@/lib/server/runtime-caches";
 
@@ -48,11 +52,22 @@ async function ensureBuilt(setId: string, refreshAi = false): Promise<CatalogSet
   const cached = cache.get(setId);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS && !refreshAi) return cached.body;
 
+  if (!refreshAi) {
+    const persisted = await readPersistedSetInsight(setId);
+    if (persisted) {
+      cache.set(setId, { at: Date.now(), body: persisted });
+      return persisted;
+    }
+  }
+
   let pending = buildInFlight.get(setId);
   if (!pending) {
     pending = buildCatalogSetInsight(setId, { refreshAi })
-      .then((body) => {
-        if (body.ready) cache.set(setId, { at: Date.now(), body });
+      .then(async (body) => {
+        if (body.ready) {
+          cache.set(setId, { at: Date.now(), body });
+          await persistSetInsight(body);
+        }
         return body;
       })
       .finally(() => {

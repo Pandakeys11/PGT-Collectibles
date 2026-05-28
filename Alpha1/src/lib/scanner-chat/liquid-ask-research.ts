@@ -408,13 +408,11 @@ export async function runLiquidAskResearch(args: {
     }
   }
 
-  if (researchCard?.name && wantsLive && !useProMarket) {
-    proMarketSkipped = caps.ebaySoldReady;
-    if (proMarketSkipped) {
-      webNotes.push(
-        "Automated eBay sold comps and full market enrich are Pro — using web search and Gemini grounding on this plan.",
-      );
-    }
+  if (researchCard?.name && wantsLive && !useProMarket && caps.ebaySoldReady) {
+    proMarketSkipped = true;
+    webNotes.push(
+      "Automated eBay sold comps are disabled (LIQUID_ASK_PRO_RESEARCH=0) — platform links below still target this card and grade.",
+    );
   }
 
   const skipFullMarket = ebaySoldFromHarvest >= 4;

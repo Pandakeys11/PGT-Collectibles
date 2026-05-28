@@ -15,13 +15,27 @@ export type CatalogCardFmvProps = CatalogCardPriceInput & {
   name?: string | null;
   number?: string | null;
   setName?: string | null;
+  /** Pre-resolved on server for master catalog grids (matches detail intel). */
+  rawFmvUsd?: number | null;
+  rawFmvSourceLabel?: string | null;
 };
 
 export function useCatalogCardRawFmv(args: CatalogCardFmvProps): CatalogRawFmv {
-  return resolveCatalogRawFmvForCard({
-    ...args,
+  const prices = catalogPriceSnapshotFromCardInput(args);
+  const computed = resolveCatalogRawFmvForCard({
+    catalogPrices: prices,
+    catalogFinish: args.catalogFinish,
+    rarity: args.rarity,
     identity: args.name ? { name: args.name, number: args.number, set: args.setName } : null,
   });
+  if (args.rawFmvUsd != null) {
+    return {
+      ...computed,
+      usd: args.rawFmvUsd,
+      sourceLabel: args.rawFmvSourceLabel ?? computed.sourceLabel,
+    };
+  }
+  return computed;
 }
 
 /** Bottom ribbon on card art — always visible in master catalog grids. */
@@ -59,7 +73,7 @@ export function CatalogCardFmvRibbon({
           hasPrice ? "text-amber-50 drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]" : "text-white/40",
         )}
       >
-        {formatCatalogFmvUsd(fmv.usd)}
+        {hasPrice ? formatCatalogFmvUsd(fmv.usd) : "Pending"}
       </span>
     </div>
   );
@@ -88,7 +102,7 @@ export function CatalogCardFmvBar({
           hasPrice ? "text-amber-100" : "text-white/35",
         )}
       >
-        {formatCatalogFmvUsd(fmv.usd)}
+        {hasPrice ? formatCatalogFmvUsd(fmv.usd) : "Pending"}
       </span>
     </div>
   );

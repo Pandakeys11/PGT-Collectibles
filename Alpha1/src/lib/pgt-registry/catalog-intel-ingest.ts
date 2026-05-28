@@ -1,3 +1,7 @@
+import {
+  priceSnapshotFromPokemonApiCard,
+  priceSnapshotToPricesJson,
+} from "@/lib/catalog/catalog-price-snapshot";
 import { getCardFromDb } from "@/lib/catalog/db-catalog-browse";
 import { upsertCatalogCards } from "@/lib/catalog/db-catalog";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
@@ -10,6 +14,7 @@ import { catalogSummaryToExtractedCard } from "@/lib/market/pokemon-market-knowl
 import { fetchPokemonCardById } from "@/lib/pokedex/tcg-api-server";
 import { isBrightDataPopHarvestEnabled } from "@/lib/market/brightdata/config";
 import { harvestGraderPopForCatalogCard } from "@/lib/pgt-registry/grader-pop-ingest";
+import { persistTcgReferenceCompsForCatalogCard } from "@/lib/market/catalog-tcg-reference-comps";
 import { persistMarketIntelFromEnrich } from "@/lib/pgt-registry/pgt-market-intel-persist";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { MarketEvidence } from "@/lib/scan/schemas";
@@ -28,57 +33,8 @@ function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function priceSnapshotFromApiCard(card: {
-  tcgplayer?: {
-    url?: string;
-    updatedAt?: string;
-    prices?: Record<string, { market?: number; mid?: number; low?: number; high?: number }>;
-  };
-  cardmarket?: {
-    url?: string;
-    updatedAt?: string;
-    prices?: {
-      averageSellPrice?: number;
-      trendPrice?: number;
-      lowPrice?: number;
-      avg7?: number;
-      avg30?: number;
-      reverseHoloTrend?: number;
-    };
-  };
-}): Record<string, unknown> {
-  const tp = card.tcgplayer;
-  const tcgPlayerPrices = tp?.prices
-    ? Object.entries(tp.prices).map(([variant, block]) => ({
-        variant,
-        market: block.market ?? null,
-        mid: block.mid ?? null,
-        low: block.low ?? null,
-        high: block.high ?? null,
-        directLow: null,
-      }))
-    : [];
-
-  const cm = card.cardmarket?.prices;
-  const cardMarket = cm
-    ? {
-        averageSellPrice: asNumber(cm.averageSellPrice),
-        trendPrice: asNumber(cm.trendPrice),
-        lowPrice: asNumber(cm.lowPrice),
-        avg7: asNumber(cm.avg7),
-        avg30: asNumber(cm.avg30),
-        reverseHoloTrend: asNumber(cm.reverseHoloTrend),
-      }
-    : null;
-
-  return {
-    tcgPlayerUrl: tp?.url ?? null,
-    tcgPlayerUpdatedAt: tp?.updatedAt ?? null,
-    tcgPlayerPrices,
-    cardMarketUrl: card.cardmarket?.url ?? null,
-    cardMarketUpdatedAt: card.cardmarket?.updatedAt ?? null,
-    cardMarket,
-  };
+function priceSnapshotFromApiCard(card: Parameters<typeof priceSnapshotFromPokemonApiCard>[0]): Record<string, unknown> {
+  return priceSnapshotToPricesJson(priceSnapshotFromPokemonApiCard(card));
 }
 
 /** Refresh `tcg_catalog_cards.prices_json` from Pokémon TCG API when we have a pokemonId. */
@@ -114,6 +70,16 @@ export async function refreshCatalogPricesFromTcgApi(catalogId: string): Promise
       sourceId: "pokemontcg.io",
     },
   ]);
+
+  const snap = parseCatalogPriceSnapshot(pricesJson);
+  await persistTcgReferenceCompsForCatalogCard({
+    catalogId,
+    name: card.name,
+    number: card.number,
+    setName: card.set?.name ?? null,
+    prices: snap,
+  });
+
   return true;
 }
 
