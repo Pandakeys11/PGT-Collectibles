@@ -6,6 +6,9 @@ export type CardIdentityLike = {
   printedName?: string | null;
   printed_name?: string | null;
   language?: string | null;
+  japaneseName?: string | null;
+  englishCounterpartName?: string | null;
+  setNameEnglish?: string | null;
 };
 
 function readPrintedName(card: CardIdentityLike): string {
@@ -34,14 +37,19 @@ export function isNonEnglishLanguage(language: string | undefined | null): boole
   return lang !== "en" && lang !== "english" && lang !== "eng";
 }
 
+export function isJapaneseLanguage(language: string | undefined | null): boolean {
+  const lang = normalizeCardLanguage(language);
+  return lang === "ja" || lang === "jp" || lang === "jpn" || lang === "japanese";
+}
+
 /** English catalog / FMV identity (kept in `name` after catalog merge). */
 export function catalogEnglishName(card: CardIdentityLike): string {
-  return readName(card);
+  return (card.englishCounterpartName ?? "").trim() || readName(card);
 }
 
 /** On-card visible title when present. */
 export function localizedPrintedName(card: CardIdentityLike): string | null {
-  const printed = readPrintedName(card);
+  const printed = (card.japaneseName ?? "").trim() || readPrintedName(card);
   return printed || null;
 }
 
@@ -58,10 +66,10 @@ export function getCardDisplayTitle(card: CardIdentityLike): string {
   const printed = localizedPrintedName(card);
   const lang = readLanguage(card);
 
-  if (printed && isNonEnglishLanguage(lang)) {
+  if (printed && isNonEnglishLanguage(lang) && !isJapaneseLanguage(lang)) {
     return printed;
   }
-  if (printed && english && !namesEquivalent(printed, english)) {
+  if (printed && english && !namesEquivalent(printed, english) && !isJapaneseLanguage(lang)) {
     return printed;
   }
   return english || printed || "—";
@@ -73,10 +81,13 @@ export function getCardDisplayTitle(card: CardIdentityLike): string {
 export function getCardDisplaySubtitle(card: CardIdentityLike): string | null {
   const title = getCardDisplayTitle(card);
   const english = catalogEnglishName(card);
+  const printed = localizedPrintedName(card);
   const lang = readLanguage(card);
   const parts: string[] = [];
 
-  if (english && !namesEquivalent(title, english)) {
+  if (isJapaneseLanguage(lang) && printed && !namesEquivalent(printed, english)) {
+    parts.push(`Japanese: ${printed}`);
+  } else if (english && !namesEquivalent(title, english)) {
     parts.push(english);
   }
   if (lang && isNonEnglishLanguage(lang)) {

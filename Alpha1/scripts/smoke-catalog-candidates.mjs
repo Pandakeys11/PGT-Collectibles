@@ -95,6 +95,22 @@ const cases = [
       details: "Base Set classic Charizard, collector number OCR may be misread",
     },
   },
+  {
+    label: "Japanese Base Set Charizard No.006",
+    expectedCatalogId: "base1-4",
+    expectedImageSource: "english_fallback",
+    card: {
+      franchise: "pokemon",
+      name: "リザードン",
+      printedName: "リザードン",
+      language: "Japanese",
+      set: "拡張パック",
+      number: "No.006",
+      year: "1996",
+      rarity: "Holo",
+      details: "Japanese old-back Base Set Charizard",
+    },
+  },
 ];
 
 async function postCandidate(card) {
@@ -123,9 +139,13 @@ async function main() {
     const catalogId = topCatalogId(result.body);
     const status = result.body.catalogIdentityStatus ?? "unknown";
     const expectedStatus = testCase.expectedStatus ?? "confirmed";
+    const imageSourceOk =
+      !testCase.expectedImageSource ||
+      result.body.catalogImageSource === testCase.expectedImageSource;
     const prefix = result.ok &&
       catalogId === testCase.expectedCatalogId &&
       status === expectedStatus &&
+      imageSourceOk &&
       result.elapsedMs <= MAX_MS
       ? "OK "
       : "FAIL";
@@ -143,6 +163,14 @@ async function main() {
       failed = true;
     } else if (result.elapsedMs > MAX_MS) {
       console.error(`       exceeded ${MAX_MS}ms`);
+      failed = true;
+    } else if (
+      testCase.expectedImageSource &&
+      result.body.catalogImageSource !== testCase.expectedImageSource
+    ) {
+      console.error(
+        `       expected image source ${testCase.expectedImageSource}, got ${result.body.catalogImageSource ?? "none"}`,
+      );
       failed = true;
     }
   }

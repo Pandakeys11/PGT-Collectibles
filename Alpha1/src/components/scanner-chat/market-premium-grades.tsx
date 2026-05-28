@@ -12,7 +12,7 @@ import {
 import type { buildHubUrlMap } from "@/lib/market/sources";
 import { buildPremiumGradesInsight } from "@/lib/scan/premium-grades-insight";
 import { usePremiumGradeBrief } from "@/hooks/use-premium-grade-brief";
-import type { ExtractedCard } from "@/lib/scan/schemas";
+import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 import { cn } from "@/lib/cn";
 
 const TIER_STYLE: Record<
@@ -87,6 +87,7 @@ export function MarketPremiumGrades({
   specimenId,
   enriching = false,
   sessionCompCount = 0,
+  sessionEvidence = [],
   marketAsOf,
   className,
 }: {
@@ -96,6 +97,7 @@ export function MarketPremiumGrades({
   specimenId?: string | null;
   enriching?: boolean;
   sessionCompCount?: number;
+  sessionEvidence?: MarketEvidence[];
   marketAsOf?: string | null;
   className?: string;
 }) {
@@ -107,10 +109,11 @@ export function MarketPremiumGrades({
   const webBrief = usePremiumGradeBrief(card ?? null, {
     specimenId,
     marketAsOf,
-    enabled: Boolean(card?.name?.trim()) && rows.length > 0,
+    sessionEvidence,
+    enabled: Boolean(card?.name?.trim()),
   });
 
-  if (rows.length === 0) return null;
+  if (rows.length === 0 && !card?.name?.trim()) return null;
 
   const showSessionLines =
     sessionInsight && !sessionInsight.isEmpty && sessionCompCount > 0;
@@ -127,6 +130,7 @@ export function MarketPremiumGrades({
         </div>
       </div>
 
+      {rows.length > 0 ? (
       <div className="grid w-full min-w-0 grid-cols-3 gap-1.5">
         {rows.map((row) => {
           const style = TIER_STYLE[row.bucket];
@@ -215,6 +219,11 @@ export function MarketPremiumGrades({
           );
         })}
       </div>
+      ) : enriching ? (
+        <p className="rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-2 text-[10px] text-slate-500">
+          Harvesting PSA 10 · BGS BL · CGC Pristine comps from market enrich…
+        </p>
+      ) : null}
 
       <div className="rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-2.5 py-2">
         <div className="flex items-start gap-2">

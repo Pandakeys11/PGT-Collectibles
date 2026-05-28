@@ -47,7 +47,16 @@ export function getGroqVisionModel(): string {
 }
 
 export function getGroqTextModel(): string {
-  return process.env.GROQ_TEXT_MODEL?.trim() || "llama-3.1-8b-instant";
+  return process.env.GROQ_TEXT_MODEL?.trim() || "llama-3.3-70b-versatile";
+}
+
+/** Agentic web search + browser tools (Groq Compound GA). */
+export function getGroqCompoundModel(): string {
+  return (
+    process.env.GROQ_COMPOUND_MODEL?.trim() ||
+    process.env.GROQ_WEB_MODEL?.trim() ||
+    "groq/compound"
+  );
 }
 
 export function getOpenRouterApiKey(): string | null {
@@ -270,6 +279,58 @@ export function getOpenRouterMarketModel(): string {
   return raw || "perplexity/sonar";
 }
 
+/** Nightly set ingest: max cards queued per cron invocation (default 120). */
+export function getMarketNightlyMaxCards(): number {
+  const raw = Number(process.env.MARKET_INGEST_MAX_CARDS ?? 120);
+  if (!Number.isFinite(raw)) return 120;
+  return Math.min(Math.max(Math.floor(raw), 20), 250);
+}
+
+/** Parallel card ingests per batch (default 5). */
+export function getMarketNightlyConcurrency(): number {
+  const raw = Number(process.env.MARKET_INGEST_CONCURRENCY ?? 5);
+  if (!Number.isFinite(raw)) return 5;
+  return Math.min(Math.max(Math.floor(raw), 1), 8);
+}
+
+/** Wall-clock budget per cron run in ms (default 285000 ≈ 4m45s under Vercel 300s). */
+export function getMarketNightlyTimeBudgetMs(): number {
+  const raw = Number(process.env.MARKET_INGEST_TIME_BUDGET_MS ?? 285_000);
+  if (!Number.isFinite(raw)) return 285_000;
+  return Math.min(Math.max(Math.floor(raw), 60_000), 295_000);
+}
+
+/** Free AI order for nightly market JSON extraction: groq compound → gemini → openrouter. */
+export function getMarketNightlyAiOrder(): Array<"groq" | "gemini" | "openrouter"> {
+  const raw = process.env.MARKET_NIGHTLY_AI_ORDER?.trim();
+  const defaultOrder: Array<"groq" | "gemini" | "openrouter"> = ["groq", "gemini", "openrouter"];
+  if (!raw) return defaultOrder;
+  const parsed = raw
+    .split(",")
+    .map((p) => p.trim().toLowerCase())
+    .filter(
+      (p): p is "groq" | "gemini" | "openrouter" =>
+        p === "groq" || p === "gemini" || p === "openrouter",
+    );
+  return parsed.length > 0 ? parsed : defaultOrder;
+}
+
+/** OpenRouter model for nightly market JSON (default free instruct; override with Sonar if you have credits). */
+export function getMarketNightlyOpenRouterModel(): string {
+  return (
+    process.env.MARKET_NIGHTLY_OPENROUTER_MODEL?.trim() ||
+    process.env.OPENROUTER_TEXT_MODEL?.trim() ||
+    "meta-llama/llama-3.1-8b-instruct:free"
+  );
+}
+
+/** Skip Gemini/OpenRouter on nightly ingest when memory is fresh (default 10 days). */
+export function getMarketNightlyMemoryFreshDays(): number {
+  const raw = Number(process.env.MARKET_NIGHTLY_MEMORY_FRESH_DAYS ?? 10);
+  if (!Number.isFinite(raw)) return 10;
+  return Math.min(Math.max(Math.floor(raw), 3), 60);
+}
+
 export function getTextModel(): string {
   return (
     process.env.OPENROUTER_TEXT_MODEL?.trim() ||
@@ -281,9 +342,9 @@ export function getTextModel(): string {
 }
 
 const DEFAULT_TEXT_PROVIDER_ORDER = [
+  "groq",
   "openai",
   "xai",
-  "groq",
   "gemini",
   "openrouter",
 ] as const;

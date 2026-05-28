@@ -1,6 +1,7 @@
 "use client";
 
 import { BookOpen, Calculator, Sparkles, X } from "lucide-react";
+import { LiveMarketTickerPanel } from "@/components/scanner-chat/live-market-ticker-panel";
 import { CollectorVendorCalculator } from "@/components/scanner-chat/collector-vendor-calculator";
 import { CompanionPanel } from "@/components/companion/companion-panel";
 import { MasterCatalogBrowser } from "@/components/catalog/master-catalog-browser";
@@ -65,6 +66,22 @@ export function LiquidChatOutputPanel({
     );
   }
 
+  if (kind === "live-market") {
+    return (
+      <div
+        className={cn(
+          "sc-live-market-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(88dvh,720px)] flex-col overflow-hidden rounded-xl border border-sky-500/25 sc-glass-raised lg:max-h-[min(calc(100dvh-12rem),680px)]",
+          className,
+        )}
+      >
+        <LiveMarketTickerPanel
+          onCatalogScanPrefill={onCatalogScanPrefill}
+          onDismiss={onDismiss}
+        />
+      </div>
+    );
+  }
+
   if (kind === "companion") {
     if (!companion) return null;
     return (
@@ -104,7 +121,7 @@ export function LiquidChatOutputPanel({
   return (
     <div
       className={cn(
-        "sc-catalog-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(88dvh,820px)] flex-col overflow-hidden rounded-xl border border-amber-500/20 sc-glass-raised max-lg:max-h-[min(94dvh,900px)] lg:min-h-[min(68vh,640px)] lg:max-h-[min(calc(100dvh-11rem),920px)]",
+        "sc-catalog-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(92dvh,880px)] flex-col overflow-hidden rounded-xl border border-amber-500/20 sc-glass-raised max-lg:max-h-[min(94dvh,920px)] lg:min-h-[min(70vh,680px)] lg:max-h-[min(calc(100dvh-10rem),940px)]",
         className,
       )}
     >
@@ -132,7 +149,7 @@ export function LiquidChatOutputPanel({
           </button>
         ) : null}
       </div>
-      <div className="liquid-catalog-embed min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-2.5 sm:px-3 sm:py-3 scanner-chat-scrollbar max-lg:px-3 max-lg:py-3 lg:px-4 lg:py-3.5">
+      <div className="liquid-catalog-embed flex min-h-0 flex-1 flex-col overflow-hidden px-2.5 py-2 sm:px-3 sm:py-2.5 max-lg:px-3 max-lg:py-2.5 lg:px-3.5 lg:py-3">
         <MasterCatalogBrowser
           embedded
           scanTargetPath={LIQUID_SCAN_PATH}

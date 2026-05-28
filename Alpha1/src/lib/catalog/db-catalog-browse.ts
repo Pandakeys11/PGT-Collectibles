@@ -5,6 +5,7 @@ import type {
   CatalogSetSummary,
 } from "@/lib/catalog/catalog-types";
 import { releaseYearFromDate } from "@/lib/catalog/catalog-types";
+import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 type DbSetRow = {
@@ -376,12 +377,13 @@ function dbCardToSummary(
   row: DbCardRow,
   set: { id: string; name: string; code?: string | null },
 ): CatalogCardSummary {
-  const prices = row.prices_json ?? {};
+  const prices = parseCatalogPriceSnapshot(row.prices_json);
   return {
     id: row.catalog_id,
     name: row.name,
     number: row.card_number,
     rarity: resolveCatalogCardRarity(row),
+    prices,
     supertype: null,
     catalogFinish: catalogVariantKey(row) === "reverse_holo" ? "reverse_holo" : undefined,
     catalogVariantKey: catalogVariantKey(row),
@@ -398,10 +400,7 @@ function dbCardToSummary(
       releaseDate: row.year ? `${row.year}-01-01` : undefined,
     },
     franchise,
-    tcgplayer:
-      typeof prices.tcgPlayerUrl === "string"
-        ? { url: prices.tcgPlayerUrl }
-        : undefined,
+    tcgplayer: prices.tcgPlayerUrl ? { url: prices.tcgPlayerUrl } : undefined,
   };
 }
 

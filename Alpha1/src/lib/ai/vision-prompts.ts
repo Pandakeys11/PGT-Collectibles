@@ -3,7 +3,7 @@ import { buildVisionSetIdentificationBlock } from "@/lib/scan/set-identification
 const FRANCHISE_FIELD =
   '"franchise":"pokemon|onepiece|dragonball|sports|yugioh|magic|lorcana|other"';
 
-const CARD_FIELDS = `${FRANCHISE_FIELD},"encapsulation":"raw|graded_slab","name":"","printedName":"","language":"","set":"","number":"","year":"","rarity":"","printStamps":"","labelTitle":"","details":"","grader":null,"grade":null,"cert":null,"extractedPrice":null,"stickerNote":null,"location":[y,x]`;
+const CARD_FIELDS = `${FRANCHISE_FIELD},"encapsulation":"raw|graded_slab","name":"","printedName":"","language":"","rawDetectedText":"","detectedLanguage":"Japanese|English|Unknown","japaneseName":"","englishCounterpartName":"","setNameJapanese":"","setNameEnglish":"","set":"","number":"","englishCounterpartNumber":"","year":"","rarity":"","printStamps":"","labelTitle":"","details":"","grader":null,"grade":null,"cert":null,"extractedPrice":null,"stickerNote":null,"location":[y,x]`;
 
 const CARD_FIELDS_WITH_BBOX = `${CARD_FIELDS},"bbox":{"top":0,"left":0,"width":0,"height":0}`;
 
@@ -22,6 +22,7 @@ const FRANCHISE_RULES = `
 const NAME_RULES = `
 - Multilingual cards: set **language** when known (English, Japanese, German, French, Italian, Spanish, Portuguese, Korean, Chinese, etc.).
 - **Pokemon only**: **name** = English Pokemon TCG catalog name when mappable; **printedName** = exact visible title (especially non-English).
+- **Japanese Pokemon**: preserve OCR in **rawDetectedText** when visible. Set **detectedLanguage** Japanese, **japaneseName** = visible kana/kanji title, **englishCounterpartName** = English card name, **setNameJapanese** = Japanese-readable set, **setNameEnglish** = English counterpart set, and keep **number** as printed (for vintage, often No.006). Use **englishCounterpartNumber** only when the English catalog number is known.
 - **Other TCG / sports**: **name** and **printedName** = best visible title on the card; preserve player names, set names, parallel names (Prizm, Optic, Select, rookie, auto, patch).
 - Do not put language in number; use language plus printedName/details.`;
 

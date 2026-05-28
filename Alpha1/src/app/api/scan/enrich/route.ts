@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enrichCacheKey, getEnrichMarketCache, setEnrichMarketCache } from "@/lib/market/enrich-cache";
+import { resolveLocalizedCatalogArtwork } from "@/lib/catalog/localized-artwork";
 import { ensureCatalogMatchOptions } from "@/lib/market/ensure-catalog-options";
 import {
   hydrateRegistryFromCard,
@@ -23,6 +24,7 @@ import {
   mergeRegistrySlabIntoCard,
   normalizeGradedSlabFields,
 } from "@/lib/scan/graded-slab";
+import { normalizeJapanesePokemonIdentity } from "@/lib/scan/japanese-pokemon";
 import { classifyCardLane } from "@/lib/scan/lane";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 import { catalogCandidateSchema, extractedCardSchema, identityEvidenceSchema } from "@/lib/scan/schemas";
@@ -81,6 +83,9 @@ export async function POST(req: NextRequest) {
     phase?: string;
     catalogId?: string | null;
     catalogImageUrl?: string | null;
+    catalogImageSource?: string | null;
+    catalogImageSourceLabel?: string | null;
+    catalogImageNeedsReview?: boolean;
     catalogIdentityStatus?: string;
     catalogConfidence?: number;
     catalogCandidates?: unknown;
@@ -105,21 +110,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid card payload" }, { status: 400 });
   }
 
-  const inputCard = normalizeGradedSlabFields(parsedCard.data);
+  const inputCard = normalizeJapanesePokemonIdentity(normalizeGradedSlabFields(parsedCard.data));
   const skipRegistry = body.skipRegistry === true;
   const appUser = skipRegistry ? null : await syncCurrentAppUser();
   const userId = appUser?.id ?? null;
 
   if (phase === "market") {
+    const catalogId =
+      typeof body.catalogId === "string" && body.catalogId.trim() ? body.catalogId.trim() : null;
     const skipCache = body.skipCache === true;
     const cacheKey = enrichCacheKey(inputCard);
     let market = skipCache ? null : getEnrichMarketCache(cacheKey);
     if (!market) {
-      market = await researchCardMarket(inputCard);
+      market = await researchCardMarket(inputCard, { catalogId });
       if (!skipCache) setEnrichMarketCache(cacheKey, market);
     }
-
-    const catalogId = typeof body.catalogId === "string" && body.catalogId.trim() ? body.catalogId.trim() : null;
     const catalogImageUrl =
       typeof body.catalogImageUrl === "string" && body.catalogImageUrl.trim()
         ? body.catalogImageUrl.trim()
@@ -159,6 +164,18 @@ export async function POST(req: NextRequest) {
       catalogId,
       year: cardOut.year ?? null,
       catalogImageUrl,
+      catalogImageSource:
+        body.catalogImageSource === "exact_japanese_print" ||
+        body.catalogImageSource === "same_art_confirmed" ||
+        body.catalogImageSource === "english_fallback" ||
+        body.catalogImageSource === "needs_image_review"
+          ? body.catalogImageSource
+          : null,
+      catalogImageSourceLabel:
+        typeof body.catalogImageSourceLabel === "string"
+          ? body.catalogImageSourceLabel
+          : null,
+      catalogImageNeedsReview: body.catalogImageNeedsReview === true,
       catalogIdentityStatus,
       catalogConfidence,
       catalogCandidates,
@@ -214,6 +231,15 @@ export async function POST(req: NextRequest) {
   const resolvedCatalogImageUrl =
     resolveCatalogImageUrl(catalog, mergedCard) ??
     resolveCatalogPreviewImageUrl(catalog, mergedCard);
+  const localizedArtwork = await resolveLocalizedCatalogArtwork({
+    card: mergedCard,
+    catalog,
+    fallbackImageUrl: resolvedCatalogImageUrl,
+  });
+  const finalCatalogImageUrl =
+    localizedArtwork?.imageSmallUrl ??
+    localizedArtwork?.imageLargeUrl ??
+    resolvedCatalogImageUrl;
 
   if (phase === "catalog") {
     const context = buildScanCardContext({
@@ -226,7 +252,10 @@ export async function POST(req: NextRequest) {
       certMarketEvidence: preCatalogRegistry.certMarketEvidence,
       catalogId: catalogIdLocked,
       year: mergedCard.year ?? (catalogTrusted ? (catalog?.year ?? null) : null),
-      catalogImageUrl: resolvedCatalogImageUrl,
+      catalogImageUrl: finalCatalogImageUrl,
+      catalogImageSource: localizedArtwork?.status ?? null,
+      catalogImageSourceLabel: localizedArtwork?.sourceLabel ?? null,
+      catalogImageNeedsReview: localizedArtwork?.needsReview ?? false,
       catalogIdentityStatus: catalog?.catalogIdentityStatus ?? "failed",
       catalogConfidence: catalog?.catalogConfidence ?? 0,
       catalogCandidates: catalog?.candidates ?? [],
@@ -249,7 +278,7 @@ export async function POST(req: NextRequest) {
   const cacheKey = enrichCacheKey(mergedCard);
   let market = skipCache ? null : getEnrichMarketCache(cacheKey);
   if (!market) {
-    market = await researchCardMarket(mergedCard);
+    market = await researchCardMarket(mergedCard, { catalogId: catalogIdLocked });
     if (!skipCache) setEnrichMarketCache(cacheKey, market);
   }
 
@@ -272,7 +301,10 @@ export async function POST(req: NextRequest) {
     certMarketEvidence: reg.certMarketEvidence,
     catalogId: catalogIdLocked,
     year: mergedCard.year ?? (catalogTrusted ? (catalog?.year ?? null) : null),
-    catalogImageUrl: resolvedCatalogImageUrl,
+    catalogImageUrl: finalCatalogImageUrl,
+    catalogImageSource: localizedArtwork?.status ?? null,
+    catalogImageSourceLabel: localizedArtwork?.sourceLabel ?? null,
+    catalogImageNeedsReview: localizedArtwork?.needsReview ?? false,
     catalogIdentityStatus: catalog?.catalogIdentityStatus ?? "failed",
     catalogConfidence: catalog?.catalogConfidence ?? 0,
     catalogCandidates: catalog?.candidates ?? [],

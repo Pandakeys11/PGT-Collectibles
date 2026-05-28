@@ -92,7 +92,8 @@ export function AIStreamingScanMessage({
   const wideEmbed =
     message.output?.kind === "catalog" ||
     message.output?.kind === "companion" ||
-    message.output?.kind === "calculator";
+    message.output?.kind === "calculator" ||
+    message.output?.kind === "live-market";
 
   const calculatorFmv =
     sessionSummary?.estimatedTotal ??
@@ -226,6 +227,12 @@ export function AIStreamingScanMessage({
               kind="calculator"
               calculatorBaseAmount={calculatorFmv}
               calculatorCardCount={calculatorCards}
+              onDismiss={onDismissOutput}
+            />
+          ) : message.output.kind === "live-market" ? (
+            <LiquidChatOutputPanel
+              kind="live-market"
+              onCatalogScanPrefill={onCatalogScanPrefill}
               onDismiss={onDismissOutput}
             />
           ) : null

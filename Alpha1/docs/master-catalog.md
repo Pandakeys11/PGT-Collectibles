@@ -27,6 +27,37 @@ Migration: `supabase/migrations/202605220001_tcg_catalog.sql`
 - `tcg_catalog_sets` — set index per franchise
 - `tcg_catalog_cards` — card rows for search + browse fallback
 
+## 2026-05-27 Known Good Baseline
+
+Treat this as the protected master-catalog spine for Liquid Scan:
+
+- Supabase `tcg_catalog_sets` and `tcg_catalog_cards` are the primary browse and scan-match cache. Live APIs are fallback/refresh sources, not the normal scan-time dependency.
+- Pokemon catalog IDs use upstream English IDs such as `base1-4`. These IDs remain the shared identity key for browse, scan candidates, saved identities, cert registry, and market intelligence.
+- Print/version variants are materialized as separate synthetic rows only when they represent a distinct PGT product identity:
+  - `__unlimited`
+  - `__first_edition`
+  - `__shadowless`
+  - `__reverse_holo`
+- Default set browse excludes synthetic variants unless the user or scan explicitly asks for that print/finish, keeping normal set pages clean and fast.
+- Scanner matching is DB-first: strict Supabase match, broad Supabase candidates, then bounded live fallback only when DB has no usable answer.
+- Matching protects exact catalog hits with set-total/collector-number checks, print-variant agreement, hard-conflict caps, and deterministic tie-breaking.
+- Japanese cards keep Japanese language/name/set/printed number on the scan object, but use an English counterpart only as the catalog spine when no dedicated Japanese catalog row exists.
+
+Do not flatten localized Japanese artwork or localized card rows into the base English Pokemon rows. Add them as an overlay or validated synthetic/localized product layer so the current English catalog remains stable.
+
+Localized Japanese artwork now uses `tcg_catalog_localized_artwork` as an overlay. Apply it with:
+
+```bash
+npm run db:apply:localized-artwork
+```
+
+Validated rows can be dry-run or upserted with:
+
+```bash
+npm run catalog:sync:pokemon-japanese-artwork
+npm run catalog:sync:pokemon-japanese-artwork -- --apply
+```
+
 ## Setup checklist (in order)
 
 1. **Apply DB migration:** `npm run db:apply` then `npm run db:verify` (expects `tcg_catalog_sets`, `tcg_catalog_cards`, `tcg_catalog_sources`).

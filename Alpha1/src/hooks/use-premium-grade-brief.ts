@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ExtractedCard } from "@/lib/scan/schemas";
+import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 
 export type PremiumGradeBriefState =
   | { status: "idle" }
@@ -43,6 +43,7 @@ export function usePremiumGradeBrief(
     specimenId?: string | null;
     /** Re-fetch when enrich finishes (pass enriching flag from parent). */
     marketAsOf?: string | null;
+    sessionEvidence?: MarketEvidence[];
     enabled?: boolean;
   },
 ): PremiumGradeBriefState {
@@ -74,7 +75,10 @@ export function usePremiumGradeBrief(
         const res = await fetch("/api/scan/premium-grade-brief", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ card }),
+          body: JSON.stringify({
+            card,
+            sessionEvidence: options?.sessionEvidence?.slice(0, 24) ?? [],
+          }),
           signal: ac.signal,
         });
         const data = (await res.json()) as {
@@ -141,6 +145,7 @@ export function usePremiumGradeBrief(
     card?.printStamps,
     options?.specimenId,
     options?.marketAsOf,
+    options?.sessionEvidence?.length,
   ]);
 
   return state;

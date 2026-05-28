@@ -2,17 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { mergeCatalogMatches } from "@/lib/market/catalog-candidate-merge";
 import { ensureCatalogMatchOptions } from "@/lib/market/ensure-catalog-options";
 import type { CatalogMatch } from "@/lib/market/pokemon-catalog";
+import { resolveLocalizedCatalogArtwork } from "@/lib/catalog/localized-artwork";
 import {
   resolveCatalogImageUrl,
   resolveCatalogPreviewImageUrl,
   trustedCatalogMatch,
 } from "@/lib/scan/catalog-merge";
+import { normalizeJapanesePokemonIdentity } from "@/lib/scan/japanese-pokemon";
 import { extractedCardSchema } from "@/lib/scan/schemas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function catalogPayload(
+async function catalogPayload(
   catalog: CatalogMatch,
   card: ReturnType<typeof extractedCardSchema.parse>,
 ) {
@@ -20,6 +22,15 @@ function catalogPayload(
   const catalogId = trusted
     ? (catalog.catalogId ?? catalog.candidates[0]?.catalogId ?? null)
     : null;
+  const fallbackImageUrl =
+    resolveCatalogImageUrl(catalog, card) ??
+    resolveCatalogPreviewImageUrl(catalog, card);
+  const localizedArtwork = await resolveLocalizedCatalogArtwork({
+    card,
+    catalog,
+    fallbackImageUrl,
+  });
+
   return {
     catalogId,
     catalogIdentityStatus: catalog.catalogIdentityStatus,
@@ -28,8 +39,12 @@ function catalogPayload(
     catalogCandidates: catalog.candidates,
     identityEvidence: catalog.identityEvidence,
     catalogImageUrl:
-      resolveCatalogImageUrl(catalog, card) ??
-      resolveCatalogPreviewImageUrl(catalog, card),
+      localizedArtwork?.imageSmallUrl ??
+      localizedArtwork?.imageLargeUrl ??
+      fallbackImageUrl,
+    catalogImageSource: localizedArtwork?.status ?? null,
+    catalogImageSourceLabel: localizedArtwork?.sourceLabel ?? null,
+    catalogImageNeedsReview: localizedArtwork?.needsReview ?? false,
     catalogMatched: trusted,
   };
 }
@@ -47,7 +62,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid card payload" }, { status: 400 });
   }
 
-  const card = parsed.data;
+  const card = normalizeJapanesePokemonIdentity(parsed.data);
   try {
     const fresh = await ensureCatalogMatchOptions(card);
     if (!fresh || fresh.candidates.length === 0) {
@@ -75,7 +90,7 @@ export async function POST(req: NextRequest) {
       merged = mergeCatalogMatches(stub, fresh) ?? fresh;
     }
 
-    return NextResponse.json(catalogPayload(merged, card));
+    return NextResponse.json(await catalogPayload(merged, card));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Catalog search failed";
     return NextResponse.json({ error: msg }, { status: 502 });

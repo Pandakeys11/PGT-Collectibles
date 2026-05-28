@@ -49,6 +49,9 @@ export function buildScanCardContext(args: {
   fairValueUsd?: number | null;
   fairValueBasis?: FairValueBasis | null;
   catalogImageUrl?: string | null;
+  catalogImageSource?: ScanCardContext["catalogImageSource"];
+  catalogImageSourceLabel?: string | null;
+  catalogImageNeedsReview?: boolean;
   catalogIdentityStatus?: CatalogIdentityStatus;
   catalogConfidence?: number | null;
   catalogCandidates?: CatalogCandidate[];
@@ -125,6 +128,8 @@ export function buildScanCardContext(args: {
         franchiseLabel(normalized),
         resolvedEdition && resolvedEdition.id !== "unknown" ? resolvedEdition.label : null,
         normalized.language,
+        normalized.japaneseName ? `Japanese: ${normalized.japaneseName}` : null,
+        normalized.setNameEnglish ? `English counterpart: ${normalized.setNameEnglish}` : null,
         normalized.printedName,
         normalized.printStamps,
         normalized.details,
@@ -158,6 +163,9 @@ export function buildScanCardContext(args: {
     certMarketEvidence: args.certMarketEvidence ?? [],
     extraction: normalized,
     catalogImageUrl: args.catalogImageUrl ?? null,
+    catalogImageSource: args.catalogImageSource ?? null,
+    catalogImageSourceLabel: args.catalogImageSourceLabel ?? null,
+    catalogImageNeedsReview: args.catalogImageNeedsReview ?? false,
   };
 }
 
@@ -174,6 +182,9 @@ export type CatalogContextSnapshot = Pick<
   | "catalogCandidates"
   | "identityEvidence"
   | "catalogImageUrl"
+  | "catalogImageSource"
+  | "catalogImageSourceLabel"
+  | "catalogImageNeedsReview"
 >;
 
 export function pickCatalogContext(context: ScanCardContext): CatalogContextSnapshot {
@@ -184,6 +195,9 @@ export function pickCatalogContext(context: ScanCardContext): CatalogContextSnap
     catalogCandidates: context.catalogCandidates,
     identityEvidence: context.identityEvidence,
     catalogImageUrl: context.catalogImageUrl ?? null,
+    catalogImageSource: context.catalogImageSource ?? null,
+    catalogImageSourceLabel: context.catalogImageSourceLabel ?? null,
+    catalogImageNeedsReview: context.catalogImageNeedsReview ?? false,
   };
 }
 

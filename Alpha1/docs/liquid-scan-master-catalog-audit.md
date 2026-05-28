@@ -246,3 +246,158 @@ Verification:
 
 - `npm run smoke:catalog-candidates` now includes `Base Set Charizard OCR number repair` and confirms `base1-4`.
 - Direct route probe returns `base1-4`, `Base Set`, `4/102`, and official `base1/4.png` art instead of Expedition `ecard1/6.png`.
+
+## 2026-05-27 Japanese Pokemon Support Upgrade
+
+Japanese raw cards and Japanese slabs now get a dedicated identity pass before catalog and market matching. The pass preserves Japanese identity while building an English catalog counterpart for the master catalog.
+
+Implemented:
+
+- Added structured Japanese fields on extracted cards: `rawDetectedText`, `detectedLanguage`, `japaneseName`, `englishCounterpartName`, `setNameJapanese`, `setNameEnglish`, `englishCounterpartNumber`, `matchConfidence`, `matchMethod`, `japaneseMatchStatus`, `marketLanguage`, `pricingConfidence`, and fallback flags.
+- Added `src/lib/scan/japanese-pokemon.ts` with Japanese text detection, old-back `No.###` normalization, Japanese set mapping, counterpart name mapping, and confidence thresholds:
+  - `>= 0.9` -> `confirmed`
+  - `>= 0.7` -> `needs_soft_review`
+  - `< 0.7` -> `needs_manual_review`
+- Japanese Base Set `リザードン / No.006` now preserves `No.006` for display and maps to English catalog `Charizard / Base Set / 4/102` for matching.
+- Catalog matching uses the English counterpart internally, but UI card fields keep Japanese set/number data.
+- Japanese market searches now prioritize Japanese-specific queries with Japanese language, Japanese name, Japanese set, printed number, year, and grade when present.
+- UI cards now show Japanese metadata consistently:
+  - English display title
+  - Japanese printed title line
+  - Japanese badge
+  - Matched Counterpart badge
+  - Japanese Market Data / Fallback Estimate badges where applicable
+- Vision prompts now request Japanese structured fields directly instead of relying on generic translation.
+- PSA slab parsing now recognizes `No.006`, `BASIC`, and Japanese Base indicators.
+
+Verification:
+
+- `npm run verify:japanese-pokemon` passes:
+  - Raw Japanese vintage card.
+  - Raw Japanese modern-style Charizard ex name.
+  - Low-confidence Japanese OCR fallback.
+  - Japanese market identity parts.
+- `npm run smoke:catalog-candidates` includes `Japanese Base Set Charizard No.006` and confirms `base1-4`.
+- Direct route probe resolves `リザードン / 拡張パック / No.006` to `base1-4`, confirmed, with `base1/4.png` artwork fallback.
+- `npm run verify:card-display` passes with Japanese display title `Charizard` and subtitle `Japanese: リザードン`.
+
+## 2026-05-27 Protected Master Catalog Baseline
+
+This is the current working setup to preserve before adding Japanese artwork coverage:
+
+- `tcg_catalog_sets` and `tcg_catalog_cards` are the master catalog cache. Browse and scan matching should hit Supabase first and only use live APIs for refresh/fallback.
+- Pokemon catalog IDs stay on the English upstream spine, for example `base1-4`.
+- Confirmed print variants are separate synthetic catalog rows, not UI-only switches:
+  - Base Set Unlimited: `base1-{number}__unlimited`
+  - WOTC/e-card 1st Edition: `{set}-{number}__first_edition`
+  - WOTC/e-card Shadowless: `{set}-{number}__shadowless`
+  - Legendary Collection Reverse Holo: `base6-{number}__reverse_holo`
+- Normal browse excludes synthetic variant rows unless print/finish filters request them.
+- Catalog candidate matching is DB-first and exits early when Supabase has a confirmed or strong answer.
+- Wrong-set/wrong-number/wrong-print candidates are capped below exact master-catalog hits.
+- Japanese scan identity is currently an overlay: it preserves Japanese language/name/set/printed number while using the English counterpart as the catalog spine where needed.
+
+Rule for future work: do not overwrite base English catalog rows with Japanese names or Japanese image URLs. Localized artwork must live in a linked overlay or in validated localized/synthetic rows.
+
+## 2026-05-27 Japanese Artwork Extension Plan
+
+### Source/API Findings
+
+- TCGdex is the best first candidate for Japanese card images because it exposes multilingual Pokemon TCG data, has Japanese language support, and returns image base URLs that can be expanded to `low.webp` / `high.webp`.
+- PokemonTCG/pokemon-tcg-data and the Pokemon TCG API remain the best English catalog spine for this project, but they are not enough for complete Japanese localized artwork.
+- Probe finding: TCGdex works well for modern Japanese examples such as Japanese Charizard ex rows, but vintage Japanese old-back data is not safe to key only by visible `No.###`. On old Japanese cards, `No.006` is the Pokedex number, not necessarily the API local set number.
+- Therefore, vintage Japanese artwork must use a curated/validated mapping layer before any image is trusted.
+
+### Recommended Data Model
+
+Add a localized artwork overlay table instead of modifying `tcg_catalog_cards` directly:
+
+```sql
+tcg_catalog_localized_artwork
+  id uuid primary key
+  franchise text not null
+  base_catalog_id text not null
+  language text not null
+  localized_catalog_id text
+  localized_set_code text
+  localized_set_name text
+  localized_name text
+  printed_number text
+  counterpart_number text
+  image_small_url text
+  image_large_url text
+  artwork_match_status text not null
+  match_method text not null
+  match_confidence numeric not null
+  source text not null
+  source_payload jsonb
+  created_at timestamptz
+  updated_at timestamptz
+```
+
+Suggested `artwork_match_status` values:
+
+- `exact_japanese_print`
+- `same_art_confirmed`
+- `english_fallback`
+- `needs_image_review`
+
+### Resolver Order
+
+Japanese card art should resolve in this order:
+
+1. Exact localized overlay row for `language + base_catalog_id + printed_number`.
+2. Exact TCGdex Japanese card ID/local ID when set and name are validated.
+3. Curated vintage Japanese mapping row for old-back cards.
+4. English counterpart image only when `same_art_confirmed` or when no Japanese art exists and the UI labels it as English fallback.
+5. Placeholder/manual review image when the artwork is uncertain.
+
+### Processing Plan
+
+1. Add the `tcg_catalog_localized_artwork` migration and DB helper functions.
+2. Add a Japanese artwork resolver that accepts the scanned Japanese card plus the matched English `catalogId`.
+3. Add `scripts/sync-japanese-pokemon-artwork.mjs`:
+   - Pull modern Japanese candidates from TCGdex.
+   - Upsert only rows that pass exact set/name/local ID validation.
+   - Skip vintage old-back rows unless they are in a curated mapping file.
+4. Add a curated seed file for high-value vintage cards first:
+   - Japanese Base Set holos.
+   - Japanese Gym cards.
+   - Neo-era Japanese holos.
+   - Japanese promos commonly seen in graded slabs.
+5. Add UI/source badges:
+   - `Japanese Art`
+   - `English Art Fallback`
+   - `Needs Image Review`
+6. Add verification:
+   - Japanese Base Set Charizard keeps `base1-4` catalog identity and never overwrites English art globally.
+   - Japanese modern Charizard ex can use TCGdex Japanese art when exact set/local ID validates.
+   - Low-confidence Japanese cards show fallback/manual-review state.
+   - English Base Set, Unlimited, Shadowless, and Legendary Collection Reverse Holo smoke tests still pass unchanged.
+
+### Why This Is Safe
+
+This keeps the working English master catalog fast and stable while allowing Japanese images to improve card-by-card. The scanner can show Japanese artwork when validated, but the core `catalogId`, cert linkage, market intelligence, and existing variant behavior remain unchanged.
+
+### Implemented Overlay Foundation
+
+- Added migration `supabase/migrations/202605280002_tcg_catalog_localized_artwork.sql`.
+- Added `src/lib/catalog/localized-artwork.ts`:
+  - Looks up validated localized artwork overlay rows first.
+  - Guards old-back Japanese `No.###` cards so the visible Pokedex number is not treated as a TCGdex set-local card ID.
+  - Uses TCGdex Japanese aliases only when name/set/number evidence agrees.
+  - Falls back to English counterpart art with an explicit `English Art Fallback` source label.
+- Wired localized artwork resolution into:
+  - `POST /api/scan/enrich`
+  - `POST /api/scan/catalog-candidates`
+- Added scan context/UI fields:
+  - `catalogImageSource`
+  - `catalogImageSourceLabel`
+  - `catalogImageNeedsReview`
+- Added Japanese image-source badges in Liquid Scan card rows.
+- Added scripts:
+  - `npm run db:apply:localized-artwork`
+  - `npm run catalog:sync:pokemon-japanese-artwork`
+  - `npm run verify:japanese-artwork`
+
+The sync script is dry-run by default and only writes with `--apply`. It writes only to `tcg_catalog_localized_artwork`.

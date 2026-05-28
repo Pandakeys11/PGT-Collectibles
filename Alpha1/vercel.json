@@ -1,8 +1,28 @@
 {
   "crons": [
     {
-      "path": "/api/catalog/sync",
-      "schedule": "0 6 * * *"
+      "path": "/api/jobs/nightly-platform",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/jobs/market-ingest",
+      "schedule": "50 7 * * *"
+    },
+    {
+      "path": "/api/jobs/market-ingest",
+      "schedule": "10 8 * * *"
+    },
+    {
+      "path": "/api/jobs/market-ingest",
+      "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/jobs/market-ingest",
+      "schedule": "50 8 * * *"
+    },
+    {
+      "path": "/api/jobs/nightly-final",
+      "schedule": "10 11 * * *"
     }
   ]
 }

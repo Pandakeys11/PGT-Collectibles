@@ -17,12 +17,17 @@ function isNonEnglishLanguage(language) {
   return lang !== "en" && lang !== "english" && lang !== "eng";
 }
 
+function isJapaneseLanguage(language) {
+  const lang = normalizeCardLanguage(language);
+  return lang === "ja" || lang === "jp" || lang === "jpn" || lang === "japanese";
+}
+
 function readPrintedName(card) {
-  return (card.printedName ?? card.printed_name ?? "").trim();
+  return (card.japaneseName ?? card.printedName ?? card.printed_name ?? "").trim();
 }
 
 function readName(card) {
-  return (card.name ?? "").trim();
+  return (card.englishCounterpartName ?? card.name ?? "").trim();
 }
 
 function namesEquivalent(a, b) {
@@ -34,17 +39,20 @@ function getCardDisplayTitle(card) {
   const english = readName(card);
   const printed = readPrintedName(card);
   const lang = (card.language ?? "").trim();
-  if (printed && isNonEnglishLanguage(lang)) return printed;
-  if (printed && english && !namesEquivalent(printed, english)) return printed;
+  if (printed && isNonEnglishLanguage(lang) && !isJapaneseLanguage(lang)) return printed;
+  if (printed && english && !namesEquivalent(printed, english) && !isJapaneseLanguage(lang)) return printed;
   return english || printed || "—";
 }
 
 function getCardDisplaySubtitle(card) {
   const title = getCardDisplayTitle(card);
   const english = readName(card);
+  const printed = readPrintedName(card);
   const lang = (card.language ?? "").trim();
   const parts = [];
-  if (english && !namesEquivalent(title, english)) parts.push(english);
+  if (isJapaneseLanguage(lang) && printed && !namesEquivalent(printed, english)) {
+    parts.push(`Japanese: ${printed}`);
+  } else if (english && !namesEquivalent(title, english)) parts.push(english);
   if (lang && isNonEnglishLanguage(lang)) parts.push(lang);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
@@ -64,6 +72,11 @@ const cases = [
     card: { name: "Glurak", printedName: "Glurak", language: "German" },
     title: "Glurak",
     subtitle: "German",
+  },
+  {
+    card: { name: "Charizard", printedName: "リザードン", japaneseName: "リザードン", englishCounterpartName: "Charizard", language: "Japanese" },
+    title: "Charizard",
+    subtitle: "Japanese: リザードン · Japanese",
   },
 ];
 

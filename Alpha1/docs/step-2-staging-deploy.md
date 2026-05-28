@@ -13,6 +13,8 @@ npm run db:apply
 npm run db:verify
 ```
 
+Set `CRON_SECRET` in Vercel (Preview + Production) so nightly jobs run (see `docs/nightly-cron.md` — 02:30–06:10 EST / 07:30–11:10 UTC).
+
 ## 2b. Staging host (Vercel recommended)
 
 1. Push repo to GitHub

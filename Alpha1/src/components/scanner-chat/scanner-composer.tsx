@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Calculator, Camera, ChevronDown, Loader2, Scan, Upload, Zap } from "lucide-react";
+import { Calculator, Camera, ChevronDown, Loader2, Scan, TrendingUp, Upload, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SCAN_MODE_OPTIONS } from "@/lib/scanner-chat/scan-mode-labels";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
@@ -37,6 +37,7 @@ export function ScannerComposer({
   onSpeedOnChange,
   onOpenLiveCamera,
   onOpenCalculator,
+  onOpenLiveMarket,
   supportsLiveCamera,
   reviewSpecimen,
   onConfirmCatalogCandidate,
@@ -64,6 +65,7 @@ export function ScannerComposer({
   onSpeedOnChange: (on: boolean) => void;
   onOpenLiveCamera: () => void;
   onOpenCalculator?: () => void;
+  onOpenLiveMarket?: () => void;
   supportsLiveCamera?: boolean;
   reviewSpecimen?: ScanSpecimen | null;
   onConfirmCatalogCandidate?: (specimenId: string, candidate: CatalogCandidate) => void;
@@ -198,6 +200,18 @@ export function ScannerComposer({
               }}
             />
 
+            {onOpenLiveMarket ? (
+              <button
+                type="button"
+                onClick={onOpenLiveMarket}
+                disabled={isBusy}
+                className="sc-composer-icon-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/5 hover:text-sky-200 disabled:opacity-40 touch-manipulation lg:hidden"
+                aria-label="Open live market pulse"
+                title="Live market — trending sets"
+              >
+                <TrendingUp className="h-4 w-4" />
+              </button>
+            ) : null}
             {onOpenCalculator ? (
               <button
                 type="button"

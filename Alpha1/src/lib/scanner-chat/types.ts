@@ -56,6 +56,9 @@ export interface CardMatch {
   status: MatchStatus;
   thumbnailGradient: string;
   catalogImageUrl?: string | null;
+  catalogImageSource?: string | null;
+  catalogImageSourceLabel?: string | null;
+  catalogImageNeedsReview?: boolean;
   previewUrl?: string | null;
   /** Legacy extraction row — powers catalog thumb + future row actions. */
   extractedCard?: import("@/lib/scan/schemas").ExtractedCard;
@@ -87,7 +90,7 @@ export interface UserChatMessage extends ChatMessageBase {
 }
 
 /** Embedded workspace panels rendered inside the Liquid Scan chat feed. */
-export type ChatOutputKind = "catalog" | "companion" | "calculator";
+export type ChatOutputKind = "catalog" | "companion" | "calculator" | "live-market";
 
 export type ChatOutputPanel = {
   kind: ChatOutputKind;

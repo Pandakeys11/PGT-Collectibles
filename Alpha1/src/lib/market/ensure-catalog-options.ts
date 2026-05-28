@@ -3,6 +3,7 @@ import { mergeCatalogMatches } from "@/lib/market/catalog-candidate-merge";
 import { matchCatalogForEnrich } from "@/lib/market/catalog-router";
 import type { CatalogMatch } from "@/lib/market/pokemon-catalog";
 import { inferCardFranchise } from "@/lib/scan/franchise";
+import { toCatalogCounterpartCard } from "@/lib/scan/japanese-pokemon";
 import { isNonTcgPokemonCollectible } from "@/lib/scan/non-tcg-pokemon";
 import type { ExtractedCard } from "@/lib/scan/schemas";
 
@@ -55,10 +56,11 @@ export async function ensureCatalogMatchOptions(
   if (isNonTcgPokemonCollectible(card)) return null;
 
   const franchise = inferCardFranchise(card).id;
-  let match = await searchDbCatalog(card, franchise);
+  const catalogCard = toCatalogCounterpartCard(card);
+  let match = await searchDbCatalog(catalogCard, franchise);
 
   if (candidateCount(match) < MIN_CATALOG_PICK_OPTIONS || topCandidateHasHardConflict(match)) {
-    const dbBroad = await searchDbCatalogBroad(card, franchise);
+    const dbBroad = await searchDbCatalogBroad(catalogCard, franchise);
     match = mergeCatalogMatches(match, dbBroad);
   }
 
@@ -66,6 +68,6 @@ export async function ensureCatalogMatchOptions(
     return match;
   }
 
-  const fallback = await withTimeout(matchCatalogForEnrich(card), 8_000, null);
+  const fallback = await withTimeout(matchCatalogForEnrich(catalogCard), 8_000, null);
   return mergeCatalogMatches(match, fallback);
 }

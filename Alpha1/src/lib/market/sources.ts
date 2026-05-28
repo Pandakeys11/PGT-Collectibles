@@ -7,6 +7,7 @@ import {
   cardLadderLadderSearchQuery,
 } from "@/lib/market/cardladder-urls";
 import { buildMarketSearchIdentity } from "@/lib/market/market-search-identity";
+import { isJapanesePokemonCard, japaneseMarketIdentityParts } from "@/lib/scan/japanese-pokemon";
 import {
   buildEbayCardKeywordQuery,
   ebaySearchCategoryIdForCard,
@@ -215,6 +216,9 @@ function compact(parts: Array<string | null | undefined>): string {
 }
 
 function identity(card: ExtractedCard): string {
+  if (isJapanesePokemonCard(card)) {
+    return compact([franchiseSearchPrefix(card), ...japaneseMarketIdentityParts(card)]);
+  }
   return compact([franchiseSearchPrefix(card), card.name, card.printedName, card.language, card.set, card.number, card.printStamps, card.details, card.rarity, card.year]);
 }
 

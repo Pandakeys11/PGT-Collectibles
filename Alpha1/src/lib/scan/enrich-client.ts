@@ -24,6 +24,9 @@ export async function enrichExtractedCard(args: {
   phase?: EnrichPhase;
   catalogId?: string | null;
   catalogImageUrl?: string | null;
+  catalogImageSource?: ScanCardContext["catalogImageSource"];
+  catalogImageSourceLabel?: string | null;
+  catalogImageNeedsReview?: boolean;
   catalogIdentityStatus?: ScanCardContext["catalogIdentityStatus"];
   catalogConfidence?: number;
   catalogCandidates?: ScanCardContext["catalogCandidates"];
@@ -39,7 +42,7 @@ export async function enrichExtractedCard(args: {
   catalogId?: string | null;
 }> {
   const phase = args.phase ?? "full";
-  const timeoutMs = phase === "catalog" ? 45_000 : phase === "market" ? 60_000 : 45_000;
+  const timeoutMs = phase === "catalog" ? 45_000 : phase === "market" ? 90_000 : 75_000;
   const maxAttempts = 3;
 
   let lastError = "Enrichment failed";
@@ -97,6 +100,9 @@ export type CatalogCandidatesPayload = {
   catalogConfidence: number;
   catalogId: string | null;
   catalogImageUrl: string | null;
+  catalogImageSource?: ScanCardContext["catalogImageSource"];
+  catalogImageSourceLabel?: string | null;
+  catalogImageNeedsReview?: boolean;
   identityEvidence: ScanCardContext["identityEvidence"];
   catalogMatched: boolean;
 };

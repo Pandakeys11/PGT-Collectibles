@@ -176,10 +176,159 @@
   border-color: rgb(255 255 255 / 0.06);
 }
 
-/* Catalog card detail sheet (portaled above chat overflow) */
+/* Set / card scroll regions inside embedded master catalog */
+.scanner-chat-root .liquid-catalog-embed .sc-pokedex-catalog-grid {
+  flex: 1 1 0%;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.scanner-chat-root .liquid-catalog-embed .sc-pokedex-catalog-grid--set-open {
+  width: 100%;
+}
+
+.scanner-chat-root .sc-catalog-set-insight-rail {
+  border-radius: 0.75rem;
+}
+
+.scanner-chat-root .sc-catalog-set-insight-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-gutter: stable;
+}
+
+.scanner-chat-root .sc-catalog-set-scroll,
+.scanner-chat-root .sc-catalog-cards-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.scanner-chat-root .sc-catalog-set-scroll {
+  scrollbar-gutter: stable;
+}
+
+/* Vault set tiles — legacy foil gallery */
+.scanner-chat-root .sc-catalog-set-tile {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.scanner-chat-root .sc-catalog-set-tile-hero {
+  border-bottom: 1px solid rgb(255 255 255 / 0.06);
+}
+
+.scanner-chat-root
+  .sc-pokedex-catalog-grid:not(.sc-pokedex-catalog-grid--set-open)
+  .sc-catalog-set-tile-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+
+@media (min-width: 640px) {
+  .scanner-chat-root
+    .sc-pokedex-catalog-grid:not(.sc-pokedex-catalog-grid--set-open)
+    .sc-catalog-set-tile-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .scanner-chat-root
+    .sc-pokedex-catalog-grid:not(.sc-pokedex-catalog-grid--set-open)
+    .sc-catalog-set-tile-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.scanner-chat-root .sc-catalog-franchise-tabs button[role="tab"] {
+  min-height: 2rem;
+}
+
+.scanner-chat-root .sc-catalog-era-filter button {
+  min-height: 2rem;
+}
+
+/* Catalog card detail — compact identity + FMV-first layout */
+.scanner-chat-root .sc-catalog-card-detail,
+.sc-catalog-card-detail {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-identity {
+  display: grid;
+  grid-template-columns: 2.75rem 1fr;
+  gap: 0.5rem 0.625rem;
+  align-items: start;
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-identity__media {
+  width: 2.75rem;
+  height: 3.65rem;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: rgb(var(--sc-panel-raised) / 0.45);
+  box-shadow: 0 0 0 1px rgb(var(--sc-border) / 0.35);
+}
+
+@media (min-width: 640px) {
+  .sc-catalog-card-detail--sheet .sc-catalog-detail-identity {
+    grid-template-columns: 3.25rem 1fr;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .sc-catalog-card-detail--sheet .sc-catalog-detail-identity__media {
+    width: 3.25rem;
+    height: 4.35rem;
+  }
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-market-intel {
+  min-width: 0;
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-comps-list ul {
+  max-height: min(9.5rem, 28vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Master catalog / pokedex card detail sheet (desktop rail) */
+.sc-pokedex-card-detail-sheet,
 .sc-catalog-card-sheet {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+@media (min-width: 640px) {
+  .sc-pokedex-card-detail-sheet,
+  .sc-catalog-card-sheet {
+    box-shadow:
+      0 0 0 1px rgb(var(--sc-border) / 0.25),
+      -12px 0 48px -12px rgb(0 0 0 / 0.45);
+  }
+
+  .scanner-chat-root .liquid-catalog-embed:has(.sc-pokedex-card-detail-sheet) {
+    /* Keep grid visible beside the rail on desktop */
+    padding-right: 0;
+  }
+}
+
+.sc-pokedex-card-detail-footer,
+.sc-catalog-card-detail-footer {
+  padding-bottom: max(0.625rem, env(safe-area-inset-bottom, 0px));
+}
+
+.sc-pokedex-card-detail-scroll,
+.sc-catalog-card-detail-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Catalog card detail sheet (portaled above chat overflow) */
 
 .sc-catalog-detail-backdrop {
   -webkit-tap-highlight-color: transparent;
@@ -198,6 +347,71 @@
 @media (max-width: 1023px) {
   .sc-extracted-cards-carousel {
     max-width: 100%;
+  }
+}
+
+/* Live market pulse — desktop banner + chat embed */
+.sc-composer-stack {
+  max-width: 100%;
+}
+
+.sc-live-market-banner-row {
+  width: 100%;
+  max-width: none;
+}
+
+.sc-live-market-banner-track {
+  width: 100%;
+}
+
+.sc-live-market-pill {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.sc-live-market-banner-track--animate .sc-live-market-pill {
+  animation: sc-live-market-pill-shift 5.5s ease-in-out infinite alternate;
+}
+
+.sc-live-market-banner-track--animate .sc-live-market-pill:nth-child(2) {
+  animation-delay: 0.35s;
+}
+
+.sc-live-market-banner-track--animate .sc-live-market-pill:nth-child(3) {
+  animation-delay: 0.7s;
+}
+
+@keyframes sc-live-market-pill-shift {
+  from {
+    transform: translateX(0.35rem);
+    opacity: 0.92;
+  }
+  to {
+    transform: translateX(-0.35rem);
+    opacity: 1;
+  }
+}
+
+.sc-live-market-banner-open {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-live-market-banner-track--animate .sc-live-market-pill {
+    animation: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sc-composer-stack {
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    max-width: none;
+  }
+
+  .sc-live-market-embed-panel.sc-chat-output-panel {
+    max-height: min(calc(100dvh - 12rem), 640px);
   }
 }
 
@@ -300,9 +514,13 @@
   }
 
   .scanner-chat-root .liquid-catalog-embed {
+    display: flex;
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
     overflow-x: hidden;
   }
 
@@ -545,11 +763,21 @@
   }
 
   .scanner-chat-root .liquid-catalog-embed .sc-pokedex-catalog-grid {
-    min-height: min(56vh, 520px);
+    flex: 1 1 0%;
+    min-height: 0;
+    max-height: 100%;
   }
 
   .scanner-chat-root .sc-catalog-embed-panel {
-    min-height: min(70vh, 680px);
+    min-height: min(78vh, 780px);
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel .liquid-catalog-embed {
+    --catalog-tile-gap: 0.5rem;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel .sc-pokedex-catalog-grid--set-open {
+    min-height: min(68vh, 640px);
   }
 
   .scanner-chat-root .sc-scan-results-block {
@@ -558,6 +786,17 @@
 
   .scanner-chat-root .sc-extracted-cards-carousel {
     width: 100%;
+  }
+}
+
+@media (max-width: 1023px) {
+  .scanner-chat-root .sc-catalog-embed-panel {
+    max-height: min(92dvh, 900px);
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel .liquid-catalog-embed .sc-pokedex-catalog-grid {
+    flex: 1 1 0%;
+    min-height: 0;
   }
 }
 

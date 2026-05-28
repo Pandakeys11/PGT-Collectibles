@@ -23,6 +23,7 @@ import {
 } from "@/lib/market/tcgdex-client";
 import { effectiveCatalogSearchName } from "@/lib/scan/card-display";
 import { inferCardFranchise } from "@/lib/scan/franchise";
+import { toCatalogCounterpartCard } from "@/lib/scan/japanese-pokemon";
 import { resolvePrintEdition } from "@/lib/scan/print-edition";
 import { hasReadableCertNumber } from "@/lib/scan/graded-slab";
 
@@ -603,8 +604,8 @@ function scoreCatalogCandidate(
     }
   }
 
-  const small = hit.images?.small ?? null;
-  const large = hit.images?.large ?? null;
+  const small = alias?.imageUrl ?? hit.images?.small ?? null;
+  const large = alias?.imageUrl ?? hit.images?.large ?? null;
   const finalScore = clampScore(score);
   return {
     catalogId: hit.id,
@@ -864,13 +865,19 @@ function buildCatalogMatchFromHits(
     return candidate;
   });
 
-  return toCatalogMatch(top.card, matchBasis, {
+  const match = toCatalogMatch(top.card, matchBasis, {
     status,
     score: top.score,
     confidence: top.confidence,
     candidates,
     evidence: top.evidence,
   });
+  return {
+    ...match,
+    imageSmallUrl: top.imageSmallUrl ?? match.imageSmallUrl,
+    imageLargeUrl: top.imageLargeUrl ?? match.imageLargeUrl,
+    imageUrl: top.imageLargeUrl ?? top.imageSmallUrl ?? match.imageUrl,
+  };
 }
 
 /** Wide master-catalog search for manual pick UI (Pokédex-aligned API). */
@@ -878,15 +885,16 @@ export async function suggestPokemonCatalogCandidates(
   card: ExtractedCard,
 ): Promise<CatalogMatch | null> {
   if (!inferCardFranchise(card).isPokemon) return null;
-  const searchName = effectiveCatalogSearchName(card);
+  const sourceCard = toCatalogCounterpartCard(card);
+  const searchName = effectiveCatalogSearchName(sourceCard);
   if (!searchName) return null;
 
-  const promoNorm = normalizePromoCardIdentity({ set: card.set, number: card.number });
+  const promoNorm = normalizePromoCardIdentity({ set: sourceCard.set, number: sourceCard.number });
   const cardForSearch = {
-    ...card,
+    ...sourceCard,
     name: searchName,
-    set: canonicalPromoSetName(promoNorm.set) ?? promoNorm.set ?? card.set,
-    number: promoNorm.number ?? card.number,
+    set: canonicalPromoSetName(promoNorm.set) ?? promoNorm.set ?? sourceCard.set,
+    number: promoNorm.number ?? sourceCard.number,
   };
   const aliases = needsTcgDexAliasLookup(card)
     ? await resolveTcgDexAliases(card)
@@ -899,15 +907,16 @@ export async function matchPokemonCatalog(
   card: ExtractedCard,
 ): Promise<CatalogMatch | null> {
   if (!inferCardFranchise(card).isPokemon) return null;
-  const searchName = effectiveCatalogSearchName(card);
+  const sourceCard = toCatalogCounterpartCard(card);
+  const searchName = effectiveCatalogSearchName(sourceCard);
   if (!searchName) return null;
 
-  const promoNorm = normalizePromoCardIdentity({ set: card.set, number: card.number });
+  const promoNorm = normalizePromoCardIdentity({ set: sourceCard.set, number: sourceCard.number });
   const cardForSearch = {
-    ...card,
+    ...sourceCard,
     name: searchName,
-    set: canonicalPromoSetName(promoNorm.set) ?? promoNorm.set ?? card.set,
-    number: promoNorm.number ?? card.number,
+    set: canonicalPromoSetName(promoNorm.set) ?? promoNorm.set ?? sourceCard.set,
+    number: promoNorm.number ?? sourceCard.number,
   };
   const aliases = needsTcgDexAliasLookup(card)
     ? await resolveTcgDexAliases(card)

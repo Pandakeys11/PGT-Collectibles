@@ -30,6 +30,7 @@ import {
   buildScanReportResearchQuery,
   LIQUID_SCAN_REPORT_SYSTEM,
 } from "@/lib/scanner-chat/liquid-scan-report";
+import { deriveLiquidAskConfidenceHints } from "@/lib/scanner-chat/liquid-ask-confidence";
 import {
   liquidAskResearchForLlm,
   runLiquidAskResearch,
@@ -249,6 +250,7 @@ export async function POST(req: NextRequest) {
             contexts,
             focusSpecimenId,
             researchJson,
+            research,
           });
           system = payload.system;
           user = payload.user;
@@ -267,6 +269,17 @@ export async function POST(req: NextRequest) {
             send({ type: "text", text: event.text });
           } else if (event.type === "done") {
             provider = event.provider;
+            const focusCtx =
+              focusSpecimenId != null
+                ? contexts.find((c) => c.specimenId === focusSpecimenId) ?? null
+                : null;
+            const confidenceHints = !isScanReport
+              ? deriveLiquidAskConfidenceHints({
+                  research,
+                  focus: focusCtx,
+                  contextCount: contexts.length,
+                })
+              : null;
             send({
               type: "done",
               provider,
@@ -276,6 +289,7 @@ export async function POST(req: NextRequest) {
               todayUtc: research?.todayUtc ?? null,
               proTier,
               research,
+              confidenceHints,
             });
           } else if (event.type === "error") {
             send({

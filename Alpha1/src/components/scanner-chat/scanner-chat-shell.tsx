@@ -21,6 +21,8 @@ import { ScanIntelligencePanel } from "./scan-intelligence-panel";
 import { ScannerComposer } from "./scanner-composer";
 import { ScannerHeader } from "./scanner-header";
 import { ScannerSidebar, type SidebarNavId } from "./scanner-sidebar";
+import { LiveMarketTickerBanner } from "./live-market-ticker-banner";
+import { LiveMarketTickerProvider } from "./live-market-ticker-provider";
 import { LiquidScanPanelBootstrap } from "./liquid-scan-panel-bootstrap";
 import { UploadDropzoneOverlay } from "./upload-dropzone";
 import { LiquidScanLiveCamera } from "./liquid-scan-live-camera";
@@ -151,12 +153,14 @@ export function ScannerChatShell() {
   );
 
   return (
+    <LiveMarketTickerProvider>
     <div className="scanner-chat-root flex h-[100dvh] w-full max-w-[100vw] flex-col overflow-hidden">
       <Suspense fallback={null}>
         <LiquidScanPanelBootstrap
           onOpenCatalog={chat.openCatalogOutput}
           onOpenCompanion={chat.openCompanionOutput}
           onOpenCalculator={chat.openCalculatorOutput}
+          onOpenLiveMarket={chat.openLiveMarketOutput}
           onCatalogPrefill={(prefill) => void chat.loadCatalogPrefill(prefill)}
         />
       </Suspense>
@@ -194,6 +198,7 @@ export function ScannerChatShell() {
           savingScan={chat.saving}
           onNav={(id: SidebarNavId) => {
             if (id === "catalog") chat.openCatalogOutput();
+            else if (id === "live-market") chat.openLiveMarketOutput();
             else if (id === "companion") chat.openCompanionOutput();
             else if (id === "calculator") chat.openCalculatorOutput();
             else if (id === "exports") handleExport("csv");
@@ -250,7 +255,12 @@ export function ScannerChatShell() {
             scanning={chat.isScanning || chat.enriching}
             onOpen={() => chat.setResultsDrawerOpen(true)}
           />
-          <ScannerComposer
+          <div className="sc-composer-stack shrink-0 border-t border-white/6 bg-[rgb(6,8,12)]/90 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md sm:px-4 lg:px-5">
+            <LiveMarketTickerBanner
+              className="mb-2"
+              onOpenFull={chat.openLiveMarketOutput}
+            />
+            <ScannerComposer
             className="sc-mobile-composer"
             prompt={chat.prompt}
             onPromptChange={chat.setPrompt}
@@ -269,6 +279,7 @@ export function ScannerChatShell() {
             onSpeedOnChange={chat.setLiquidScanSpeedOn}
             onOpenLiveCamera={() => setLiveCameraOpen(true)}
             onOpenCalculator={() => chat.openCalculatorOutput()}
+            onOpenLiveMarket={() => chat.openLiveMarketOutput()}
             reviewSpecimen={
               chat.selectedSpecimen?.context.catalogIdentityStatus !== "confirmed" ||
               chat.selectedSpecimen?.context.verificationStatus !== "verified"
@@ -281,7 +292,8 @@ export function ScannerChatShell() {
             onOpenMasterCatalog={chat.openCatalogOutput}
             catalogRefreshingId={chat.catalogRefreshingId}
             catalogBusy={chat.enrichingSpecimenId != null}
-          />
+            />
+          </div>
         </main>
         <div className="hidden w-[min(100%,380px)] min-w-0 shrink-0 flex-col border-l border-white/6 lg:flex xl:w-[420px]">
           <div className="flex items-center justify-between gap-2 border-b border-white/6 px-4 py-2">
@@ -376,5 +388,6 @@ export function ScannerChatShell() {
         onOpenMasterCatalog={chat.openCatalogOutput}
       />
     </div>
+    </LiveMarketTickerProvider>
   );
 }

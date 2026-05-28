@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { BookOpen, ChevronRight, Loader2, Search, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, BookOpen, LineChart, Loader2, Search, X } from "lucide-react";
+import Link from "next/link";
+import { CatalogEraFilter } from "@/components/catalog/catalog-era-filter";
+import { CatalogSetTileGrid } from "@/components/catalog/catalog-set-tile-grid";
+import { tcgSetToTileModel } from "@/components/catalog/catalog-set-tile";
+import { useCatalogMobileLayout } from "@/hooks/use-catalog-mobile-layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { CatalogCardDetailSheet } from "@/components/catalog/catalog-card-detail-sheet";
 import { Input } from "@/components/ui/input";
 import {
   releaseYearFromApiDate,
@@ -14,15 +20,21 @@ import {
 import {
   SET_ERA_DESCRIPTION,
   SET_ERA_LABEL,
-  SET_ERA_ORDER,
   setEraToOrderBy,
   type SetEraId,
 } from "@/lib/pokedex/set-era";
 import { CatalogFocusGrid } from "@/components/pokedex/catalog-focus-grid";
 import { CatalogVariantImage } from "@/components/pokedex/catalog-variant-image";
-import { PokedexCardMarketPanel } from "@/components/pokedex/pokedex-card-market-panel";
+import {
+  CatalogCardDetailActions,
+  CatalogCardDetailBody,
+  type CatalogCardDetailIdentity,
+} from "@/components/catalog/catalog-card-detail-body";
+import { marketPokemonHref } from "@/lib/app-routes";
 import { ScanThisCardButton } from "@/components/pokedex/scan-this-card-button";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import { CatalogSetInsightRail } from "@/components/catalog/catalog-set-insight-rail";
+import { rollupSetInsightCards } from "@/lib/catalog/set-insight-utils";
 import { PokedexSetOverviewPanel } from "@/components/pokedex/pokedex-set-overview-panel";
 import { hasCatalogSetOverlay } from "@/lib/pokedex/catalog-set-overlay";
 import { getCatalogPromoSpecialRow } from "@/lib/pokedex/catalog-promo-special-sets";
@@ -49,47 +61,15 @@ const CATALOG_PAGE_SIZE = 250;
 
 const CATALOG_GUARD_RAILS_URL = getCatalogVariantArtworkGuardRailsUrl();
 
+function fmtUsd(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return `$${Math.round(n).toLocaleString()}`;
+}
+
 function preferDistinctCurated(api: string | undefined, resolved: string | undefined): string | undefined {
   if (!resolved?.trim()) return undefined;
   if (!api?.trim()) return resolved;
   return resolved.trim() !== api.trim() ? resolved : undefined;
-}
-
-function setListInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
-  }
-  const w = name.trim();
-  return w.slice(0, 2).toUpperCase() || "?";
-}
-
-function SetListLogo({ tcgSet, embedded = false }: { tcgSet: TcgSetSummary; embedded?: boolean }) {
-  const [failed, setFailed] = useState(false);
-  const src = tcgSet.images?.logo || tcgSet.images?.symbol;
-  const frame = cn(
-    "flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-subtle bg-panel-raised/80",
-    embedded ? "h-10 w-10 lg:h-12 lg:w-12" : "h-11 w-11 sm:h-12 sm:w-12",
-  );
-  if (!src || failed) {
-    return (
-      <div className={cn(frame, "text-[10px] font-semibold uppercase tracking-tight text-faint")} aria-hidden>
-        {setListInitials(tcgSet.name)}
-      </div>
-    );
-  }
-  return (
-    <div className={frame}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt=""
-        className="max-h-full max-w-full object-contain object-center p-1"
-        loading="lazy"
-        onError={() => setFailed(true)}
-      />
-    </div>
-  );
 }
 
 function RarityFilterTabs(props: {
@@ -204,31 +184,6 @@ async function fetchJson<T>(url: string): Promise<T> {
     throw new Error(err.error || `Request failed (${res.status})`);
   }
   return res.json() as Promise<T>;
-}
-
-function CatalogMetaRow({
-  label,
-  children,
-  emphasize,
-}: {
-  label: string;
-  children: ReactNode;
-  emphasize?: boolean;
-}) {
-  if (children == null || children === "") return null;
-  return (
-    <div className="flex items-start justify-between gap-4 py-3">
-      <dt className="shrink-0 pt-0.5 text-desk-label">{label}</dt>
-      <dd
-        className={cn(
-          "min-w-0 flex-1 text-right leading-snug text-primary break-words",
-          emphasize ? "font-display text-base font-semibold" : "text-sm font-medium",
-        )}
-      >
-        {children}
-      </dd>
-    </div>
-  );
 }
 
 export function PokedexBrowser({
@@ -552,7 +507,40 @@ export function PokedexBrowser({
     selectedSetSnapshot,
   ]);
 
-  const catalogDetailFields = useMemo(() => {
+  const mobileStepped = useCatalogMobileLayout(embedded);
+  /** Embedded: sets full-width until a set is picked; then split (desktop) or cards-only (mobile). */
+  const showSetsPane = !embedded || !selectedSetId;
+  const showCardsPane = !embedded || Boolean(selectedSetId);
+  const embeddedSetOpen = embedded && Boolean(selectedSetId);
+  const [setInsightOpen, setSetInsightOpen] = useState(false);
+
+  const inViewRollup = useMemo(() => rollupSetInsightCards(cards), [cards]);
+  const inViewPct =
+    inViewRollup.cardCount > 0
+      ? Math.round((100 * inViewRollup.pricedSlots) / inViewRollup.cardCount)
+      : 0;
+
+  const openCardDetailByCatalogId = useCallback(
+    (catalogId: string) => {
+      const card = cards.find((c) => c.id === catalogId);
+      if (card) setDetail(card);
+    },
+    [cards],
+  );
+
+  const setTiles = useMemo(
+    () =>
+      sets.map((s) => {
+        const promo = getCatalogPromoSpecialRow(s.id);
+        return {
+          ...tcgSetToTileModel(s),
+          badge: promo ? (promo.bucket === "promo" ? "Promo" : "Special") : null,
+        };
+      }),
+    [sets],
+  );
+
+  const catalogDetailIdentity = useMemo((): CatalogCardDetailIdentity | null => {
     if (!detail) return null;
     const fromCard = detail.set;
     const snap = selectedSetSnapshot;
@@ -565,23 +553,80 @@ export function PokedexBrowser({
     const cardsInSet =
       printed != null && Number.isFinite(printed) ? String(printed) : null;
 
-    return {
+    const subtitle = [
       setName,
-      series,
+      detail.number ? `#${detail.number}` : null,
+      detail.rarity,
       releaseYear,
-      releaseDate,
-      cardsInSet,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    const badges = (
+      <>
+        {detail.catalogFinish === "reverse_holo" ? (
+          <span className="inline-flex rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+            Reverse holofoil
+          </span>
+        ) : null}
+        {printingPreset !== "catalog" && printingMarketSuffix ? (
+          <span className="inline-flex rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+            Comps: {printingMarketSuffix}
+          </span>
+        ) : null}
+      </>
+    );
+
+    const image =
+      detail.images?.large || detail.images?.small || detailResolvedImages?.small ? (
+        <CatalogVariantImage
+          apiSrc={detail.images?.large ?? detail.images?.small}
+          preferredSrc={preferDistinctCurated(
+            detail.images?.large ?? detail.images?.small,
+            detailResolvedImages?.large ?? detailResolvedImages?.small,
+          )}
+          alt={detail.name}
+          className="h-full w-full object-contain p-0.5"
+        />
+      ) : null;
+
+    return {
+      catalogId: detail.id,
+      name: detail.name,
+      subtitle,
+      image,
+      badges,
+      extraRows: [
+        { label: "Series", value: series },
+        { label: "Released", value: releaseDate },
+        { label: "Cards in set", value: cardsInSet },
+        { label: "HP", value: detail.hp ? `${detail.hp} HP` : null },
+        { label: "Type", value: detail.supertype },
+        {
+          label: "Subtypes",
+          value: detail.subtypes?.length ? detail.subtypes.join(", ") : null,
+        },
+        { label: "Artist", value: detail.artist },
+      ],
     };
-  }, [detail, selectedSetName, selectedSetSnapshot]);
+  }, [
+    detail,
+    detailResolvedImages?.large,
+    detailResolvedImages?.small,
+    printingMarketSuffix,
+    printingPreset,
+    selectedSetName,
+    selectedSetSnapshot,
+  ]);
 
   return (
     <div
       className={cn(
         "relative min-w-0 max-w-full overflow-x-hidden",
-        embedded && "liquid-catalog-embed text-slate-200",
+        embedded && "liquid-catalog-embed flex min-h-0 flex-1 flex-col text-slate-200",
       )}
     >
-      <div className={cn("mx-auto max-w-full", !embedded && "max-w-[1600px]")}>
+      <div className={cn("mx-auto flex min-h-0 w-full max-w-full flex-1 flex-col", !embedded && "max-w-[1600px]")}>
         {embedded ? null : (
         <p className="text-xs leading-relaxed text-muted">
           Card data from{" "}
@@ -630,15 +675,21 @@ export function PokedexBrowser({
           className={cn(
             "sc-pokedex-catalog-grid min-h-0 gap-3",
             embedded
-              ? "mt-1 flex flex-col lg:grid lg:grid-cols-[minmax(280px,34%)_minmax(0,1fr)] lg:gap-4 xl:grid-cols-[minmax(320px,36%)_minmax(0,1fr)]"
-              : "mt-8 grid lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-5",
+              ? cn(
+                  "mt-1 flex min-h-0 flex-1 flex-col overflow-hidden",
+                  embeddedSetOpen &&
+                    "sc-pokedex-catalog-grid--set-open lg:grid lg:max-h-full lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,340px)] lg:grid-rows-1 lg:items-stretch lg:gap-3 [&>*]:min-h-0 [&>*]:max-h-full",
+                  !embeddedSetOpen && selectedSetId === null && "lg:grid lg:grid-cols-1",
+                )
+              : "mt-8 grid lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:gap-5",
           )}
         >
+          {showSetsPane ? (
           <Card
             className={cn(
-              "desk-surface-raised flex min-h-0 flex-col overflow-hidden",
+              "desk-surface-raised flex h-full min-h-0 flex-col overflow-hidden",
               embedded
-                ? "max-h-[min(40dvh,320px)] shrink-0 p-2.5 sc-glass-raised !border-white/8 max-lg:shrink-0 lg:max-h-none lg:min-h-0 lg:p-4"
+                ? "min-h-0 flex-1 p-2.5 sc-glass-raised !border-white/8 lg:p-3"
                 : "max-h-[70dvh] p-4 sm:max-h-none sm:p-5 lg:max-h-[calc(100dvh-10rem)]",
             )}
           >
@@ -665,38 +716,7 @@ export function PokedexBrowser({
                   aria-label="Search sets"
                 />
               </div>
-              <div
-                className={cn(
-                  "grid shrink-0 grid-cols-3 gap-0.5 rounded-lg border border-border-subtle bg-panel-raised/40 p-0.5",
-                  embedded ? "lg:min-w-[11.5rem] lg:gap-1 lg:rounded-xl lg:p-1" : "gap-1 rounded-xl p-1",
-                )}
-                role="group"
-                aria-label="Filter sets by era"
-              >
-                {SET_ERA_ORDER.map((era) => {
-                  const active = setEra === era;
-                  return (
-                    <button
-                      key={era}
-                      type="button"
-                      title={SET_ERA_DESCRIPTION[era]}
-                      aria-pressed={active}
-                      onClick={() => setSetEra(era)}
-                      className={cn(
-                        "rounded-md px-1 py-1.5 text-center font-semibold leading-tight transition touch-manipulation",
-                        embedded
-                          ? "text-[10px] lg:rounded-lg lg:px-2 lg:py-2 lg:text-xs"
-                          : "rounded-lg px-1.5 py-2 text-[10px] sm:px-2 sm:text-xs",
-                        active
-                          ? "bg-accent text-canvas shadow-sm"
-                          : "text-muted hover:bg-panel-raised hover:text-primary",
-                      )}
-                    >
-                      {SET_ERA_LABEL[era]}
-                    </button>
-                  );
-                })}
-              </div>
+              <CatalogEraFilter value={setEra} onChange={setSetEra} embedded={embedded} />
             </div>
             {!embedded ? (
               <p className="mt-2 text-[10px] leading-snug text-muted sm:text-[11px]">
@@ -704,115 +724,66 @@ export function PokedexBrowser({
               </p>
             ) : null}
 
-            <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-lg border border-border-subtle bg-panel-raised/30">
-              {setsLoading ? (
-                <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted">
-                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                  Loading sets…
-                </div>
-              ) : setsError ? (
-                <p className="p-4 text-sm text-danger">{setsError}</p>
-              ) : (
-                <ul className="divide-y divide-border-subtle">
-                  {sets.map((s) => {
-                    const promo = getCatalogPromoSpecialRow(s.id);
-                    return (
-                      <li key={s.id}>
-                        <button
-                          type="button"
-                          onClick={() => selectSet(s)}
-                          className={cn(
-                            "flex w-full items-center gap-2.5 text-left transition touch-manipulation",
-                            embedded ? "px-2.5 py-2 lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm" : "gap-3 px-3 py-2.5 text-sm",
-                            selectedSetId === s.id ? "bg-accent/15 text-primary" : "hover:bg-panel-raised",
-                          )}
-                        >
-                          <SetListLogo tcgSet={s} embedded={embedded} />
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={cn(
-                                "flex flex-wrap items-center gap-1.5 font-medium leading-snug",
-                                embedded && "text-[11px] lg:text-sm",
-                              )}
-                            >
-                              <span className="line-clamp-2 lg:line-clamp-none">{s.name}</span>
-                              {promo ? (
-                                <span
-                                  className={cn(
-                                    "shrink-0 rounded bg-panel-raised px-1.5 py-0.5 font-semibold uppercase tracking-wide text-muted",
-                                    embedded ? "text-[8px] lg:text-[9px]" : "text-[9px]",
-                                  )}
-                                >
-                                  {promo.bucket === "promo" ? "Promo" : "Special"}
-                                </span>
-                              ) : null}
-                            </p>
-                            <p
-                              className={cn(
-                                "mt-0.5 text-muted",
-                                embedded ? "text-[10px] leading-snug lg:text-xs" : "text-xs",
-                              )}
-                            >
-                              <span className="line-clamp-2 lg:line-clamp-1">
-                                {s.series} · {s.releaseDate} · {s.printedTotal ?? s.total} cards
-                              </span>
-                            </p>
-                          </div>
-                          <ChevronRight className="h-4 w-4 shrink-0 text-faint" aria-hidden />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-
-            <div
-              className={cn(
-                "mt-3 flex shrink-0 items-center justify-between gap-2 text-muted",
-                embedded ? "text-[10px] lg:text-xs" : "text-xs",
-              )}
-            >
-              <span className="min-w-0 truncate">
-                Page {setsPage} / {setsTotalPages} · {setsMeta.totalCount} sets
-              </span>
-              <div className="flex gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={setsPage <= 1 || setsLoading}
-                  onClick={() => setSetsPage((p) => Math.max(1, p - 1))}
-                >
-                  Prev
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={setsPage >= setsTotalPages || setsLoading}
-                  onClick={() => setSetsPage((p) => p + 1)}
-                >
-                  Next
-                </Button>
-              </div>
+            <div className="mt-2.5 flex min-h-0 flex-1 flex-col overflow-hidden">
+              <CatalogSetTileGrid
+                className="h-full min-h-0"
+                sets={setTiles}
+                selectedSetId={selectedSetId}
+                onSelect={(tile) => {
+                  const hit = sets.find((s) => s.id === tile.id);
+                  if (hit) selectSet(hit);
+                }}
+                loading={setsLoading}
+                error={setsError}
+                compact={embedded}
+                emptyMessage={`No ${SET_ERA_LABEL[setEra].toLowerCase()} sets match your search.`}
+                page={setsPage}
+                totalPages={setsTotalPages}
+                totalCount={setsMeta.totalCount}
+                pagingDisabled={setsLoading}
+                onPrevPage={() => setSetsPage((p) => Math.max(1, p - 1))}
+                onNextPage={() => setSetsPage((p) => p + 1)}
+              />
             </div>
           </Card>
+          ) : null}
 
+          {showCardsPane ? (
           <Card
             className={cn(
-              "desk-surface-raised flex min-h-0 flex-col overflow-hidden",
+              "desk-surface-raised flex h-full min-h-0 flex-col overflow-hidden",
               embedded
-                ? "min-h-[min(42dvh,380px)] flex-1 p-2.5 sc-glass-raised !border-white/8 lg:min-h-0 lg:p-4"
+                ? "min-h-0 flex-1 p-2.5 sc-glass-raised !border-white/8 lg:p-3"
                 : "min-h-[50dvh] p-4 sm:p-5 lg:min-h-[calc(100dvh-10rem)]",
             )}
           >
             {!selectedSetId ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-16 text-center text-sm text-muted">
-                <p className="max-w-sm text-pretty">Choose a set on the left to load its cards here.</p>
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden px-4 py-8 text-center">
+                <div className="rounded-2xl border border-dashed border-amber-400/25 bg-amber-400/[0.04] px-6 py-8">
+                  <p className="text-sm font-medium text-slate-300">Choose a set</p>
+                  <p className="mt-1.5 max-w-xs text-pretty text-xs leading-relaxed text-slate-500">
+                    Pick a set from the gallery{embedded && mobileStepped ? "" : " on the left"} to browse cards,
+                    rarities, and scan into your session.
+                  </p>
+                </div>
               </div>
             ) : (
-              <>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                {embedded && mobileStepped ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSetId(null);
+                      setSelectedSetName(null);
+                      setSelectedSetSnapshot(null);
+                      setDetail(null);
+                    }}
+                    className="mb-2 inline-flex min-h-10 shrink-0 items-center gap-1.5 text-sm font-medium text-amber-300/95 touch-manipulation hover:text-amber-200"
+                  >
+                    <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+                    All sets
+                  </button>
+                ) : null}
                 <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-border-subtle pb-3">
                   <div className="min-w-0">
                     <h2 className="text-lg font-semibold text-primary">{selectedSetName}</h2>
@@ -871,13 +842,39 @@ export function PokedexBrowser({
                   </div>
                 ) : null}
 
-                {selectedSetId && selectedSetName && hasCatalogSetOverlay(selectedSetId) ? (
+                {embeddedSetOpen ? (
+                  <div className="mt-2 shrink-0 lg:hidden">
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-semibold uppercase tracking-wide text-faint">
+                            Set insight
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-muted">
+                            {fmtUsd(inViewRollup.tcgPlayerSumUsd)} · {inViewRollup.pricedSlots} priced · {inViewPct}%
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setSetInsightOpen(true)}
+                          className="shrink-0"
+                        >
+                          Open
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {!embedded && selectedSetId && selectedSetName && hasCatalogSetOverlay(selectedSetId) ? (
                   <div className="mt-3 shrink-0">
                     <PokedexSetOverviewPanel setId={selectedSetId} setName={selectedSetName} />
                   </div>
                 ) : null}
 
-                <div className="min-h-0 flex-1 overflow-y-auto pt-3">
+                <div className="sc-catalog-cards-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-2 scanner-chat-scrollbar touch-pan-y lg:pt-3">
                   {cardsLoading ? (
                     <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted">
                       <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
@@ -895,6 +892,11 @@ export function PokedexBrowser({
                     <CatalogFocusGrid
                       items={cards}
                       getKey={(c) => `${c.id}-${c.catalogFinish ?? "std"}`}
+                      className={cn(
+                        embedded
+                          ? "grid-cols-2 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+                          : undefined,
+                      )}
                       renderItem={(c) => {
                         const apiSmall = c.images?.small;
                         const resolved = resolveCatalogCardImages({
@@ -910,7 +912,12 @@ export function PokedexBrowser({
                             onClick={() => setDetail(c)}
                             className="group h-full w-full overflow-hidden rounded-xl border border-border-subtle bg-panel-raised/50 text-left transition hover:border-accent/40 touch-manipulation"
                           >
-                            <div className="relative aspect-[245/342] w-full bg-subtle">
+                            <div
+                              className={cn(
+                                "relative w-full bg-subtle",
+                                embedded ? "aspect-[3/4]" : "aspect-[245/342]",
+                              )}
+                            >
                               {apiSmall || preferred ? (
                                 <CatalogVariantImage
                                   apiSrc={apiSmall}
@@ -941,8 +948,15 @@ export function PokedexBrowser({
                                 ) : null}
                               </div>
                             </div>
-                            <div className="p-2">
-                              <p className="line-clamp-2 text-[11px] font-medium leading-snug text-primary">{c.name}</p>
+                            <div className={cn("p-2", embedded && "p-2.5")}>
+                              <p
+                                className={cn(
+                                  "line-clamp-2 font-medium leading-snug text-primary",
+                                  embedded ? "text-xs" : "text-[11px]",
+                                )}
+                              >
+                                {c.name}
+                              </p>
                               <p className="mt-0.5 text-[10px] text-muted">
                                 #{c.number}
                                 {c.rarity ? ` · ${c.rarity}` : ""}
@@ -983,9 +997,20 @@ export function PokedexBrowser({
                     </div>
                   </div>
                 ) : null}
-              </>
+              </div>
             )}
           </Card>
+          ) : null}
+
+          {embeddedSetOpen && selectedSetId ? (
+            <CatalogSetInsightRail
+              setId={selectedSetId}
+              setName={selectedSetName ?? "Set"}
+              cards={cards}
+              onSelectCard={openCardDetailByCatalogId}
+              className="hidden min-h-0 rounded-xl lg:flex"
+            />
+          ) : null}
         </div>
       </div>
 
@@ -1001,109 +1026,91 @@ export function PokedexBrowser({
             role="dialog"
             aria-modal="true"
             aria-labelledby="pokedex-card-title"
-            className="desk-surface-raised fixed inset-x-0 bottom-0 z-[70] max-h-[min(92dvh,860px)] overflow-y-auto rounded-t-[1.35rem] border border-border-subtle/80 px-4 pb-6 pt-3 shadow-panel sm:inset-y-4 sm:left-auto sm:right-4 sm:flex sm:max-h-none sm:w-[min(100vw-2rem,420px)] sm:flex-col sm:rounded-2xl sm:px-5 sm:pb-6 sm:pt-4"
+            className="sc-pokedex-card-detail-sheet desk-surface-raised fixed inset-x-0 bottom-0 z-[70] flex max-h-[min(92dvh,860px)] flex-col overflow-hidden rounded-t-[1.35rem] border border-border-subtle/80 shadow-panel sm:inset-y-3 sm:left-auto sm:right-3 sm:max-h-[calc(100dvh-1.5rem)] sm:w-[min(30rem,calc(100vw-1.5rem))] sm:rounded-2xl lg:right-4 lg:w-[min(28rem,calc(100vw-2rem))]"
           >
-            <div className="mx-auto mb-2 h-1 w-10 shrink-0 rounded-full bg-border-subtle/80 sm:hidden" aria-hidden />
+            <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border-subtle/80 sm:hidden" aria-hidden />
 
-            <header className="relative flex flex-col items-center px-1 pb-2 pt-2 text-center">
+            <header className="relative shrink-0 border-b border-border-subtle/70 px-3 py-2 sm:px-4">
               <button
                 type="button"
-                className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center rounded-xl text-muted transition hover:bg-panel-raised/80 hover:text-primary touch-manipulation"
+                className="absolute right-2 top-1.5 flex h-9 w-9 items-center justify-center rounded-xl text-muted transition hover:bg-panel-raised/80 hover:text-primary touch-manipulation sm:right-3"
                 onClick={() => setDetail(null)}
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </button>
-
-              {detail.images?.large || detail.images?.small || detailResolvedImages?.small ? (
-                <div className="mx-auto w-full max-w-[min(72vw,13.5rem)]">
-                  <div className="aspect-[3/4] overflow-hidden rounded-2xl bg-panel-raised/50 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.65)] ring-1 ring-border-subtle/90">
-                    <CatalogVariantImage
-                      apiSrc={detail.images?.large ?? detail.images?.small}
-                      preferredSrc={preferDistinctCurated(
-                        detail.images?.large ?? detail.images?.small,
-                        detailResolvedImages?.large ?? detailResolvedImages?.small,
-                      )}
-                      alt={detail.name}
-                      className="h-full w-full object-contain p-2.5"
-                    />
-                  </div>
-                </div>
-              ) : null}
-
-              <h3 id="pokedex-card-title" className="sr-only">
+              <h3
+                id="pokedex-card-title"
+                className="pr-10 text-sm font-semibold leading-snug text-primary line-clamp-2"
+              >
                 {detail.name}
               </h3>
-
-              {(detail.catalogFinish === "reverse_holo" ||
-                (printingPreset !== "catalog" && printingMarketSuffix)) && (
-                <div className="mt-3 flex max-w-full flex-wrap justify-center gap-1.5">
-                  {detail.catalogFinish === "reverse_holo" ? (
-                    <span className="inline-flex rounded-full bg-violet-500/15 px-2.5 py-1 text-[10px] font-medium text-violet-300">
-                      Reverse holofoil
-                    </span>
-                  ) : null}
-                  {printingPreset !== "catalog" && printingMarketSuffix ? (
-                    <span className="inline-flex rounded-full bg-accent/10 px-2.5 py-1 text-[10px] font-medium text-accent">
-                      Comps: {printingMarketSuffix}
-                    </span>
-                  ) : null}
-                </div>
-              )}
+              {catalogDetailIdentity?.subtitle ? (
+                <p className="mt-0.5 pr-10 text-[11px] leading-snug text-muted line-clamp-1">
+                  {catalogDetailIdentity.subtitle}
+                </p>
+              ) : null}
             </header>
 
-            <dl className="mt-2 divide-y divide-border-subtle/70 border-t border-border-subtle/70">
-              <CatalogMetaRow label="Name" emphasize>
-                {detail.name}
-              </CatalogMetaRow>
-              {catalogDetailFields ? (
-                <>
-                  <CatalogMetaRow label="Set">{catalogDetailFields.setName}</CatalogMetaRow>
-                  <CatalogMetaRow label="Series">{catalogDetailFields.series}</CatalogMetaRow>
-                  <CatalogMetaRow label="Year">{catalogDetailFields.releaseYear}</CatalogMetaRow>
-                  <CatalogMetaRow label="Released">{catalogDetailFields.releaseDate}</CatalogMetaRow>
-                  <CatalogMetaRow label="Cards in set">{catalogDetailFields.cardsInSet}</CatalogMetaRow>
-                </>
-              ) : null}
-              <CatalogMetaRow label="Card #">{detail.number ? `#${detail.number}` : null}</CatalogMetaRow>
-              <CatalogMetaRow label="Rarity">
-                {detail.rarity}
-                {detail.catalogFinish === "reverse_holo" ? " · Reverse holofoil" : null}
-              </CatalogMetaRow>
-              <CatalogMetaRow label="HP">{detail.hp ? `${detail.hp} HP` : null}</CatalogMetaRow>
-              <CatalogMetaRow label="Type">{detail.supertype}</CatalogMetaRow>
-              <CatalogMetaRow label="Subtypes">
-                {detail.subtypes?.length ? detail.subtypes.join(", ") : null}
-              </CatalogMetaRow>
-              <CatalogMetaRow label="Artist">{detail.artist}</CatalogMetaRow>
-            </dl>
-            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              {catalogScanPrefill ? (
-                <ScanThisCardButton
-                  prefill={catalogScanPrefill}
-                  className="w-full sm:w-auto"
-                  targetPath={scanTargetPath}
-                  onScan={onScanPrefill}
+            <div className="sc-pokedex-card-detail-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-2 pt-2 scanner-chat-scrollbar sm:px-4">
+              {catalogDetailIdentity ? (
+                <CatalogCardDetailBody
+                  identity={catalogDetailIdentity}
+                  variant="sheet"
+                  hideTitle
                 />
               ) : null}
-              {detail.tcgplayer?.url ? (
-                <Button size="sm" variant="secondary" asChild>
-                  <a href={detail.tcgplayer.url} target="_blank" rel="noreferrer">
-                    TCGPlayer
-                  </a>
-                </Button>
-              ) : null}
-              {detail.cardmarket?.url ? (
-                <Button size="sm" variant="secondary" asChild>
-                  <a href={detail.cardmarket.url} target="_blank" rel="noreferrer">
-                    Cardmarket
-                  </a>
-                </Button>
-              ) : null}
             </div>
-            <PokedexCardMarketPanel cardId={detail.sourceCatalogId ?? detail.id} printingHint={detailMarketPrintingHint} />
+
+            <footer className="sc-pokedex-card-detail-footer shrink-0 border-t border-border-subtle/70 bg-panel/80 px-3 py-2.5 backdrop-blur-sm sm:px-4">
+              <CatalogCardDetailActions>
+                {catalogScanPrefill ? (
+                  <ScanThisCardButton
+                    prefill={catalogScanPrefill}
+                    className="w-full sm:flex-1"
+                    targetPath={scanTargetPath}
+                    onScan={onScanPrefill}
+                  />
+                ) : null}
+                <Button size="sm" variant="secondary" className="w-full sm:flex-1" asChild>
+                  <Link href={marketPokemonHref(detail.id)}>
+                    <LineChart className="mr-1.5 h-4 w-4" aria-hidden />
+                    Market intel
+                  </Link>
+                </Button>
+                {detail.tcgplayer?.url ? (
+                  <Button size="sm" variant="secondary" className="w-full sm:w-auto" asChild>
+                    <a href={detail.tcgplayer.url} target="_blank" rel="noreferrer">
+                      TCGPlayer
+                    </a>
+                  </Button>
+                ) : null}
+              </CatalogCardDetailActions>
+            </footer>
           </div>
         </>
+      ) : null}
+
+      {embeddedSetOpen && mobileStepped && selectedSetId ? (
+        <CatalogCardDetailSheet
+          open={setInsightOpen}
+          onClose={() => setSetInsightOpen(false)}
+          title="Set insight"
+          subtitle={selectedSetName ?? selectedSetId}
+          backLabel="Back to cards"
+          onBack={() => setSetInsightOpen(false)}
+        >
+          <CatalogSetInsightRail
+            setId={selectedSetId}
+            setName={selectedSetName ?? "Set"}
+            cards={cards}
+            onSelectCard={(catalogId) => {
+              setSetInsightOpen(false);
+              openCardDetailByCatalogId(catalogId);
+            }}
+            className="border-0 bg-transparent shadow-none"
+          />
+        </CatalogCardDetailSheet>
       ) : null}
     </div>
   );

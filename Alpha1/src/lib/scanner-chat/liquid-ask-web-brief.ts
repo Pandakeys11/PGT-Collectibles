@@ -3,22 +3,16 @@ import OpenAI from "openai";
 import {
   getGeminiApiKey,
   getGeminiTextModel,
+  getGroqApiKey,
+  getGroqCompoundModel,
   getOpenRouterApiKey,
   getOpenRouterBaseUrl,
   getOpenRouterMarketModel,
 } from "@/lib/ai/env";
 import { withTimeout } from "@/lib/async-timeout";
+import { buildMarketMasterWebBriefRules } from "@/lib/scanner-chat/market-master-guard-rails";
 
-const WEB_BRIEF_SYSTEM = `You are PGT Liquid Vault **Open Research** — answer collectible market questions using current public web knowledge (use search/retrieval when available).
-
-Hard requirements:
-1. **Answer the question directly** in the first paragraph (name cards, editions, grades when relevant). Do NOT tell the user to upload scans, use Liquid Scan steps, or "provide more information" unless the question is truly impossible to narrow (e.g. no franchise named at all).
-2. Never say you lack a "research pack" — this request is the research pass.
-3. Use ranges and "reported as of {date}" language for prices; cite source types (eBay sold, auction, PriceCharting, PSA pop reports) when known.
-4. Separate **1st Edition / Shadowless / Unlimited** for vintage Pokémon when discussing Base Set era.
-5. End with one short disclaimer line: web-sourced indicative intel — verify before transacting.
-
-Format: markdown with a bold lead sentence, then 3–6 evidence bullets, optional short "Also consider" for runners-up.`;
+const WEB_BRIEF_SYSTEM = buildMarketMasterWebBriefRules();
 
 function buildUserPrompt(message: string, todayUtc: string): string {
   return `Today's date (UTC): ${todayUtc}
@@ -26,7 +20,7 @@ function buildUserPrompt(message: string, todayUtc: string): string {
 User question:
 ${message.trim()}
 
-Produce a direct, web-grounded answer. If the question is about the highest-value card in a set (e.g. Pokémon Base Set), name the top card(s) by edition (1st Ed vs Unlimited), typical grade buckets (PSA 10 vs raw), and approximate recent sale ranges with source cues.`;
+Produce a direct, web-grounded answer. If the question is about the highest-value card in a set (e.g. Pokémon Base Set), name the top card(s) by edition (1st Ed vs Unlimited), typical grade buckets (PSA 10 vs raw), and approximate recent sale ranges with source cues. Label each price as SOLD, ACTIVE (ask), or REFERENCE.`;
 }
 
 /** Free tier: Gemini + Google Search grounding (uses GEMINI_API_KEY free quota). */
@@ -64,6 +58,43 @@ export async function runLiquidAskFreeWebBrief(
     const markdown = result.response.text().trim();
     if (!markdown) return null;
     return { markdown, model: modelName };
+  } catch {
+    return null;
+  }
+}
+
+/** Groq Compound — built-in web search (preferred when GROQ_API_KEY is set). */
+export function isLiquidAskGroqWebBriefConfigured(): boolean {
+  return Boolean(getGroqApiKey());
+}
+
+export async function runLiquidAskGroqWebBrief(
+  message: string,
+  todayUtc: string,
+): Promise<{ markdown: string; model: string } | null> {
+  const key = getGroqApiKey();
+  if (!key) return null;
+
+  const client = new OpenAI({ apiKey: key, baseURL: "https://api.groq.com/openai/v1" });
+  const model = getGroqCompoundModel();
+
+  try {
+    const response = await withTimeout(
+      client.chat.completions.create({
+        model,
+        messages: [
+          { role: "system", content: WEB_BRIEF_SYSTEM },
+          { role: "user", content: buildUserPrompt(message, todayUtc) },
+        ],
+        temperature: 0.25,
+        max_tokens: 2_400,
+      }),
+      90_000,
+      "liquid ask groq web brief",
+    );
+    const markdown = response.choices[0]?.message?.content?.trim() ?? "";
+    if (!markdown) return null;
+    return { markdown, model };
   } catch {
     return null;
   }

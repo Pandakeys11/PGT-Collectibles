@@ -231,6 +231,7 @@ export function SpecimenMarketHub({
         specimenId={specimen.id}
         enriching={enriching}
         sessionCompCount={specimen.context.marketEvidence?.length ?? 0}
+        sessionEvidence={specimen.context.marketEvidence}
         marketAsOf={specimen.context.marketAsOf}
       />
 

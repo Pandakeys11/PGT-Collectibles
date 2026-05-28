@@ -1,6 +1,18 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import { completePlainText } from "@/lib/ai/text";
-import { getGeminiApiKey, getGeminiTextModel } from "@/lib/ai/env";
+import {
+  getGeminiApiKey,
+  getGeminiTextModel,
+  getGroqApiKey,
+  getGroqCompoundModel,
+  getMarketNightlyAiOrder,
+  getMarketNightlyMemoryFreshDays,
+  getMarketNightlyOpenRouterModel,
+  getOpenRouterApiKey,
+  getOpenRouterBaseUrl,
+} from "@/lib/ai/env";
+import type { CatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
 import { deriveFairValueResult, type FairValueBasis } from "@/lib/market/fair-value";
 import { buildMarketQueries } from "@/lib/market/queries";
 import {
@@ -24,7 +36,12 @@ import {
   inferMarketVenueType,
 } from "@/lib/market/market-intelligence";
 import { filterMarketEvidenceForCardIdentity } from "@/lib/market/market-evidence-identity";
+import {
+  hasInstitutionalMarketMemory,
+  loadPersistedMarketEvidence,
+} from "@/lib/market/persisted-market-evidence";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
+import { MARKET_MASTER_COMPACT_RESEARCH_RULES } from "@/lib/scanner-chat/market-master-guard-rails";
 
 const MARKET_SOURCES_LINE =
   "eBay, Card Ladder, ALT, Goldin, PriceCharting, CardMarket, and TCGPlayer";
@@ -45,16 +62,18 @@ const MARKET_JSON_SCHEMA = `{
   ]
 }`;
 
-const MARKET_ANALYST_SYSTEM = `You are a senior trading-card and collectibles market analyst for Pokemon TCG, other TCGs (One Piece, Yu-Gi-Oh!, Magic, Lorcana, Dragon Ball), and sports cards. Pull the freshest sold comps and active asks from ${MARKET_SOURCES_LINE}.
+const MARKET_ANALYST_SYSTEM = `You are Pokémon Market Master — senior trading-card market analyst (Pokémon TCG, other TCGs, sports). Pull the freshest **sold** comps and clearly labeled active asks from ${MARKET_SOURCES_LINE}.
 
-Today's date is ${RESEARCH_TODAY_ISO} (use only for reasoning, not as a fake observedAt).
+Today's date is ${RESEARCH_TODAY_ISO} (reasoning only — not a fake observedAt).
 
-Card Ladder links: use the provided Card Ladder search URL; use \`/ladder/card/...\` only when that exact URL appears in snippets. Never invent slugs.
+${MARKET_MASTER_COMPACT_RESEARCH_RULES}
 
-Return only verifiable rows with real URLs, USD prices when visible, and the correct source label.
-Prioritize PSA 10 and BGS Black Label sold comps when the card is vintage, chase, or slab-relevant.
+Card Ladder: use provided search URL; \`/ladder/card/...\` only when that exact URL appears in snippets.
 
-For observedAt (sale or listing date): set null unless that exact calendar date appears verbatim in the provided snippets or in grounded search result text for that row. Never invent dates, never use card set release years, copyright years, or years embedded only in URLs. Never use training-data recollection of old auctions.`;
+Return only verifiable rows with real URLs, USD prices when visible, correct source label, and kind (sold|active|reference).
+Prioritize PSA 10 and BGS Black Label **sold** comps when vintage, chase, or slab-relevant.
+
+observedAt: null unless that calendar date appears verbatim in snippets/grounded text for that row — never invent dates or use set release/copyright years.`;
 
 function parseMarketJson(text: string): MarketEvidence[] {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] ?? text;
@@ -241,6 +260,140 @@ ${MARKET_JSON_SCHEMA}`;
   return parseMarketJson(result.response.text());
 }
 
+async function researchWithGroqCompound(
+  card: ExtractedCard,
+  bundles: Awaited<ReturnType<typeof collectSourceSnippets>>["bundles"],
+): Promise<MarketEvidence[]> {
+  const key = getGroqApiKey();
+  if (!key) return [];
+  const client = new OpenAI({ apiKey: key, baseURL: "https://api.groq.com/openai/v1" });
+  const model = getGroqCompoundModel();
+  const prompt = `${MARKET_ANALYST_SYSTEM}
+
+Card JSON:
+${JSON.stringify(card, null, 2)}
+
+Detected franchise/category: ${franchiseLabel(card)}
+
+Source-targeted snippets:
+${JSON.stringify(bundles, null, 2)}
+
+Return JSON only matching:
+${MARKET_JSON_SCHEMA}`;
+
+  try {
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: MARKET_ANALYST_SYSTEM },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.2,
+      max_tokens: 1_400,
+      response_format: { type: "json_object" },
+    });
+    const text = response.choices[0]?.message?.content?.trim() ?? "";
+    if (!text) return [];
+    return parseMarketJson(text);
+  } catch {
+    return [];
+  }
+}
+
+async function researchWithOpenRouterMarket(
+  card: ExtractedCard,
+  bundles: Awaited<ReturnType<typeof collectSourceSnippets>>["bundles"],
+): Promise<MarketEvidence[]> {
+  const key = getOpenRouterApiKey();
+  if (!key) return [];
+  const client = new OpenAI({ apiKey: key, baseURL: getOpenRouterBaseUrl() });
+  const model = getMarketNightlyOpenRouterModel();
+  const prompt = `${MARKET_ANALYST_SYSTEM}
+
+Card JSON:
+${JSON.stringify(card, null, 2)}
+
+Detected franchise/category: ${franchiseLabel(card)}
+
+Source-targeted snippets:
+${JSON.stringify(bundles, null, 2)}
+
+Return JSON only matching:
+${MARKET_JSON_SCHEMA}`;
+
+  try {
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: MARKET_ANALYST_SYSTEM },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.2,
+      max_tokens: 1_400,
+      response_format: { type: "json_object" },
+    });
+    const text = response.choices[0]?.message?.content?.trim() ?? "";
+    if (!text) return [];
+    return parseMarketJson(text);
+  } catch {
+    return [];
+  }
+}
+
+function isNightlyMemoryFresh(intel: CatalogMarketIntel | null, freshDays: number): boolean {
+  if (!intel?.comps.length) return false;
+  let latest = 0;
+  for (const row of intel.comps) {
+    const t = Date.parse(row.ingestedAt);
+    if (Number.isFinite(t) && t > latest) latest = t;
+  }
+  if (!latest) return false;
+  const ageDays = (Date.now() - latest) / (24 * 60 * 60 * 1000);
+  return ageDays <= freshDays;
+}
+
+/** Nightly batch: Gemini Google Search (free) → OpenRouter market model → snippet text fallback. */
+async function collectNightlyAiEvidence(
+  card: ExtractedCard,
+  bundles: Awaited<ReturnType<typeof collectSourceSnippets>>["bundles"],
+): Promise<MarketEvidence[]> {
+  const order = getMarketNightlyAiOrder();
+  const collected: MarketEvidence[] = [];
+
+  for (const provider of order) {
+    if (provider === "groq" && getGroqApiKey()) {
+      const rows = await withTimeout(researchWithGroqCompound(card, bundles), 18_000, "nightly groq").catch(
+        () => [],
+      );
+      collected.push(...rows);
+      if (rows.filter((r) => r.kind === "sold" && r.priceUsd != null).length >= 3) break;
+    }
+    if (provider === "gemini" && getGeminiApiKey()) {
+      const rows = await withTimeout(researchWithGemini(card, bundles), 16_000, "nightly gemini").catch(
+        () => [],
+      );
+      collected.push(...rows);
+      if (rows.filter((r) => r.kind === "sold" && r.priceUsd != null).length >= 3) break;
+    }
+    if (provider === "openrouter" && getOpenRouterApiKey()) {
+      const rows = await withTimeout(researchWithOpenRouterMarket(card, bundles), 14_000, "nightly openrouter").catch(
+        () => [],
+      );
+      collected.push(...rows);
+      if (rows.filter((r) => r.kind === "sold" && r.priceUsd != null).length >= 2) break;
+    }
+  }
+
+  if (collected.length === 0) {
+    const fallback = await withTimeout(researchWithSearchSnippets(card, bundles), 12_000, "nightly snippets").catch(
+      () => [],
+    );
+    collected.push(...fallback);
+  }
+
+  return collected;
+}
+
 async function researchWithSearchSnippets(
   card: ExtractedCard,
   bundles: Awaited<ReturnType<typeof collectSourceSnippets>>["bundles"],
@@ -316,56 +469,96 @@ function decorateEvidence(items: MarketEvidence[]): MarketEvidence[] {
   }));
 }
 
-export async function researchCardMarket(card: ExtractedCard): Promise<{
+export async function researchCardMarket(
+  card: ExtractedCard,
+  options?: { catalogId?: string | null; profile?: "scan" | "nightly" },
+): Promise<{
   marketEvidence: MarketEvidence[];
   fairValueUsd: number | null;
   fairValueBasis: FairValueBasis | null;
   marketSourceLinks: ReturnType<typeof buildMarketSourceLinks>;
+  institutionalMemory: boolean;
 }> {
+  const profile = options?.profile ?? "scan";
+  const isNightly = profile === "nightly";
   const marketSourceLinks = buildMarketSourceLinks(card);
+  const catalogId = options?.catalogId?.trim() || null;
+  const institutional = catalogId
+    ? await loadPersistedMarketEvidence(catalogId, { compLimit: 48 })
+    : { evidence: [], intel: null, catalogReference: [] };
+  const memoryEvidence = institutional.evidence;
+  const nightlyFresh =
+    isNightly &&
+    isNightlyMemoryFresh(institutional.intel, getMarketNightlyMemoryFreshDays()) &&
+    hasInstitutionalMarketMemory(memoryEvidence, { minSold: 5 });
+  const skipHeavyLiveResearch =
+    nightlyFresh ||
+    (process.env.MARKET_SKIP_LLM_WHEN_MEMORY === "1" &&
+      hasInstitutionalMarketMemory(memoryEvidence, { minSold: 8 }));
+
   const lane = classifyCardLane(card as Record<string, unknown>).lane;
   const gradedHarvest =
-    lane === "graded" || card.cert
+    !isNightly && (lane === "graded" || card.cert)
       ? await withTimeout(harvestGradedMarketEvidence(card), 20_000, "graded harvest").catch(() => null)
       : null;
 
-  const apiEvidence = await withTimeout(collectApiMarketEvidence(card), 15_000, "market api adapters").catch(
-    () => [],
-  );
+  const apiEvidence = await withTimeout(
+    collectApiMarketEvidence(card),
+    isNightly ? 10_000 : 15_000,
+    "market api adapters",
+  ).catch(() => []);
 
   const rawSoldForLanes = apiEvidence.filter(
     (item) => item.kind === "sold" && /ebay/i.test(item.source ?? ""),
   );
   const premiumGradeLanes = await withTimeout(
-    collectPremiumGradeLanes(card, rawSoldForLanes),
-    26_000,
+    collectPremiumGradeLanes(card, rawSoldForLanes, { minRows: 1 }),
+    isNightly ? 22_000 : 38_000,
     "premium grade lanes",
   ).catch(() => []);
 
   const { bundles, heuristicEvidence } = await withTimeout(
     collectSourceSnippets(card),
-    20_000,
+    isNightly ? 12_000 : 20_000,
     "market snippet collection",
   ).catch(() => ({ bundles: [], heuristicEvidence: [], queries: buildMarketQueries(card) }));
 
   const evidence: MarketEvidence[] = [
+    ...memoryEvidence,
     ...apiEvidence,
     ...premiumGradeLanes,
     ...(gradedHarvest?.evidence ?? []),
     ...heuristicEvidence,
   ];
-  const tasks: Promise<MarketEvidence[]>[] = [];
 
-  if (getGeminiApiKey()) {
-    tasks.push(
-      withTimeout(researchWithGemini(card, bundles), 22_000, "gemini market research").catch(() => []),
-    );
-  }
-  tasks.push(withTimeout(researchWithSearchSnippets(card, bundles), 18_000, "market text extraction").catch(() => []));
-
-  const chunks = await Promise.all(tasks);
-  for (const chunk of chunks) {
-    evidence.push(...chunk);
+  if (!skipHeavyLiveResearch) {
+    if (isNightly) {
+      const nightlyAi = await collectNightlyAiEvidence(card, bundles);
+      evidence.push(...nightlyAi);
+    } else {
+      const tasks: Promise<MarketEvidence[]>[] = [];
+      if (getGroqApiKey()) {
+        tasks.push(
+          withTimeout(researchWithGroqCompound(card, bundles), 20_000, "groq market research").catch(
+            () => [],
+          ),
+        );
+      }
+      if (getGeminiApiKey()) {
+        tasks.push(
+          withTimeout(researchWithGemini(card, bundles), 22_000, "gemini market research").catch(() => []),
+        );
+      }
+      tasks.push(
+        withTimeout(researchWithSearchSnippets(card, bundles), 18_000, "market text extraction").catch(
+          () => [],
+        ),
+      );
+      const chunks = await Promise.all(tasks);
+      for (const chunk of chunks) {
+        evidence.push(...chunk);
+      }
+    }
   }
 
   const identityScopedEvidence = filterMarketEvidenceForCardIdentity(
@@ -384,5 +577,6 @@ export async function researchCardMarket(card: ExtractedCard): Promise<{
     fairValueUsd,
     fairValueBasis,
     marketSourceLinks,
+    institutionalMemory: hasInstitutionalMarketMemory(marketEvidence, { minSold: 6 }),
   };
 }

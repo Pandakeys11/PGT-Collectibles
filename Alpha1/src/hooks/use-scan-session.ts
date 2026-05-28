@@ -462,6 +462,9 @@ export function useScanSession(options?: { speedOn?: boolean }) {
                       catalogCandidates: fallback.candidates,
                       identityEvidence: fallback.identityEvidence,
                       catalogImageUrl: fallback.catalogImageUrl,
+                      catalogImageSource: fallback.catalogImageSource ?? null,
+                      catalogImageSourceLabel: fallback.catalogImageSourceLabel ?? null,
+                      catalogImageNeedsReview: fallback.catalogImageNeedsReview ?? false,
                       marketEvidence: specimen.context.marketEvidence,
                       marketSourceLinks: specimen.context.marketSourceLinks,
                       fairValueUsd: specimen.context.fairValueUsd,
@@ -530,6 +533,12 @@ export function useScanSession(options?: { speedOn?: boolean }) {
                         : entry.context.identityEvidence,
                     catalogImageUrl:
                       result.catalogImageUrl ?? entry.context.catalogImageUrl,
+                    catalogImageSource:
+                      result.catalogImageSource ?? entry.context.catalogImageSource,
+                    catalogImageSourceLabel:
+                      result.catalogImageSourceLabel ?? entry.context.catalogImageSourceLabel,
+                    catalogImageNeedsReview:
+                      result.catalogImageNeedsReview ?? entry.context.catalogImageNeedsReview,
                     marketEvidence: entry.context.marketEvidence,
                     marketSourceLinks: entry.context.marketSourceLinks,
                     fairValueUsd: entry.context.fairValueUsd,
@@ -1388,6 +1397,15 @@ export function useScanSession(options?: { speedOn?: boolean }) {
               catalogImageUrl: manualLock
                 ? entry.context.catalogImageUrl
                 : result.catalogImageUrl ?? entry.context.catalogImageUrl,
+              catalogImageSource: manualLock
+                ? entry.context.catalogImageSource
+                : result.catalogImageSource ?? entry.context.catalogImageSource,
+              catalogImageSourceLabel: manualLock
+                ? entry.context.catalogImageSourceLabel
+                : result.catalogImageSourceLabel ?? entry.context.catalogImageSourceLabel,
+              catalogImageNeedsReview: manualLock
+                ? entry.context.catalogImageNeedsReview
+                : result.catalogImageNeedsReview ?? entry.context.catalogImageNeedsReview,
               marketEvidence: entry.context.marketEvidence,
               marketSourceLinks: entry.context.marketSourceLinks,
               fairValueUsd: entry.context.fairValueUsd,

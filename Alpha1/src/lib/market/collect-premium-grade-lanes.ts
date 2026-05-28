@@ -27,7 +27,7 @@ export const PREMIUM_GRADE_BUCKETS: GradeBucketId[] = [
   "cgcPristine10",
 ];
 
-const DEFAULT_LANE_MIN_ROWS = 2;
+const DEFAULT_LANE_MIN_ROWS = 1;
 
 function laneMinRows(): number {
   const n = Number(process.env.MARKET_PREMIUM_LANE_MIN_ROWS ?? DEFAULT_LANE_MIN_ROWS);
@@ -41,7 +41,7 @@ function gradedEvidenceFromRawSold(rawSold: MarketEvidence[]): MarketEvidence[] 
 }
 
 async function collectEbaySold(card: ExtractedCard): Promise<MarketEvidence[]> {
-  const result = await withTimeout(ebaySoldScrapeAdapter.collect(card), 28_000, "ebay sold").catch(
+  const result = await withTimeout(ebaySoldScrapeAdapter.collect(card), 35_000, "ebay sold").catch(
     () => ({ evidence: [] as MarketEvidence[] }),
   );
   return result.evidence;
@@ -112,6 +112,10 @@ export async function collectGradedLanes(
 export async function collectPremiumGradeLanes(
   base: ExtractedCard,
   rawSold: MarketEvidence[],
+  options?: Pick<CollectGradedLanesOptions, "minRows">,
 ): Promise<MarketEvidence[]> {
-  return collectGradedLanes(base, rawSold, { buckets: PREMIUM_GRADE_BUCKETS });
+  return collectGradedLanes(base, rawSold, {
+    buckets: PREMIUM_GRADE_BUCKETS,
+    minRows: options?.minRows,
+  });
 }

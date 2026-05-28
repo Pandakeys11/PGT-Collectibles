@@ -56,7 +56,7 @@ export function CatalogCardDetailSheet({
         aria-modal="true"
         aria-labelledby="catalog-card-detail-title"
         className={cn(
-          "sc-catalog-card-sheet desk-surface-raised fixed inset-x-0 bottom-0 z-[109] flex max-h-[min(94dvh,920px)] flex-col overflow-hidden rounded-t-[1.35rem] border border-border-subtle/80 shadow-[0_-28px_64px_rgb(0_0_0/0.55)] sm:inset-y-4 sm:left-auto sm:right-4 sm:max-h-none sm:w-[min(100vw-2rem,440px)] sm:rounded-2xl",
+          "sc-catalog-card-sheet desk-surface-raised fixed inset-x-0 bottom-0 z-[109] flex max-h-[min(94dvh,920px)] flex-col overflow-hidden rounded-t-[1.35rem] border border-border-subtle/80 shadow-[0_-28px_64px_rgb(0_0_0/0.55)] sm:inset-y-3 sm:left-auto sm:right-3 sm:max-h-[calc(100dvh-1.5rem)] sm:w-[min(30rem,calc(100vw-1.5rem))] sm:rounded-2xl lg:right-4 lg:w-[min(28rem,calc(100vw-2rem))]",
           className,
         )}
       >
@@ -97,12 +97,12 @@ export function CatalogCardDetailSheet({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3 scanner-chat-scrollbar sm:px-5">
+        <div className="sc-catalog-card-detail-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-2 pt-2 scanner-chat-scrollbar sm:px-4">
           {children}
         </div>
 
         {footer ? (
-          <footer className="shrink-0 border-t border-border-subtle/70 px-4 py-3 sm:px-5">
+          <footer className="sc-catalog-card-detail-footer shrink-0 border-t border-border-subtle/70 bg-panel/80 px-3 py-2.5 backdrop-blur-sm sm:px-4">
             {footer}
           </footer>
         ) : null}

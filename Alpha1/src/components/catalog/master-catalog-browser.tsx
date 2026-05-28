@@ -72,7 +72,7 @@ export function MasterCatalogBrowser({
   const activeMeta = metas.find((m) => m.id === franchise) ?? defaultFranchiseMeta(franchise);
 
   return (
-    <div className={cn("min-w-0", embedded ? "space-y-2" : "space-y-3")}>
+    <div className={cn("min-w-0", embedded ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-3")}>
       <div
         className={cn(
           embedded && "sticky top-0 z-20 -mx-0.5 rounded-lg bg-[rgb(8,10,14)]/95 px-0.5 py-1 backdrop-blur-md",
@@ -81,7 +81,7 @@ export function MasterCatalogBrowser({
         <div
           role="tablist"
           aria-label="Catalog franchise"
-          className="flex gap-1 overflow-x-auto rounded-lg border border-white/10 bg-black/35 p-1 scanner-chat-scrollbar [scrollbar-width:thin]"
+          className="sc-catalog-franchise-tabs flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.03] p-1 scanner-chat-scrollbar [scrollbar-width:thin]"
         >
           {TAB_ORDER.filter((id) => {
             if (id === "dragonball") {
@@ -104,8 +104,8 @@ export function MasterCatalogBrowser({
                   "shrink-0 rounded-md px-2.5 py-1.5 text-[10px] font-semibold transition touch-manipulation sm:px-3 sm:text-[11px]",
                   embedded && "lg:px-3.5 lg:py-2 lg:text-xs",
                   active
-                    ? "bg-amber-400/95 text-black shadow-sm"
-                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+                    ? "border border-amber-400/35 bg-amber-400/95 text-[#080a0e] shadow-sm"
+                    : "border border-transparent text-slate-400 hover:bg-white/[0.06] hover:text-slate-200",
                 )}
               >
                 <span className="sm:hidden">{short}</span>
@@ -134,6 +134,7 @@ export function MasterCatalogBrowser({
         )}
       </div>
 
+      <div className={cn(embedded && "flex min-h-0 flex-1 flex-col")}>
       {franchise === "pokemon" ? (
         <PokedexBrowser
           embedded={embedded}
@@ -156,6 +157,7 @@ export function MasterCatalogBrowser({
           onScanPrefill={onScanPrefill}
         />
       )}
+      </div>
     </div>
   );
 }

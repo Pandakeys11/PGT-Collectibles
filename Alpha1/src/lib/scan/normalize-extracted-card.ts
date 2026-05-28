@@ -7,6 +7,7 @@ import { classifyCardLane } from "@/lib/scan/lane";
 import { applyResolvedPrintEdition } from "@/lib/scan/print-edition";
 import { isDexLikeCardNumberOnly } from "@/lib/scan/collector-fraction";
 import { inferCardFranchise } from "@/lib/scan/franchise";
+import { normalizeJapanesePokemonIdentity } from "@/lib/scan/japanese-pokemon";
 import { applySetFromCollectorFraction, applyWizardsTitleAndFractionHeuristics } from "@/lib/scan/set-identification";
 import { normalizeVisionBboxGrid, scaleVisionGridCoord } from "@/lib/scan/spatial-grid";
 import { isNonTcgPokemonCollectible } from "@/lib/scan/non-tcg-pokemon";
@@ -39,6 +40,29 @@ function asBbox(
   value: unknown,
 ): { top: number; left: number; width: number; height: number } | undefined {
   return normalizeVisionBboxGrid(value);
+}
+
+function asJapaneseMatchMethod(value: unknown) {
+  const text = asString(value);
+  if (
+    text === "exact_japanese_name_number" ||
+    text === "set_number_match" ||
+    text === "artwork_similarity" ||
+    text === "known_counterpart_mapping" ||
+    text === "translation_fallback" ||
+    text === "low_confidence_manual_review"
+  ) {
+    return text;
+  }
+  return undefined;
+}
+
+function asJapaneseMatchStatus(value: unknown) {
+  const text = asString(value);
+  if (text === "confirmed" || text === "needs_soft_review" || text === "needs_manual_review") {
+    return text;
+  }
+  return undefined;
 }
 
 function locationFromBbox(
@@ -189,10 +213,25 @@ export function normalizeVisionCard(raw: unknown): ExtractedCard | null {
     name: nameEarly,
     printedName: asString(record.printedName),
     language: asString(record.language),
+    rawDetectedText: asString(record.rawDetectedText),
+    detectedLanguage:
+      record.detectedLanguage === "Japanese" ||
+      record.detectedLanguage === "English" ||
+      record.detectedLanguage === "Unknown"
+        ? record.detectedLanguage
+        : undefined,
+    japaneseName: asString(record.japaneseName),
+    englishCounterpartName: asString(record.englishCounterpartName),
+    setNameJapanese: asString(record.setNameJapanese),
+    setNameEnglish: asString(record.setNameEnglish),
     set: finalSet,
     number: finalNumber,
+    englishCounterpartNumber: asString(record.englishCounterpartNumber),
     year,
     rarity: asString(record.rarity),
+    matchConfidence: asNumber(record.matchConfidence) ?? undefined,
+    matchMethod: asJapaneseMatchMethod(record.matchMethod),
+    japaneseMatchStatus: asJapaneseMatchStatus(record.japaneseMatchStatus),
     grader: asString(record.grader),
     grade: asString(record.grade),
     cert: asString(record.cert),
@@ -214,9 +253,27 @@ export function normalizeVisionCard(raw: unknown): ExtractedCard | null {
       typeof record.visionBatchMerged === "boolean" ? record.visionBatchMerged : undefined,
     visionLane: lane.lane,
     visionLaneConfidence: lane.confidence,
+    marketLanguage:
+      record.marketLanguage === "Japanese" ||
+      record.marketLanguage === "English" ||
+      record.marketLanguage === "Unknown"
+        ? record.marketLanguage
+        : undefined,
+    pricingConfidence: asNumber(record.pricingConfidence) ?? undefined,
+    rawEstimate: asNumber(record.rawEstimate) ?? null,
+    gradedEstimate: asNumber(record.gradedEstimate) ?? null,
+    fallbackUsed: typeof record.fallbackUsed === "boolean" ? record.fallbackUsed : undefined,
+    fallbackReason: asString(record.fallbackReason),
   };
 
-  const parsed = extractedCardSchema.safeParse(normalized);
+  const baseParsed = extractedCardSchema.safeParse(normalized);
+  if (!baseParsed.success) return null;
+
+  const withJapaneseIdentity = franchiseHint.isPokemon
+    ? normalizeJapanesePokemonIdentity(baseParsed.data)
+    : baseParsed.data;
+
+  const parsed = extractedCardSchema.safeParse(withJapaneseIdentity);
   if (!parsed.success) return null;
   const graded = normalizeGradedSlabFields(parsed.data, lane.lane);
   const profile = inferCardFranchise(graded);

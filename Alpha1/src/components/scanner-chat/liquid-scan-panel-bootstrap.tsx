@@ -10,11 +10,13 @@ export function LiquidScanPanelBootstrap({
   onOpenCatalog,
   onOpenCompanion,
   onOpenCalculator,
+  onOpenLiveMarket,
   onCatalogPrefill,
 }: {
   onOpenCatalog: () => void;
   onOpenCompanion: () => void;
   onOpenCalculator: () => void;
+  onOpenLiveMarket: () => void;
   onCatalogPrefill: (prefill: CatalogScanPrefill) => void;
 }) {
   const searchParams = useSearchParams();
@@ -39,8 +41,17 @@ export function LiquidScanPanelBootstrap({
     if (panel === "catalog") onOpenCatalog();
     else if (panel === "companion") onOpenCompanion();
     else if (panel === "calculator") onOpenCalculator();
+    else if (panel === "live-market" || panel === "market") onOpenLiveMarket();
     router.replace(LIQUID_SCAN_PATH, { scroll: false });
-  }, [searchParams, router, onOpenCatalog, onOpenCompanion, onOpenCalculator, onCatalogPrefill]);
+  }, [
+    searchParams,
+    router,
+    onOpenCatalog,
+    onOpenCompanion,
+    onOpenCalculator,
+    onOpenLiveMarket,
+    onCatalogPrefill,
+  ]);
 
   return null;
 }

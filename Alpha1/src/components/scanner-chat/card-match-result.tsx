@@ -16,6 +16,7 @@ import {
 import { CatalogCardThumb } from "@/components/scan-panels/catalog-card-thumb";
 import type { CardMatch } from "@/lib/scanner-chat/types";
 import { buildEbayHubForCard } from "@/lib/market/sources";
+import { isJapanesePokemonCard } from "@/lib/scan/japanese-pokemon";
 import { cn } from "@/lib/cn";
 
 function statusMeta(status: CardMatch["status"]) {
@@ -79,6 +80,10 @@ export function CardMatchResult({
   const ebaySoldHub = card.extractedCard
     ? buildEbayHubForCard(card.extractedCard).sold
     : null;
+  const japaneseCard = card.extractedCard ? isJapanesePokemonCard(card.extractedCard) : false;
+  const japaneseName = card.extractedCard?.japaneseName ?? card.extractedCard?.printedName;
+  const counterpartSet = card.extractedCard?.setNameEnglish;
+  const marketConfidence = card.extractedCard?.pricingConfidence;
 
   return (
     <motion.div
@@ -123,6 +128,12 @@ export function CardMatchResult({
                     : ""}
                 </p>
               ) : null}
+              {japaneseCard ? (
+                <p className="mt-1 text-[11px] leading-snug text-slate-400 sm:text-xs">
+                  {japaneseName ? `Japanese: ${japaneseName}` : "Japanese-language card"}
+                  {counterpartSet ? ` · English counterpart: ${counterpartSet}` : ""}
+                </p>
+              ) : null}
             </div>
             <span
               className={cn(
@@ -136,6 +147,40 @@ export function CardMatchResult({
             </span>
           </div>
           <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
+            {japaneseCard ? (
+              <span className="rounded-md border border-red-400/25 bg-red-500/10 px-1.5 py-0.5 text-red-100">
+                Japanese
+              </span>
+            ) : null}
+            {japaneseCard && counterpartSet ? (
+              <span className="rounded-md border border-sky-400/25 bg-sky-500/10 px-1.5 py-0.5 text-sky-100">
+                Matched Counterpart
+              </span>
+            ) : null}
+            {japaneseCard && card.sources.some((source) => /ebay|pricecharting|cardmarket/i.test(source)) ? (
+              <span className="rounded-md border border-emerald-400/25 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-100">
+                Japanese Market Data
+              </span>
+            ) : null}
+            {card.extractedCard?.fallbackUsed ? (
+              <span className="rounded-md border border-amber-400/25 bg-amber-500/10 px-1.5 py-0.5 text-amber-100">
+                Fallback Estimate
+              </span>
+            ) : null}
+            {japaneseCard && card.catalogImageSourceLabel ? (
+              <span
+                className={cn(
+                  "rounded-md border px-1.5 py-0.5",
+                  card.catalogImageSource === "english_fallback"
+                    ? "border-amber-400/25 bg-amber-500/10 text-amber-100"
+                    : card.catalogImageNeedsReview
+                      ? "border-rose-400/25 bg-rose-500/10 text-rose-100"
+                      : "border-emerald-400/25 bg-emerald-500/10 text-emerald-100",
+                )}
+              >
+                {card.catalogImageSourceLabel}
+              </span>
+            ) : null}
             <span className="rounded-md bg-white/5 px-1.5 py-0.5">{card.rarity}</span>
             {card.printVersion ? (
               <span className="rounded-md border border-violet-500/25 bg-violet-500/12 px-1.5 py-0.5 text-violet-200/95">
@@ -159,6 +204,11 @@ export function CardMatchResult({
             <span className={cn("font-medium", confidenceTone(card.confidence))}>
               {card.confidence}% confidence
             </span>
+            {marketConfidence != null ? (
+              <span className={cn("font-medium", confidenceTone(Math.round(marketConfidence * 100)))}>
+                Market {Math.round(marketConfidence * 100)}%
+              </span>
+            ) : null}
           </div>
           {card.hasSticker || (card.fmvUsd != null && card.fmvUsd > 0) || card.soldCompCount > 0 ? (
             <div className="mt-2 space-y-2">

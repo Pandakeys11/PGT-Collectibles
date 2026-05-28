@@ -1,5 +1,6 @@
 import { classifyCardLane } from "@/lib/scan/lane";
 import { franchiseSearchPrefix } from "@/lib/scan/franchise";
+import { isJapanesePokemonCard, japaneseMarketIdentityParts } from "@/lib/scan/japanese-pokemon";
 import type { ExtractedCard } from "@/lib/scan/schemas";
 
 export function compact(parts: Array<string | null | undefined>): string {
@@ -64,22 +65,21 @@ export function buildMarketSearchIdentity(card: ExtractedCard): MarketSearchIden
   const prefix = franchiseSearchPrefix(card);
   const lane = classifyCardLane(card as Record<string, unknown>).lane;
   const gradeLabel = formatGraderGradeLabel(card.grader, card.grade);
+  const japanese = isJapanesePokemonCard(card);
+  const japaneseParts = japaneseMarketIdentityParts(card);
 
   const head = compact([
     prefix,
-    card.name,
-    card.printedName,
-    card.set,
+    ...(japanese ? japaneseParts : [card.name, card.printedName, card.set]),
     card.rarity,
-    card.year,
+    japanese ? null : card.year,
   ]);
 
   const graded = compact([
     prefix,
-    card.name,
-    card.set,
+    ...(japanese ? japaneseParts : [card.name, card.set]),
     card.rarity,
-    card.year,
+    japanese ? null : card.year,
     gradeLabel,
   ]);
 
@@ -93,7 +93,7 @@ export function buildMarketSearchIdentity(card: ExtractedCard): MarketSearchIden
 
   const ebayPrimary =
     lane === "graded" && gradeLabel
-      ? compact([prefix, card.name, card.set, card.rarity, card.year, gradeLabel])
+      ? compact([prefix, ...(japanese ? japaneseParts : [card.name, card.set]), card.rarity, japanese ? null : card.year, gradeLabel, japanese ? "sold" : null])
       : head;
 
   return {

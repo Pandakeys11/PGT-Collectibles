@@ -62,6 +62,21 @@ export const catalogIdentityStatusSchema = z.enum([
   "failed",
 ]);
 
+export const japanesePokemonMatchMethodSchema = z.enum([
+  "exact_japanese_name_number",
+  "set_number_match",
+  "artwork_similarity",
+  "known_counterpart_mapping",
+  "translation_fallback",
+  "low_confidence_manual_review",
+]);
+
+export const japanesePokemonMatchStatusSchema = z.enum([
+  "confirmed",
+  "needs_soft_review",
+  "needs_manual_review",
+]);
+
 export const identityEvidenceSchema = z.object({
   field: z.string(),
   extracted: z.string().nullable(),
@@ -131,6 +146,18 @@ export const scanCardContextSchema = z.object({
   extraction: z.record(z.string(), z.unknown()),
   /** Official Pokémon TCG API small art when catalog match succeeds (enrich / resolver). */
   catalogImageUrl: z.string().nullable().optional(),
+  /** Image source for localized/fallback catalog artwork. */
+  catalogImageSource: z
+    .enum([
+      "exact_japanese_print",
+      "same_art_confirmed",
+      "english_fallback",
+      "needs_image_review",
+    ])
+    .nullable()
+    .optional(),
+  catalogImageSourceLabel: z.string().nullable().optional(),
+  catalogImageNeedsReview: z.boolean().optional(),
   /** Grader cert lookup provider id (gemrate, psa_cert_page, web_snippet, …). */
   certProvider: z.string().nullable().optional(),
   certGradeDate: z.string().nullable().optional(),
@@ -168,10 +195,20 @@ export const extractedCardSchema = z.object({
   name: z.string().min(1).max(160),
   printedName: z.string().max(160).optional(),
   language: z.string().max(64).optional(),
+  rawDetectedText: z.string().max(2_000).optional(),
+  detectedLanguage: z.enum(["Japanese", "English", "Unknown"]).optional(),
+  japaneseName: z.string().max(160).optional(),
+  englishCounterpartName: z.string().max(160).optional(),
+  setNameJapanese: z.string().max(160).optional(),
+  setNameEnglish: z.string().max(160).optional(),
   set: z.string().max(160).optional(),
   number: z.string().max(64).optional(),
+  englishCounterpartNumber: z.string().max(64).optional(),
   year: z.string().max(16).optional(),
   rarity: z.string().max(80).optional(),
+  matchConfidence: z.number().min(0).max(1).optional(),
+  matchMethod: japanesePokemonMatchMethodSchema.optional(),
+  japaneseMatchStatus: japanesePokemonMatchStatusSchema.optional(),
   grader: z.string().max(32).optional(),
   grade: z.string().max(32).optional(),
   cert: z.string().max(80).optional(),
@@ -196,6 +233,12 @@ export const extractedCardSchema = z.object({
   visionBatchMerged: z.boolean().optional(),
   visionLane: z.enum(["raw", "graded"]).optional(),
   visionLaneConfidence: z.number().optional(),
+  marketLanguage: z.enum(["Japanese", "English", "Unknown"]).optional(),
+  pricingConfidence: z.number().min(0).max(1).optional(),
+  rawEstimate: z.number().nullable().optional(),
+  gradedEstimate: z.number().nullable().optional(),
+  fallbackUsed: z.boolean().optional(),
+  fallbackReason: z.string().max(300).optional(),
 });
 
 export type ExtractedCard = z.infer<typeof extractedCardSchema>;

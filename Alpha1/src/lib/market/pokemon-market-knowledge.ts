@@ -1,0 +1,158 @@
+import { getCardFromDb } from "@/lib/catalog/db-catalog-browse";
+import type { CatalogCardSummary } from "@/lib/catalog/catalog-types";
+import {
+  catalogCardReferenceEvidence,
+  parseCatalogPriceSnapshot,
+} from "@/lib/market/catalog-reference-evidence";
+import { deriveFairValueResult, type FairValueBasis } from "@/lib/market/fair-value";
+import {
+  analyzeMarketEvidence,
+  type MarketIntelligence,
+} from "@/lib/market/market-intelligence";
+import {
+  hasInstitutionalMarketMemory,
+  intelCompsToMarketEvidence,
+  loadPersistedMarketEvidence,
+} from "@/lib/market/persisted-market-evidence";
+import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
+import type { CatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
+import { readCatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
+import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
+import { extractedCardSchema } from "@/lib/scan/schemas";
+
+export type PokemonMarketKnowledge = {
+  catalogId: string;
+  card: {
+    name: string;
+    setName: string | null;
+    setCode: string | null;
+    number: string | null;
+    year: string | null;
+    rarity: string | null;
+    imageSmallUrl: string | null;
+    imageLargeUrl: string | null;
+  } | null;
+  referencePrices: CatalogPriceSnapshot;
+  intel: CatalogMarketIntel | null;
+  marketEvidence: MarketEvidence[];
+  intelligence: MarketIntelligence;
+  fairValueUsd: number | null;
+  fairValueBasis: FairValueBasis | null;
+  institutionalMemory: boolean;
+  dataDepth: {
+    persistedComps: number;
+    catalogReferenceRows: number;
+    populationSnapshots: number;
+    certifications: number;
+  };
+  refreshedAt: string;
+};
+
+export function catalogSummaryToExtractedCard(
+  card: CatalogCardSummary,
+  options?: { gradeCard?: ExtractedCard | null },
+): ExtractedCard {
+  const grade = options?.gradeCard;
+  return extractedCardSchema.parse({
+    franchise: "pokemon",
+    name: card.name,
+    printedName: card.name,
+    set: card.set?.name ?? card.set?.code ?? undefined,
+    number: card.number ?? undefined,
+    year: card.set?.releaseDate?.slice(0, 4) ?? undefined,
+    rarity: card.rarity ?? undefined,
+    grader: grade?.grader,
+    grade: grade?.grade,
+    cert: grade?.cert,
+    printStamps: grade?.printStamps,
+    details: grade?.details,
+    encapsulation: grade?.encapsulation,
+  });
+}
+
+/**
+ * Unified read model: catalog spine + institutional comps + reference prices + FMV intelligence.
+ * This is the backend “market master” view for a locked `catalog_id`.
+ */
+export async function buildPokemonMarketKnowledge(
+  catalogId: string,
+  options?: {
+    compLimit?: number;
+    /** When grading context is known (scan/slab), scopes FMV to that lane. */
+    gradeCard?: ExtractedCard | null;
+    extraEvidence?: MarketEvidence[];
+  },
+): Promise<PokemonMarketKnowledge | null> {
+  const id = catalogId.trim();
+  if (!id) return null;
+
+  const compLimit = Math.min(100, Math.max(1, options?.compLimit ?? 48));
+  const [catalogCard, loaded] = await Promise.all([
+    getCardFromDb("pokemon", id),
+    loadPersistedMarketEvidence(id, { compLimit }),
+  ]);
+
+  const referencePrices = catalogCard?.prices ?? parseCatalogPriceSnapshot(null);
+
+  const catalogRef = catalogCard ? catalogCardReferenceEvidence(catalogCard) : [];
+  const extra = options?.extraEvidence ?? [];
+  const seen = new Set<string>();
+  const marketEvidence: MarketEvidence[] = [];
+  for (const row of [...loaded.evidence, ...catalogRef, ...extra]) {
+    const key = `${row.kind}|${row.url ?? ""}|${row.title}|${row.priceUsd ?? ""}|${row.observedAt ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    marketEvidence.push(row);
+  }
+
+  const gradeCard =
+    options?.gradeCard ??
+    (catalogCard ? catalogSummaryToExtractedCard(catalogCard) : null);
+
+  const { fairValueUsd, fairValueBasis } = deriveFairValueResult(marketEvidence, {
+    card: gradeCard,
+    gradeCard: gradeCard ?? undefined,
+    targetGradeBucket: gradeCard ? undefined : "raw",
+  });
+
+  const intelligence = analyzeMarketEvidence(marketEvidence, {
+    card: gradeCard,
+    gradeCard: gradeCard ?? undefined,
+  });
+
+  const intel =
+    loaded.intel ??
+    (await readCatalogMarketIntel(id, { compLimit }));
+
+  return {
+    catalogId: id,
+    card: catalogCard
+      ? {
+          name: catalogCard.name,
+          setName: catalogCard.set?.name ?? null,
+          setCode: catalogCard.set?.code ?? null,
+          number: catalogCard.number,
+          year: catalogCard.set?.releaseDate?.slice(0, 4) ?? null,
+          rarity: catalogCard.rarity,
+          imageSmallUrl: catalogCard.images?.small ?? null,
+          imageLargeUrl: catalogCard.images?.large ?? null,
+        }
+      : null,
+    referencePrices,
+    intel,
+    marketEvidence,
+    intelligence,
+    fairValueUsd,
+    fairValueBasis,
+    institutionalMemory: hasInstitutionalMarketMemory(marketEvidence),
+    dataDepth: {
+      persistedComps: intel?.comps.length ?? 0,
+      catalogReferenceRows: catalogRef.length,
+      populationSnapshots: intel?.population.length ?? 0,
+      certifications: intel?.certifications.length ?? 0,
+    },
+    refreshedAt: new Date().toISOString(),
+  };
+}
+
+export { intelCompsToMarketEvidence, loadPersistedMarketEvidence, hasInstitutionalMarketMemory };

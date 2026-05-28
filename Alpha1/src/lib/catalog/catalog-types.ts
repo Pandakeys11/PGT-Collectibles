@@ -1,5 +1,7 @@
 /** Unified master catalog types (browse + scan handoff). */
 
+import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
+
 export type CatalogFranchiseId =
   | "pokemon"
   | "magic"
@@ -41,6 +43,8 @@ export type CatalogCardSummary = {
   };
   franchise: CatalogFranchiseId;
   tcgplayer?: { url?: string };
+  /** Parsed from `tcg_catalog_cards.prices_json` when present. */
+  prices?: CatalogPriceSnapshot;
 };
 
 export type CatalogPaginated<T> = {

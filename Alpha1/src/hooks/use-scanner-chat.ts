@@ -439,7 +439,7 @@ export function useScannerChat() {
 
   useEffect(() => {
     if (!isScanAutoReportEnabled()) return;
-    if (!shouldAutoSessionReport(speedOn)) return;
+    if (!shouldAutoSessionReport()) return;
     if (!activeScanId || reportScanRef.current === activeScanId) return;
     if (scanning || enriching) return;
     if (specimens.length === 0 || error) return;
@@ -453,7 +453,6 @@ export function useScannerChat() {
     specimens.length,
     error,
     generateScanReport,
-    speedOn,
   ]);
 
   const addImages = useCallback(
@@ -865,6 +864,14 @@ export function useScannerChat() {
     );
   }, [pushChatOutput, specimens]);
 
+  const openLiveMarketOutput = useCallback(() => {
+    pushChatOutput(
+      "live-market",
+      "Open live market pulse",
+      "Touring **top catalog values** across Pokémon sets from **vintage → modern**. Prices use cached **TCGPlayer** references; tap **Market intel** for institutional comps and FMV.",
+    );
+  }, [pushChatOutput]);
+
   const loadCatalogPrefill = useCallback(
     async (prefill: CatalogScanPrefill) => {
       if (isBusy) return;
@@ -1026,6 +1033,15 @@ export function useScannerChat() {
         openCalculatorOutput();
         return;
       }
+      if (
+        lower.includes("live market") ||
+        lower.includes("market pulse") ||
+        lower.includes("trending") ||
+        lower.includes("top value")
+      ) {
+        openLiveMarketOutput();
+        return;
+      }
       if (lower.includes("export") && lower.includes("csv")) {
         if (specimens.length === 0) {
           setMessages((prev) => [
@@ -1051,7 +1067,14 @@ export function useScannerChat() {
       setPrompt(chip);
       await sendLiquidAsk(chip);
     },
-    [openCalculatorOutput, openCatalogOutput, openCompanionOutput, sendLiquidAsk, specimens],
+    [
+      openCalculatorOutput,
+      openCatalogOutput,
+      openCompanionOutput,
+      openLiveMarketOutput,
+      sendLiquidAsk,
+      specimens,
+    ],
   );
 
   const runLiveScan = useCallback(async () => {
@@ -1192,6 +1215,7 @@ export function useScannerChat() {
     openCatalogOutput,
     openCompanionOutput,
     openCalculatorOutput,
+    openLiveMarketOutput,
     loadCatalogPrefill,
     rescanSpecimen,
     setUserEvidenceCrop,

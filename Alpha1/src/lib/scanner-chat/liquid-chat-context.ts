@@ -2,8 +2,11 @@ import { buildSessionBrief } from "@/lib/scan/narration-brief";
 import { buildNarrationLlmContext } from "@/lib/scan/narration-context";
 import type { ScanCardContext } from "@/lib/scan/schemas";
 import {
-  buildLiquidVaultSystemPrompt,
-} from "@/lib/scanner-chat/liquid-vault-guru-rules";
+  deriveLiquidAskConfidenceHints,
+  formatConfidenceHintsForLlm,
+} from "@/lib/scanner-chat/liquid-ask-confidence";
+import type { LiquidAskResearch } from "@/lib/scanner-chat/liquid-ask-types";
+import { buildLiquidVaultSystemPrompt } from "@/lib/scanner-chat/liquid-vault-guru-rules";
 
 const MAX_SPECIMENS_IN_SESSION = 12;
 
@@ -46,18 +49,33 @@ function marketRecencyNote(
   return `Session market evidence latest capture (UTC): ${latest}. No live research pack for this turn — describe staleness if citing session comps only.`;
 }
 
+function confidenceBlock(
+  research: LiquidAskResearch | null | undefined,
+  contexts: ScanCardContext[],
+  focus: ScanCardContext | null,
+): string {
+  const hints = deriveLiquidAskConfidenceHints({
+    research: research ?? null,
+    focus: focus ?? undefined,
+    contextCount: contexts.length,
+  });
+  return hints ? formatConfidenceHintsForLlm(hints) : "";
+}
+
 export function buildLiquidChatPayload({
   message,
   history,
   contexts,
   focusSpecimenId,
   researchJson,
+  research,
 }: {
   message: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
   contexts: ScanCardContext[];
   focusSpecimenId?: string | null;
   researchJson?: string | null;
+  research?: LiquidAskResearch | null;
 }): {
   system: string;
   user: string;
@@ -79,6 +97,7 @@ export function buildLiquidChatPayload({
   if (focus) {
     const compact = buildNarrationLlmContext(focus);
     const digest = briefDigestForContext(focus);
+    const confidence = confidenceBlock(research, contexts, focus);
     return {
       hasScanData: true,
       marketAsOf: focus.marketAsOf ?? null,
@@ -86,6 +105,7 @@ export function buildLiquidChatPayload({
       user: [
         recency ? `Recency:\n${recency}\n` : "",
         researchJson ? `Live research pack (${researchJson.length} chars, use for comps/certs/population):\n${researchJson}\n` : "",
+        confidence,
         `Desk brief (verified session synthesis):\n${JSON.stringify(digest)}`,
         `Focused card context:\n${JSON.stringify(compact)}`,
         `Conversation:\n${transcript}`,
@@ -110,6 +130,7 @@ export function buildLiquidChatPayload({
       catalogConfirmed: contexts.filter((c) => c.catalogIdentityStatus === "confirmed").length,
     };
     const latestAsOf = contexts.map((c) => c.marketAsOf).filter(Boolean).sort().at(-1) ?? null;
+    const confidence = confidenceBlock(research, contexts, null);
     return {
       hasScanData: true,
       marketAsOf: latestAsOf,
@@ -117,6 +138,7 @@ export function buildLiquidChatPayload({
       user: [
         recency ? `Recency:\n${recency}\n` : "",
         researchJson ? `Live research pack:\n${researchJson}\n` : "",
+        confidence,
         `Session totals:\n${JSON.stringify(totals)}`,
         `Session cards:\n${JSON.stringify(sessionCards)}`,
         `Conversation:\n${transcript}`,
@@ -146,10 +168,11 @@ export function buildLiquidChatPayload({
     }
   }
 
+  const confidence = confidenceBlock(research, contexts, null);
   return {
     hasScanData: false,
     marketAsOf: null,
     system: buildLiquidVaultSystemPrompt("general"),
-    user: researchBlock ? `${researchBlock}\n\nConversation:\n${transcript}` : transcript,
+    user: [researchBlock, confidence, `Conversation:\n${transcript}`].filter(Boolean).join("\n\n"),
   };
 }

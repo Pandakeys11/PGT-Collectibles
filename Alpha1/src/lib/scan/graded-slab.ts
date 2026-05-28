@@ -1,4 +1,5 @@
 import { classifyCardLane } from "@/lib/scan/lane";
+import { normalizeJapanesePokemonIdentity } from "@/lib/scan/japanese-pokemon";
 import {
   combineSlabLabelSources,
   extractSlabSubgrades,
@@ -316,7 +317,7 @@ export function normalizeGradedSlabFields(
     details,
   );
 
-  return {
+  return normalizeJapanesePokemonIdentity({
     ...card,
     name: name || card.name,
     set: set || card.set,
@@ -331,7 +332,7 @@ export function normalizeGradedSlabFields(
     details: detailsWithCertNote || undefined,
     encapsulation: card.encapsulation || "graded_slab",
     visionLane: card.visionLane ?? "graded",
-  };
+  });
 }
 
 /** Fill missing slab fields from registry lookup without overwriting vision/user values. */

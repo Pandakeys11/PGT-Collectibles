@@ -29,6 +29,9 @@ export function combineSlabLabelSources(
 }
 
 function extractPromoOrCollectorNumber(text: string): string | undefined {
+  const japaneseNo = text.match(/\bNo\.?\s*0*(\d{1,3})\b/i);
+  if (japaneseNo) return `No.${japaneseNo[1]!.padStart(3, "0")}`;
+
   const fraction = text.match(/#?\s*(\d{1,3})\s*\/\s*(\d{1,3})\b/);
   if (fraction) return `${fraction[1]}/${fraction[2]}`;
 
@@ -59,6 +62,7 @@ function normalizePokemonSetName(fragment: string): string {
     [/^JUNGLE\b/i, "Jungle"],
     [/^BASE\s*SET\b/i, "Base Set"],
     [/^BASE\b/i, "Base Set"],
+    [/^BASIC\b/i, "Base Set"],
     [/^GYM\s*2\b/i, "Gym Challenge"],
     [/^GYM\s*CHALLENGE\b/i, "Gym Challenge"],
     [/^GYM\s*HEROES\b/i, "Gym Heroes"],
@@ -103,6 +107,8 @@ function appendDetail(existing: string | undefined, extra: string): string {
 const PSA_SET_PATTERNS: Array<{ pattern: RegExp; set: string; printStamp?: string; language?: string; nonTcg?: boolean }> = [
   { pattern: /\bBASE\s*(?:II|2)\b/i, set: "Base Set 2" },
   { pattern: /\bBASE\s*SET\s*(?:II|2)\b/i, set: "Base Set 2" },
+  { pattern: /\bBASIC\b/i, set: "Base Set", language: "Japanese" },
+  { pattern: /\bJAPANESE\s+BASE\b/i, set: "Base Set", language: "Japanese" },
   { pattern: /\bGYM\s*2\b/i, set: "Gym Challenge", language: "Japanese" },
   { pattern: /\bGYM\s*CHALLENGE\b/i, set: "Gym Challenge" },
   { pattern: /\bGYM\s*HEROES\b/i, set: "Gym Heroes" },
@@ -127,9 +133,10 @@ function cleanPsaPokemonName(value: string): string | undefined {
     .replace(/\b(?:19\d{2}|20\d{2})\b/g, " ")
     .replace(/\b(?:POKEMON|POKÉMON|P\.?\s*M\.?|JAPANESE|GAME|PROMO|E-CARD|POCKET\s*MONSTERS)\b/gi, " ")
     .replace(/\b(?:HOLO|HOLOFOIL|REVERSE|NM[-/]?MT\+?|NM|MINT|EX|GEM\s*MT|GEM\s*MINT)\b/gi, " ")
-    .replace(/\b(?:BASE|II|GYM|HEROES|CHALLENGE|FOSSIL|JUNGLE|SKYRIDGE|AQUAPOLIS|EXPEDITION|NEO|REVELATION|GENESIS|DISCOVERY|DESTINY)\b/gi, " ")
+    .replace(/\b(?:BASE|BASIC|II|GYM|HEROES|CHALLENGE|FOSSIL|JUNGLE|SKYRIDGE|AQUAPOLIS|EXPEDITION|NEO|REVELATION|GENESIS|DISCOVERY|DESTINY)\b/gi, " ")
     .replace(/\b(?:1ST|FIRST)\s*EDITION\b/gi, " ")
     .replace(/#\s*[A-Z]{0,4}\d+[A-Z]?/gi, " ")
+    .replace(/\bNo\.?\s*\d{1,3}\b/gi, " ")
     .replace(/\b\d{1,2}(?:\.\d)?\b/g, " ")
     .replace(/[-_]+/g, " ")
     .replace(/\s+/g, " ")
@@ -178,7 +185,7 @@ function parsePsaPokemonLabelIdentity(raw: string): PsaPokemonLabelIdentity {
     identity.set = "Base Set";
   }
 
-  const numberIndex = text.search(/#\s*[A-Z]{0,4}\d+[A-Z]?|\b\d{1,3}\s*\/\s*\d{1,3}\b/);
+  const numberIndex = text.search(/\bNo\.?\s*\d{1,3}\b|#\s*[A-Z]{0,4}\d+[A-Z]?|\b\d{1,3}\s*\/\s*\d{1,3}\b/i);
   const beforeNumber = numberIndex >= 0 ? text.slice(0, numberIndex) : text;
 
   let nameSegment = "";

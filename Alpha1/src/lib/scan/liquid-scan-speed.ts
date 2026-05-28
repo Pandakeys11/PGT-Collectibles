@@ -1,7 +1,9 @@
 /**
  * Client preference:
- * - Speed ON — balanced parallelism (fewer vision/catalog timeouts than max blast).
- * - Speed OFF — gentler API pacing + skips registry only for raw/binder bulk rows.
+ * - Speed ON — higher parallelism for vision / catalog / market enrich.
+ * - Speed OFF — gentler API pacing.
+ * Market intelligence (comps, premium lanes, session report) runs for **every** scan
+ * regardless of Speed toggle — only concurrency differs.
  * Graded slabs with certs always hydrate registry during enrich regardless of mode.
  */
 
@@ -52,12 +54,12 @@ export function getLiquidScanSpeedProfile(speedOn: boolean): LiquidScanSpeedProf
   return {
     visionConcurrency: 2,
     catalogConcurrency: 4,
-    marketConcurrency: 3,
+    marketConcurrency: 4,
     precisionConcurrency: 2,
     skipRegistryOnBulkEnrich: false,
     precisionCropEnabled: true,
     precisionCropMax: 6,
-    autoSessionReport: false,
+    autoSessionReport: true,
   };
 }
 
@@ -84,6 +86,7 @@ export function precisionCropMaxForCardCount(
   return base;
 }
 
-export function shouldAutoSessionReport(speedOn: boolean): boolean {
-  return getLiquidScanSpeedProfile(speedOn).autoSessionReport;
+/** Session market intelligence report after enrich — not gated by Speed toggle. */
+export function shouldAutoSessionReport(_speedOn?: boolean): boolean {
+  return true;
 }

@@ -2,6 +2,7 @@ import type { CatalogMatch } from "@/lib/market/pokemon-catalog";
 import { hasCatalogIdentityFields } from "@/lib/scan/card-display";
 import { inferCardFranchise } from "@/lib/scan/franchise";
 import { hasReadableCertNumber } from "@/lib/scan/graded-slab";
+import { isJapanesePokemonCard } from "@/lib/scan/japanese-pokemon";
 import { extractedCardSchema, type ExtractedCard } from "@/lib/scan/schemas";
 
 /** Fields that can trigger catalog + market refresh when edited manually. */
@@ -99,11 +100,14 @@ export function mergeExtractedCardWithCatalog(
   if (!mayMerge) return card;
 
   const slabMerge = gradedSlabTrustsCatalog(card, catalog);
+  const japanese = isJapanesePokemonCard(card);
   return extractedCardSchema.parse({
     ...card,
     name: catalog.name?.trim() ? catalog.name : card.name,
-    set: catalog.setName ?? card.set,
-    number: catalog.cardNumber ?? card.number,
+    set: japanese ? card.set : (catalog.setName ?? card.set),
+    number: japanese ? card.number : (catalog.cardNumber ?? card.number),
+    setNameEnglish: card.setNameEnglish ?? (japanese ? catalog.setName ?? undefined : undefined),
+    englishCounterpartNumber: card.englishCounterpartNumber ?? (japanese ? catalog.cardNumber ?? undefined : undefined),
     year: catalog.year ?? card.year,
     rarity: catalog.rarity ?? card.rarity,
     grader: card.grader,

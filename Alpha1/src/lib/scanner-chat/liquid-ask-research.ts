@@ -12,14 +12,17 @@ import { shouldRunLiveResearch } from "@/lib/scanner-chat/liquid-ask-intent";
 import { resolveLiquidAskResearchTier } from "@/lib/scanner-chat/liquid-ask-research-tier";
 import {
   isLiquidAskFreeWebBriefConfigured,
+  isLiquidAskGroqWebBriefConfigured,
   isLiquidAskProWebBriefConfigured,
   runLiquidAskFreeWebBrief,
+  runLiquidAskGroqWebBrief,
   runLiquidAskProWebBrief,
 } from "@/lib/scanner-chat/liquid-ask-web-brief";
 import { countCompsBySource, sortCompsForDisplay } from "@/lib/scanner-chat/prioritize-comps";
 import { buildGradedHubLinks } from "@/lib/market/graded-hub-urls";
 import { isLiquidAskGeminiResearchEnabled } from "@/lib/ai/env";
 import { getMarketCapabilities } from "@/lib/market/market-capabilities";
+import { buildMarketMasterCompExtractionRules } from "@/lib/scanner-chat/market-master-guard-rails";
 import type {
   LiquidAskCertLookup,
   LiquidAskComp,
@@ -189,7 +192,9 @@ async function researchAskWithGemini(
     tools: [{ googleSearch: {} }] as never,
   });
 
-  const prompt = `Today is ${RESEARCH_TODAY_ISO}. User question: ${message}
+  const prompt = `${buildMarketMasterCompExtractionRules(RESEARCH_TODAY_ISO)}
+
+User question: ${message}
 
 ${card ? `Card context JSON:\n${JSON.stringify(card)}` : ""}
 ${certLookups.length ? `Cert lookups:\n${JSON.stringify(certLookups)}` : ""}
@@ -200,9 +205,7 @@ Use Google Search grounding. Return ONLY JSON:
     { "kind": "sold|active|reference", "title": "string", "priceUsd": number|null, "observedAt": "yyyy-mm-dd|null", "url": "https...", "source": "eBay|Card Ladder|PSA|...", "slab": "PSA 10|null" }
   ],
   "notes": ["string"]
-}
-
-Rules: real URLs only; observedAt null unless date appears in search results; prioritize exact cert and grade comps when certs provided.`;
+}`;
 
   const result = await model.generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -338,7 +341,19 @@ export async function runLiquidAskResearch(args: {
   const generalQuestion = !researchCard?.name;
 
   if (wantsLive && generalQuestion) {
-    if (useProMarket && isLiquidAskProWebBriefConfigured()) {
+    if (isLiquidAskGroqWebBriefConfigured()) {
+      try {
+        const brief = await runLiquidAskGroqWebBrief(args.message, RESEARCH_TODAY_ISO);
+        if (brief?.markdown) {
+          webBrief = brief.markdown;
+          liveResearchUsed = true;
+          webNotes.push(`Groq Compound web brief (${brief.model}, ${RESEARCH_TODAY_ISO}).`);
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+    if (!webBrief && useProMarket && isLiquidAskProWebBriefConfigured()) {
       try {
         const brief = await runLiquidAskProWebBrief(args.message, RESEARCH_TODAY_ISO);
         if (brief?.markdown) {

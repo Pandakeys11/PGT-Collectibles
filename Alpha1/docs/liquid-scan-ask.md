@@ -8,7 +8,7 @@
 
 Liquid Scan Ask uses **grounded context**: `buildNarrationLlmContext` + a **session brief digest** built from in-session FMV, comps, and verification (not invented prices). Legacy command-center routes (`/scanner`, `/api/scan/narrate`, `/api/scan/chat`) were removed — use Liquid Scan only.
 
-The system persona is defined in `src/lib/scanner-chat/liquid-vault-guru-rules.ts` (PGT Liquid Vault AI — TCG, sports, raw/graded/sealed, print-edition-aware FMV).
+The system persona uses **Pokémon Market Master** guard rails in `src/lib/scanner-chat/market-master-guard-rails.ts`, composed by `liquid-vault-guru-rules.ts` (accuracy, multi-layer verification, sold-vs-ask pricing, grading, JP/EN splits, confidence disclosure). Deterministic confidence hints: `liquid-ask-confidence.ts`.
 
 ## Research tiers (free vs Pro)
 
@@ -58,6 +58,18 @@ LIQUID_ASK_PRO_RESEARCH=0
 3. `useScannerChat` → `sendLiquidAsk` → `/api/scan/liquid-chat` (SSE stream).
 
 If images are queued, submit runs **vision scan** instead of Ask.
+
+## Pokémon Market Master guard rails
+
+| File | Role |
+|------|------|
+| `market-master-guard-rails.ts` | Master rules: accuracy, verification layers, market hierarchy, marketplaces, grading, authenticity, risk |
+| `liquid-vault-guru-rules.ts` | Composes guard rails + Ask mode (focused / session / general) |
+| `liquid-ask-confidence.ts` | Deterministic confidence scores → LLM hints + SSE `confidenceHints` on `done` |
+| `liquid-ask-web-brief.ts` | Same rules for Gemini / OpenRouter web briefs |
+| `liquid-scan-report.ts` | Session report uses Market Master accuracy blocks |
+
+Answers should end with a **## Confidence** section (Identity / Market / Grading / Overall) when the question is card-specific.
 
 ## What “up to date” means
 
