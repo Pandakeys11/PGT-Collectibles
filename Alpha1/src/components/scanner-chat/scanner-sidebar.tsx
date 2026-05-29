@@ -11,6 +11,8 @@ import {
   Download,
   History,
   Loader2,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Sparkles,
   Star,
@@ -19,6 +21,7 @@ import {
   Gavel,
   X,
 } from "lucide-react";
+import { LiquidScanRailToggle } from "@/components/scanner-chat/liquid-scan-rail-toggle";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { BrandLogo } from "@/components/branding/brand-logo";
@@ -181,6 +184,7 @@ function SidebarContent({
   savingScan,
   themeStripCompact = false,
   onClose,
+  onCollapseDesktop,
 }: {
   onNewScan: () => void;
   onNav: (id: SidebarNavId) => void;
@@ -200,15 +204,26 @@ function SidebarContent({
   savingScan?: boolean;
   themeStripCompact?: boolean;
   onClose?: () => void;
+  /** Desktop: hide nav rail for full-width scan view. */
+  onCollapseDesktop?: () => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b border-white/6 px-4 py-4">
-        <BrandLogo variant="icon-only" href={null} className="h-8 w-auto" showTagline={false} />
+      <div className="flex items-center gap-2 border-b border-white/6 px-3 py-3 lg:px-4 lg:py-4">
+        <BrandLogo variant="icon-only" href={null} className="h-8 w-auto shrink-0" showTagline={false} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-primary">PGT Collectibles</p>
           <p className="text-[10px] text-muted">Liquid Scan</p>
         </div>
+        {onCollapseDesktop ? (
+          <LiquidScanRailToggle
+            label="Collapse navigation"
+            onClick={onCollapseDesktop}
+            edge="inline"
+          >
+            <PanelLeftClose className="h-4 w-4" aria-hidden />
+          </LiquidScanRailToggle>
+        ) : null}
         {onClose ? (
           <button
             type="button"
@@ -334,6 +349,54 @@ function SidebarContent({
   );
 }
 
+const COLLAPSED_NAV_QUICK: { id: SidebarNavId; label: string; icon: typeof Plus }[] = [
+  { id: "new", label: "New scan", icon: Plus },
+  { id: "catalog", label: "Master catalog", icon: BookOpen },
+  { id: "live-market", label: "Live market pulse", icon: TrendingUp },
+  { id: "calculator", label: "Deal calculator", icon: Calculator },
+];
+
+function CollapsedNavRail({
+  onExpand,
+  onNewScan,
+  onNav,
+}: {
+  onExpand: () => void;
+  onNewScan: () => void;
+  onNav: (id: SidebarNavId) => void;
+}) {
+  return (
+    <div className="sc-liquid-scan-nav-collapsed flex h-full min-h-0 w-full flex-col items-center gap-1 border-r border-white/6 bg-[rgb(6,8,12)]/95 py-3">
+      <LiquidScanRailToggle label="Expand navigation" onClick={onExpand} edge="strip">
+        <PanelLeftOpen className="h-4 w-4" aria-hidden />
+      </LiquidScanRailToggle>
+      <div className="my-1 h-px w-6 bg-white/10" aria-hidden />
+      {COLLAPSED_NAV_QUICK.map((item) => {
+        const Icon = item.icon;
+        return (
+          <LiquidScanRailToggle
+            key={item.id}
+            label={item.label}
+            edge="strip"
+            onClick={() => {
+              if (item.id === "new") onNewScan();
+              else onNav(item.id);
+            }}
+          >
+            <Icon className="h-4 w-4" aria-hidden />
+          </LiquidScanRailToggle>
+        );
+      })}
+      <p
+        className="mt-auto select-none pb-1 text-[8px] font-semibold uppercase tracking-[0.2em] text-faint [writing-mode:vertical-rl]"
+        aria-hidden
+      >
+        Nav
+      </p>
+    </div>
+  );
+}
+
 export function ScannerSidebar({
   mobileOpen,
   onMobileClose,
@@ -353,6 +416,8 @@ export function ScannerSidebar({
   onSaveScan,
   canSaveScan,
   savingScan,
+  desktopCollapsed = false,
+  onToggleDesktopCollapsed,
   className,
 }: {
   mobileOpen: boolean;
@@ -373,6 +438,8 @@ export function ScannerSidebar({
   onSaveScan?: () => void;
   canSaveScan?: boolean;
   savingScan?: boolean;
+  desktopCollapsed?: boolean;
+  onToggleDesktopCollapsed?: () => void;
   className?: string;
 }) {
   const sidebarProps = {
@@ -445,11 +512,27 @@ export function ScannerSidebar({
     <>
       <aside
         className={cn(
-          "hidden w-[260px] shrink-0 border-r border-white/6 sc-glass lg:flex lg:flex-col",
+          "sc-liquid-scan-nav-rail hidden shrink-0 overflow-hidden transition-[width] duration-200 ease-out lg:flex lg:flex-col",
+          desktopCollapsed ? "w-11" : "w-[260px]",
+          !desktopCollapsed && "border-r border-white/6 sc-glass",
           className,
         )}
+        aria-label="Liquid Scan navigation"
+        data-collapsed={desktopCollapsed ? "true" : "false"}
       >
-        <SidebarContent {...sidebarProps} themeStripCompact />
+        {desktopCollapsed && onToggleDesktopCollapsed ? (
+          <CollapsedNavRail
+            onExpand={onToggleDesktopCollapsed}
+            onNewScan={onNewScan}
+            onNav={onNav}
+          />
+        ) : (
+          <SidebarContent
+            {...sidebarProps}
+            themeStripCompact
+            onCollapseDesktop={onToggleDesktopCollapsed}
+          />
+        )}
       </aside>
       {mobileDrawer ? createPortal(mobileDrawer, document.body) : null}
     </>

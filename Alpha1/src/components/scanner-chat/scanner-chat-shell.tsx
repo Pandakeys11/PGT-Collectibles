@@ -1,14 +1,18 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BarChart3, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { ScanLimitBanner } from "@/components/billing/scan-limit-banner";
 import { ScanQuotaChip } from "@/components/billing/scan-quota-chip";
 import { ScanQuotaTip } from "@/components/billing/scan-quota-tip";
 import { AuthControls } from "@/components/auth/auth-controls";
 import { EvidenceCropDialog } from "@/components/scan-panels/evidence-crop-dialog";
 import { useCompanion } from "@/hooks/use-companion";
+import { useLiquidScanRailLayout } from "@/hooks/use-liquid-scan-rail-layout";
 import { useScanQuota } from "@/hooks/use-scan-quota";
 import { useScannerChat } from "@/hooks/use-scanner-chat";
+import { LiquidScanRailToggle } from "@/components/scanner-chat/liquid-scan-rail-toggle";
+import { cn } from "@/lib/cn";
 import { LIQUID_SCAN_PATH } from "@/lib/app-routes";
 import { getActiveCatalogCandidate } from "@/lib/scanner-chat/catalog-match-present";
 import { openAppraisalPrint } from "@/lib/scan/appraisal-export";
@@ -22,6 +26,7 @@ import { ScannerComposer } from "./scanner-composer";
 import { ScannerHeader } from "./scanner-header";
 import { ScannerSidebar, type SidebarNavId } from "./scanner-sidebar";
 import { LiveMarketTickerBanner } from "./live-market-ticker-banner";
+import { PgtMusicBar } from "@/components/music/pgt-music-bar";
 import { EbayEndingSoonProvider } from "./ebay-ending-soon-provider";
 import { LiveMarketTickerProvider } from "./live-market-ticker-provider";
 import { LiquidScanPanelBootstrap } from "./liquid-scan-panel-bootstrap";
@@ -29,6 +34,7 @@ import { UploadDropzoneOverlay } from "./upload-dropzone";
 import { LiquidScanLiveCamera } from "./liquid-scan-live-camera";
 export function ScannerChatShell() {
   const chat = useScannerChat();
+  const { navCollapsed, intelCollapsed, toggleNav, toggleIntel } = useLiquidScanRailLayout();
   const [liveCameraOpen, setLiveCameraOpen] = useState(false);
   const companion = useCompanion();
   const { quota, isPro } = useScanQuota();
@@ -184,6 +190,8 @@ export function ScannerChatShell() {
         <ScannerSidebar
           mobileOpen={chat.sidebarOpen}
           onMobileClose={() => chat.setSidebarOpen(false)}
+          desktopCollapsed={navCollapsed}
+          onToggleDesktopCollapsed={toggleNav}
           onNewScan={chat.resetScan}
           canExport={chat.specimens.length > 0}
           recentSessions={chat.recentSessions}
@@ -214,7 +222,11 @@ export function ScannerChatShell() {
             }
           }}
         />
-        <main className="flex w-full min-w-0 flex-1 flex-col">
+        <main
+          className={cn(
+            "sc-liquid-scan-main relative flex w-full min-w-0 flex-1 flex-col transition-[max-width] duration-200 ease-out",
+          )}
+        >
           <div
             ref={feedRef}
             className="sc-mobile-feed sc-desktop-chat-feed flex-1 overflow-y-auto overflow-x-hidden py-4 sm:px-6 lg:px-5 lg:py-5 xl:px-6 scanner-chat-scrollbar"
@@ -264,6 +276,7 @@ export function ScannerChatShell() {
               className="mb-2"
               onOpenFull={chat.openLiveMarketOutput}
             />
+            <PgtMusicBar className="mb-2" />
             <ScannerComposer
             className="sc-mobile-composer"
             prompt={chat.prompt}
@@ -300,39 +313,82 @@ export function ScannerChatShell() {
             />
           </div>
         </main>
-        <div className="hidden w-[min(100%,380px)] min-w-0 shrink-0 flex-col border-l border-white/6 lg:flex xl:w-[420px]">
-          <div className="flex items-center justify-between gap-2 border-b border-white/6 px-4 py-2">
-            <AuthControls redirectUrl={LIQUID_SCAN_PATH} />
-            <ScanQuotaChip quota={quota} compact />
-          </div>
-          <ScanIntelligencePanel
-            {...intelligenceCropProps}
-            summary={chat.summary}
-            cards={chat.cards}
-            selectedSpecimen={chat.selectedSpecimen}
-            selectedSpecimenId={chat.selectedSpecimenId}
-            enrichingSpecimenId={chat.enrichingSpecimenId}
-            catalogEnriching={chat.enriching}
-            marketEnriching={chat.marketEnriching}
-            onSelectSpecimen={chat.setSelectedSpecimenId}
-            onConfirmCandidate={chat.handleConfirmCandidate}
-            onRejectCandidate={chat.handleRejectCandidate}
-            onRefreshCatalogCandidates={chat.handleRefreshCatalogCandidates}
-            refreshingCatalogCandidates={chat.refreshingCatalogCandidates}
-            onExport={handleExport}
-            onNewScan={chat.resetScan}
-            onReviewUncertain={reviewUncertain}
-            onSaveCollection={() => void chat.saveToCollection()}
-            saveStatus={chat.saveStatus}
-            saving={chat.saving}
-            loadedSessionId={chat.loadedSessionId}
-            historyRefreshKey={chat.historyRefreshKey}
-            compsSectionRef={chat.compsSectionRef}
-            isPro={isPro}
-            onOpenMasterCatalog={chat.openCatalogOutput}
-            className="flex-1"
-          />
-        </div>
+        <aside
+          className={cn(
+            "sc-liquid-scan-intel-rail hidden shrink-0 overflow-hidden transition-[width] duration-200 ease-out lg:flex lg:flex-col",
+            intelCollapsed ? "w-11" : "w-[min(100%,380px)] xl:w-[420px]",
+            !intelCollapsed && "border-l border-white/6",
+          )}
+          aria-label="Market intelligence"
+          data-collapsed={intelCollapsed ? "true" : "false"}
+        >
+          {intelCollapsed ? (
+            <div className="sc-liquid-scan-intel-collapsed flex h-full min-h-0 w-full flex-col items-center gap-1 bg-[rgb(6,8,12)]/95 py-3">
+              <LiquidScanRailToggle label="Expand market intelligence" onClick={toggleIntel} edge="strip">
+                <PanelRightOpen className="h-4 w-4" aria-hidden />
+              </LiquidScanRailToggle>
+              <div className="my-1 h-px w-6 bg-white/10" aria-hidden />
+              <LiquidScanRailToggle
+                label="Open scan results"
+                edge="strip"
+                onClick={() => {
+                  if (chat.specimens.length > 0) chat.setResultsDrawerOpen(true);
+                }}
+              >
+                <BarChart3 className="h-4 w-4" aria-hidden />
+              </LiquidScanRailToggle>
+              <p
+                className="mt-auto select-none pb-1 text-[8px] font-semibold uppercase tracking-[0.2em] text-faint [writing-mode:vertical-rl]"
+                aria-hidden
+              >
+                Intel
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/6 px-3 py-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <LiquidScanRailToggle
+                    label="Collapse market intelligence"
+                    onClick={toggleIntel}
+                    edge="inline"
+                  >
+                    <PanelRightClose className="h-4 w-4" aria-hidden />
+                  </LiquidScanRailToggle>
+                  <AuthControls redirectUrl={LIQUID_SCAN_PATH} />
+                </div>
+                <ScanQuotaChip quota={quota} compact />
+              </div>
+              <ScanIntelligencePanel
+                {...intelligenceCropProps}
+                summary={chat.summary}
+                cards={chat.cards}
+                selectedSpecimen={chat.selectedSpecimen}
+                selectedSpecimenId={chat.selectedSpecimenId}
+                enrichingSpecimenId={chat.enrichingSpecimenId}
+                catalogEnriching={chat.enriching}
+                marketEnriching={chat.marketEnriching}
+                onSelectSpecimen={chat.setSelectedSpecimenId}
+                onConfirmCandidate={chat.handleConfirmCandidate}
+                onRejectCandidate={chat.handleRejectCandidate}
+                onRefreshCatalogCandidates={chat.handleRefreshCatalogCandidates}
+                refreshingCatalogCandidates={chat.refreshingCatalogCandidates}
+                onExport={handleExport}
+                onNewScan={chat.resetScan}
+                onReviewUncertain={reviewUncertain}
+                onSaveCollection={() => void chat.saveToCollection()}
+                saveStatus={chat.saveStatus}
+                saving={chat.saving}
+                loadedSessionId={chat.loadedSessionId}
+                historyRefreshKey={chat.historyRefreshKey}
+                compsSectionRef={chat.compsSectionRef}
+                isPro={isPro}
+                onOpenMasterCatalog={chat.openCatalogOutput}
+                className="min-h-0 flex-1"
+              />
+            </>
+          )}
+        </aside>
       </div>
       {cropTarget?.previewUrl ? (
         <EvidenceCropDialog

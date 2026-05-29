@@ -1,0 +1,201 @@
+/**
+ * PGT Player — Omega-style compact waveform strip.
+ */
+
+.pgt-music-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.5);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.pgt-music-bar:hover {
+  border-color: rgb(var(--energy-water-1) / 0.45);
+  box-shadow: 0 8px 32px rgb(var(--energy-water-glow) / 0.12);
+}
+
+.scanner-chat-root .pgt-music-bar {
+  background: rgb(8 10 16 / 0.92);
+  border-color: rgb(var(--energy-water-1) / 0.22);
+}
+
+.pgt-music-bar__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.04);
+  color: rgb(255 255 255 / 0.92);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.pgt-music-bar__nav:hover {
+  background: rgb(var(--energy-water-1) / 0.12);
+  border-color: rgb(var(--energy-water-1) / 0.45);
+  color: rgb(var(--energy-water-1));
+  transform: scale(1.06);
+}
+
+.pgt-music-bar__nav:active {
+  transform: scale(0.94);
+}
+
+.pgt-music-bar__meta {
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+  max-width: 7rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+}
+
+.pgt-music-bar__brand {
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(var(--nexus-text-faint));
+}
+
+.pgt-music-bar__title {
+  width: 100%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pgt-music-bar__subtitle {
+  font-size: 0.5625rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(136 136 136 / 1);
+}
+
+.pgt-music-bar__wave-hit {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 2.5rem;
+  padding: 0 0.25rem;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Waveform — matches Omega MainWaveform */
+.pgt-music-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  max-width: 11rem;
+  height: 1.5rem;
+}
+
+.pgt-music-wave__bar {
+  display: block;
+  width: 2px;
+  height: 8px;
+  border-radius: 1px;
+  background: rgb(var(--energy-water-1));
+  opacity: 0.5;
+  transform-origin: center center;
+  animation: pgt-wave-idle 1.5s ease-in-out infinite;
+}
+
+.pgt-music-wave--playing .pgt-music-wave__bar {
+  opacity: 1;
+  animation: pgt-wave-playing 0.8s ease-in-out infinite;
+}
+
+.pgt-music-wave--playing .pgt-music-wave__bar:nth-child(odd) {
+  animation-duration: 0.72s;
+}
+
+.pgt-music-wave--playing .pgt-music-wave__bar:nth-child(even) {
+  animation-duration: 0.88s;
+}
+
+.pgt-music-wave--playing .pgt-music-wave__bar:nth-child(3n) {
+  animation-duration: 0.64s;
+}
+
+.pgt-music-wave--playing .pgt-music-wave__bar:nth-child(5n) {
+  animation-duration: 0.96s;
+}
+
+@keyframes pgt-wave-idle {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes pgt-wave-playing {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+  }
+  25% {
+    transform: scaleY(1.8);
+  }
+  50% {
+    transform: scaleY(0.8);
+  }
+  75% {
+    transform: scaleY(1.4);
+  }
+}
+
+/* Floating shell (non–Liquid Scan routes) */
+.pgt-music-widget {
+  pointer-events: none;
+  position: fixed;
+  z-index: 38;
+  width: min(22rem, calc(100vw - 1.5rem));
+}
+
+.pgt-music-widget > .pgt-music-bar {
+  pointer-events: auto;
+}
+
+@media (max-width: 640px) {
+  .pgt-music-widget {
+    width: min(19rem, calc(100vw - 1rem));
+  }
+
+  .pgt-music-bar__meta {
+    min-width: 4.5rem;
+    max-width: 5.5rem;
+  }
+
+  .pgt-music-wave {
+    max-width: 7.5rem;
+  }
+}

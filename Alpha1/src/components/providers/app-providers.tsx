@@ -1,19 +1,19 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { OmegaMusicWidget } from "@/components/music/omega-music-widget";
+import { PgtMusicWidget } from "@/components/music/pgt-music-widget";
 import { CatalogAmbientProvider } from "@/components/effects/catalog-ambient-provider";
 import { MotionProvider } from "@/components/motion/motion-provider";
-import { OmegaMusicProvider } from "@/providers/omega-music-provider";
+import { PgtMusicProvider } from "@/providers/pgt-music-provider";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <MotionProvider>
       <CatalogAmbientProvider>
-        <OmegaMusicProvider>
+        <PgtMusicProvider>
           {children}
-          <OmegaMusicWidget />
-        </OmegaMusicProvider>
+          <PgtMusicWidget />
+        </PgtMusicProvider>
       </CatalogAmbientProvider>
     </MotionProvider>
   );

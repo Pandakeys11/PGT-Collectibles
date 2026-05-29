@@ -1,1 +1,1 @@
-export { useOmegaMusic } from "@/providers/omega-music-provider";
+export { usePgtMusic, usePgtMusic as useOmegaMusic } from "@/providers/pgt-music-provider";
