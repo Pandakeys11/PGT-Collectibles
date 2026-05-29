@@ -67,7 +67,7 @@ export function LiveMarketTickerPanel({
   );
 
   return (
-    <div className={cn("sc-live-market-panel flex min-w-0 flex-col", className)}>
+    <div className={cn("sc-live-market-panel flex min-h-0 min-w-0 flex-1 flex-col", className)}>
       <div className="flex items-center justify-between gap-2 border-b border-sky-500/15 bg-sky-500/[0.06] px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <TrendingUp className="h-4 w-4 shrink-0 text-sky-300" aria-hidden />
@@ -146,8 +146,9 @@ export function LiveMarketTickerPanel({
         })}
       </div>
 
+      <div className="sc-live-market-panel__scroll min-h-0 flex-1 overflow-y-auto overscroll-contain scanner-chat-scrollbar touch-pan-y">
       <div
-        className="relative min-h-[min(52vw,17rem)] p-3 sm:min-h-[15.5rem] lg:min-h-[14rem]"
+        className="relative min-h-[min(38vw,11rem)] p-3 max-lg:min-h-[10.5rem] sm:min-h-[15.5rem] lg:min-h-[14rem]"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
@@ -286,6 +287,7 @@ export function LiveMarketTickerPanel({
 
       <div className="shrink-0 border-t border-white/6 px-2 py-2">
         <WeeklyMoversStrip compact />
+      </div>
       </div>
 
       {lane && lane.slides.length > 0 ? (

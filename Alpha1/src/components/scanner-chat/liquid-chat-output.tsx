@@ -33,7 +33,7 @@ export function LiquidChatOutputPanel({
     return (
       <div
         className={cn(
-          "sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(52dvh,520px)] flex-col overflow-hidden rounded-xl border border-emerald-500/20 sc-glass-raised max-lg:max-h-[min(52dvh,calc(100dvh-14rem))] lg:min-h-[min(40vh,420px)] lg:max-h-[min(calc(100dvh-11rem),640px)]",
+          "sc-chat-output-panel flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-emerald-500/20 sc-glass-raised lg:min-h-[min(40vh,420px)] lg:max-h-[min(calc(100dvh-11rem),640px)]",
           className,
         )}
       >
@@ -71,7 +71,7 @@ export function LiquidChatOutputPanel({
     return (
       <div
         className={cn(
-          "sc-live-market-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(54dvh,560px)] flex-col overflow-hidden rounded-xl border border-sky-500/25 sc-glass-raised max-lg:max-h-[min(54dvh,calc(100dvh-14rem))] lg:max-h-[min(calc(100dvh-12rem),680px)]",
+          "sc-live-market-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-sky-500/25 sc-glass-raised lg:max-h-[min(calc(100dvh-12rem),680px)]",
           className,
         )}
       >
@@ -87,7 +87,7 @@ export function LiquidChatOutputPanel({
     return (
       <div
         className={cn(
-          "sc-ebay-ending-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(54dvh,560px)] flex-col overflow-hidden rounded-xl border border-rose-500/25 sc-glass-raised max-lg:max-h-[min(54dvh,calc(100dvh-14rem))] lg:max-h-[min(calc(100dvh-12rem),680px)]",
+          "sc-ebay-ending-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-rose-500/25 sc-glass-raised lg:max-h-[min(calc(100dvh-12rem),680px)]",
           className,
         )}
       >
@@ -101,7 +101,7 @@ export function LiquidChatOutputPanel({
     return (
       <div
         className={cn(
-          "sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(52dvh,540px)] flex-col overflow-hidden rounded-xl border border-violet-500/20 sc-glass-raised max-lg:max-h-[min(52dvh,calc(100dvh-14rem))] lg:min-h-[min(52vh,480px)] lg:max-h-[min(calc(100dvh-11rem),720px)]",
+          "sc-chat-output-panel flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-violet-500/20 sc-glass-raised lg:min-h-[min(52vh,480px)] lg:max-h-[min(calc(100dvh-11rem),720px)]",
           className,
         )}
       >
@@ -135,11 +135,11 @@ export function LiquidChatOutputPanel({
   return (
     <div
       className={cn(
-        "sc-catalog-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full max-h-[min(58dvh,640px)] flex-col overflow-hidden rounded-xl border border-amber-500/20 sc-glass-raised max-lg:max-h-[min(58dvh,calc(100dvh-13rem))] lg:min-h-[min(70vh,680px)] lg:max-h-[min(calc(100dvh-10rem),940px)]",
+        "sc-catalog-embed-panel sc-chat-output-panel flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-amber-500/20 sc-glass-raised lg:min-h-[min(70vh,680px)] lg:max-h-[min(calc(100dvh-10rem),940px)]",
         className,
       )}
     >
-      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/8 bg-[rgb(8,10,14)]/95 px-3 py-2.5 backdrop-blur-md max-lg:px-3.5 max-lg:py-3">
+      <div className="sc-catalog-embed-panel__header flex shrink-0 items-center justify-between gap-3 border-b border-white/8 bg-[rgb(8,10,14)]/95 px-3 py-2.5 backdrop-blur-md max-lg:px-3 max-lg:py-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <BookOpen className="h-4 w-4 shrink-0 text-amber-300 max-lg:h-[1.125rem] max-lg:w-[1.125rem]" aria-hidden />
@@ -147,7 +147,7 @@ export function LiquidChatOutputPanel({
               Master catalog
             </p>
           </div>
-          <p className="mt-1 text-[11px] leading-relaxed text-slate-500 max-lg:text-xs">
+          <p className="mt-1 hidden text-[11px] leading-relaxed text-slate-500 lg:block">
             Pick a set, tap a card, then <span className="text-amber-200/90">Scan this card</span> to load
             it into your session.
           </p>
@@ -163,7 +163,7 @@ export function LiquidChatOutputPanel({
           </button>
         ) : null}
       </div>
-      <div className="liquid-catalog-embed flex min-h-0 flex-1 flex-col overflow-hidden px-2.5 py-2 sm:px-3 sm:py-2.5 max-lg:px-3 max-lg:py-2.5 lg:px-3.5 lg:py-3">
+      <div className="liquid-catalog-embed flex min-h-0 flex-1 flex-col overflow-hidden px-2 py-1.5 sm:px-3 sm:py-2 max-lg:px-2 max-lg:py-1.5 lg:px-3.5 lg:py-3">
         <MasterCatalogBrowser
           embedded
           scanTargetPath={LIQUID_SCAN_PATH}

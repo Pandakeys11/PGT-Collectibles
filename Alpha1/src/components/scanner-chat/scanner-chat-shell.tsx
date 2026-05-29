@@ -231,7 +231,7 @@ export function ScannerChatShell() {
             ref={feedRef}
             className="sc-mobile-feed sc-desktop-chat-feed flex-1 overflow-y-auto overflow-x-hidden py-4 sm:px-6 lg:px-5 lg:py-5 xl:px-6 scanner-chat-scrollbar"
           >
-            <div className="sc-mobile-feed-inner sc-desktop-feed-inner mx-auto w-full max-w-3xl space-y-3 lg:max-w-none">
+            <div className="sc-mobile-feed-inner sc-desktop-feed-inner mx-auto w-full max-w-none space-y-3 lg:max-w-none">
               <div className="lg:hidden">
                 <ScanQuotaTip quota={quota} />
               </div>

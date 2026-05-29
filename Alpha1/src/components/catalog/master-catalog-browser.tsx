@@ -75,7 +75,7 @@ export function MasterCatalogBrowser({
     <div className={cn("min-w-0", embedded ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-3")}>
       <div
         className={cn(
-          embedded && "sticky top-0 z-20 -mx-0.5 rounded-lg bg-[rgb(8,10,14)]/95 px-0.5 py-1 backdrop-blur-md",
+          embedded && "sc-master-catalog-chrome sticky top-0 z-20 -mx-0.5 rounded-lg bg-[rgb(8,10,14)]/95 px-0.5 py-1 backdrop-blur-md",
         )}
       >
         <div

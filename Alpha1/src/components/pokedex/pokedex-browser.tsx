@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BookOpen, LineChart, Loader2, Search, X } from "lucide-react";
+import { ArrowLeft, BookOpen, LineChart, Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { useCatalogAmbientOptional } from "@/components/effects/catalog-ambient-provider";
 import { CatalogSetTileGrid } from "@/components/catalog/catalog-set-tile-grid";
@@ -39,6 +39,7 @@ import { CatalogCardFmvRibbon } from "@/components/catalog/catalog-card-fmv-badg
 import { CatalogCardGradedRibbon } from "@/components/catalog/catalog-card-graded-ribbon";
 import { CatalogSetHeaderBand } from "@/components/catalog/catalog-set-header-band";
 import {
+  CATALOG_CARD_SORT_OPTIONS,
   sortCatalogCards,
   type CatalogCardSortId,
 } from "@/lib/catalog/catalog-card-sort";
@@ -48,6 +49,7 @@ import {
   CatalogCardDetailBody,
   type CatalogCardDetailIdentity,
 } from "@/components/catalog/catalog-card-detail-body";
+import { CatalogCardDetailSheet } from "@/components/catalog/catalog-card-detail-sheet";
 import { marketPokemonHref } from "@/lib/app-routes";
 import { ScanThisCardButton } from "@/components/pokedex/scan-this-card-button";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
@@ -674,6 +676,7 @@ export function PokedexBrowser({
       className={cn(
         "relative min-w-0 max-w-full overflow-x-hidden",
         embedded && "liquid-catalog-embed flex min-h-0 flex-1 flex-col text-slate-200",
+        embeddedSetOpen && mobileStepped && "sc-catalog-set-view-open",
       )}
     >
       <div className={cn("mx-auto flex min-h-0 w-full max-w-full flex-1 flex-col", !embedded && "max-w-[1600px]")}>
@@ -832,7 +835,7 @@ export function PokedexBrowser({
           {showCardsPane ? (
           <Card
             className={cn(
-              "desk-surface-raised flex h-full min-h-0 flex-col overflow-hidden",
+              "sc-catalog-card-pane desk-surface-raised flex h-full min-h-0 flex-col overflow-hidden",
               embedded
                 ? "min-h-0 flex-1 p-2.5 sc-glass-raised !border-white/8 lg:p-3"
                 : "min-h-[50dvh] p-4 sm:p-5 lg:min-h-[calc(100dvh-10rem)]",
@@ -849,68 +852,81 @@ export function PokedexBrowser({
                 </div>
               </div>
             ) : (
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="sc-catalog-set-body flex min-h-0 flex-1 flex-col overflow-hidden">
                 {embedded && mobileStepped ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedSetId(null);
-                      setSelectedSetName(null);
-                      setSelectedSetSnapshot(null);
-                      setDetail(null);
-                    }}
-                    className="mb-2 inline-flex min-h-10 shrink-0 items-center gap-1.5 text-sm font-medium text-amber-300/95 touch-manipulation hover:text-amber-200"
-                  >
-                    <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-                    All sets
-                  </button>
-                ) : null}
-                <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-border-subtle pb-3">
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-semibold text-primary">{selectedSetName}</h2>
-                    <p className="mt-0.5 text-xs text-muted">
-                      {rarityBucket === "all"
-                        ? `${cardsMeta.totalCount} cards`
-                        : `${cardsMeta.totalCount} ${RARITY_TAB_LABELS[rarityBucket]} cards`}
-                      {selectedSetId && supportsFinishTabs(selectedSetId) && finishBucket !== "all"
-                        ? ` · ${CATALOG_FINISH_TAB_LABELS[finishBucket]}`
-                        : ""}
-                      {selectedSetId && isLegendaryCollectionCatalogExpand(selectedSetId)
-                        ? " · Standard and reverse holofoil variants"
-                        : variantArtworkOverlay && supportsPrintingPresets(selectedSetId)
-                          ? " · Curated print artwork where available"
-                          : ""}
-                    </p>
+                  <div className="sc-catalog-set-mobile-toolbar mb-1.5 flex shrink-0 items-center gap-2 border-b border-border-subtle/70 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSetId(null);
+                        setSelectedSetName(null);
+                        setSelectedSetSnapshot(null);
+                        setDetail(null);
+                      }}
+                      className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg px-1.5 text-xs font-medium text-amber-300/95 touch-manipulation hover:bg-white/5 hover:text-amber-200"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      Sets
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-sm font-semibold text-primary">{selectedSetName}</h2>
+                      <p className="truncate text-[10px] text-muted">
+                        {rarityBucket === "all"
+                          ? `${cardsMeta.totalCount} cards`
+                          : `${cardsMeta.totalCount} ${RARITY_TAB_LABELS[rarityBucket]}`}
+                      </p>
+                    </div>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSelectedSetId(null);
-                      setSelectedSetName(null);
-                      setSelectedSetSnapshot(null);
-                    }}
-                  >
-                    Clear
-                  </Button>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-border-subtle pb-3">
+                      <div className="min-w-0">
+                        <h2 className="text-lg font-semibold text-primary">{selectedSetName}</h2>
+                        <p className="mt-0.5 text-xs text-muted">
+                          {rarityBucket === "all"
+                            ? `${cardsMeta.totalCount} cards`
+                            : `${cardsMeta.totalCount} ${RARITY_TAB_LABELS[rarityBucket]} cards`}
+                          {selectedSetId && supportsFinishTabs(selectedSetId) && finishBucket !== "all"
+                            ? ` · ${CATALOG_FINISH_TAB_LABELS[finishBucket]}`
+                            : ""}
+                          {selectedSetId && isLegendaryCollectionCatalogExpand(selectedSetId)
+                            ? " · Standard and reverse holofoil variants"
+                            : variantArtworkOverlay && supportsPrintingPresets(selectedSetId)
+                              ? " · Curated print artwork where available"
+                              : ""}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSelectedSetId(null);
+                          setSelectedSetName(null);
+                          setSelectedSetSnapshot(null);
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    </div>
 
-                {selectedSetId && selectedSetName ? (
-                  <CatalogSetHeaderBand
-                    setId={selectedSetId}
-                    setName={selectedSetName}
-                    cardSort={cardSort}
-                    onCardSortChange={setCardSort}
-                    onSelectChase={(catalogId) => {
-                      const hit = cards.find((c) => c.id === catalogId);
-                      if (hit) setDetail(hit);
-                    }}
-                    className="mt-2 shrink-0"
-                  />
-                ) : null}
+                    {selectedSetId && selectedSetName ? (
+                      <CatalogSetHeaderBand
+                        setId={selectedSetId}
+                        setName={selectedSetName}
+                        cardSort={cardSort}
+                        onCardSortChange={setCardSort}
+                        onSelectChase={(catalogId) => {
+                          const hit = cards.find((c) => c.id === catalogId);
+                          if (hit) setDetail(hit);
+                        }}
+                        className="mt-2 shrink-0"
+                      />
+                    ) : null}
+                  </>
+                )}
 
-                <div className="mt-3 shrink-0">
+                <div className={cn("shrink-0", embedded && mobileStepped ? "mt-1" : "mt-3")}>
                   <RarityFilterTabs
                     value={rarityBucket}
                     counts={rarityCounts}
@@ -919,39 +935,47 @@ export function PokedexBrowser({
                   />
                 </div>
 
+                {embedded && mobileStepped && selectedSetId ? (
+                  <div className="mt-1 flex shrink-0 items-center justify-end gap-2">
+                    <label
+                      className="text-[9px] font-semibold uppercase tracking-wide text-faint"
+                      htmlFor="catalog-mobile-card-sort"
+                    >
+                      Sort
+                    </label>
+                    <select
+                      id="catalog-mobile-card-sort"
+                      value={cardSort}
+                      onChange={(e) => setCardSort(e.target.value as CatalogCardSortId)}
+                      className="h-8 min-w-[6.5rem] rounded-lg border border-white/10 bg-black/40 px-2 text-[11px] text-primary"
+                    >
+                      {CATALOG_CARD_SORT_OPTIONS.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
                 {selectedSetId && supportsFinishTabs(selectedSetId) ? (
-                  <div className="mt-2 shrink-0">
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-faint">Rare finish</p>
+                  <div className="mt-1.5 shrink-0 lg:mt-2">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-faint max-lg:sr-only">
+                      Rare finish
+                    </p>
                     <FinishFilterTabs value={finishBucket} onChange={onFinishTabChange} />
                   </div>
                 ) : null}
 
                 {printingPresetOptionsList ? (
-                  <div className="mt-2 shrink-0">
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-faint">Print run</p>
+                  <div className="mt-1.5 shrink-0 lg:mt-2">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-faint max-lg:sr-only">
+                      Print run
+                    </p>
                     <PrintingPresetTabs
                       options={printingPresetOptionsList}
                       value={printingPreset}
                       onChange={onPrintingPresetChange}
-                    />
-                  </div>
-                ) : null}
-
-                {embeddedSetOpen && mobileStepped && selectedSetId && selectedSetName ? (
-                  <div className="mt-2 shrink-0 space-y-2 lg:hidden">
-                    <CatalogMarketIntelligenceRail
-                      setId={selectedSetId}
-                      setName={selectedSetName}
-                      cards={cards}
-                      onSelectCard={openCardDetailByCatalogId}
-                      className="max-h-[min(38vh,300px)]"
-                    />
-                    <CatalogSetInsightRail
-                      setId={selectedSetId}
-                      setName={selectedSetName}
-                      cards={cards}
-                      onSelectCard={openCardDetailByCatalogId}
-                      className="max-h-[min(42vh,320px)]"
                     />
                   </div>
                 ) : null}
@@ -962,7 +986,7 @@ export function PokedexBrowser({
                   </div>
                 ) : null}
 
-                <div className="sc-catalog-cards-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-2 scanner-chat-scrollbar touch-pan-y lg:pt-3">
+                <div className="sc-catalog-cards-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-1.5 scanner-chat-scrollbar touch-pan-y lg:pt-3">
                   {cardsLoading ? (
                     <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted">
                       <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
@@ -1069,7 +1093,7 @@ export function PokedexBrowser({
                 </div>
 
                 {selectedSetId && !cardsLoading && cardsMeta.totalCount > cardsMeta.pageSize ? (
-                  <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-border-subtle pt-3 text-xs text-muted">
+                  <div className="sc-catalog-cards-pager mt-2 flex shrink-0 items-center justify-between gap-2 border-t border-border-subtle pt-2 text-xs text-muted">
                     <span>
                       Page {cardsPage} / {cardsTotalPages}
                     </span>
@@ -1122,80 +1146,41 @@ export function PokedexBrowser({
       </div>
 
       {detail ? (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-[2px]"
-            aria-label="Close card detail"
-            onClick={() => setDetail(null)}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pokedex-card-title"
-            className="sc-pokedex-card-detail-sheet desk-surface-raised fixed inset-x-0 bottom-0 z-[70] flex max-h-[min(92dvh,860px)] flex-col overflow-hidden rounded-t-[1.35rem] border border-border-subtle/80 shadow-panel sm:inset-y-3 sm:left-auto sm:right-3 sm:max-h-[calc(100dvh-1.5rem)] sm:w-[min(30rem,calc(100vw-1.5rem))] sm:rounded-2xl lg:right-4 lg:w-[min(28rem,calc(100vw-2rem))]"
-          >
-            <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border-subtle/80 sm:hidden" aria-hidden />
-
-            <header className="relative shrink-0 border-b border-border-subtle/70 px-3 py-2 sm:px-4">
-              <button
-                type="button"
-                className="absolute right-2 top-1.5 flex h-9 w-9 items-center justify-center rounded-xl text-muted transition hover:bg-panel-raised/80 hover:text-primary touch-manipulation sm:right-3"
-                onClick={() => setDetail(null)}
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </button>
-              <h3
-                id="pokedex-card-title"
-                className="pr-10 text-sm font-semibold leading-snug text-primary line-clamp-2"
-              >
-                {detail.name}
-              </h3>
-              {catalogDetailIdentity?.subtitle ? (
-                <p className="mt-0.5 pr-10 text-[11px] leading-snug text-muted line-clamp-1">
-                  {catalogDetailIdentity.subtitle}
-                </p>
-              ) : null}
-            </header>
-
-            <div className="sc-pokedex-card-detail-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-2 pt-2 scanner-chat-scrollbar sm:px-4">
-              {catalogDetailIdentity ? (
-                <CatalogCardDetailBody
-                  identity={catalogDetailIdentity}
-                  variant="sheet"
-                  hideTitle
+        <CatalogCardDetailSheet
+          open
+          onClose={() => setDetail(null)}
+          title={detail.name}
+          subtitle={catalogDetailIdentity?.subtitle}
+          footer={
+            <CatalogCardDetailActions>
+              {catalogScanPrefill ? (
+                <ScanThisCardButton
+                  prefill={catalogScanPrefill}
+                  className="w-full sm:flex-1"
+                  targetPath={scanTargetPath}
+                  onScan={onScanPrefill}
                 />
               ) : null}
-            </div>
-
-            <footer className="sc-pokedex-card-detail-footer shrink-0 border-t border-border-subtle/70 bg-panel/80 px-3 py-2.5 backdrop-blur-sm sm:px-4">
-              <CatalogCardDetailActions>
-                {catalogScanPrefill ? (
-                  <ScanThisCardButton
-                    prefill={catalogScanPrefill}
-                    className="w-full sm:flex-1"
-                    targetPath={scanTargetPath}
-                    onScan={onScanPrefill}
-                  />
-                ) : null}
-                <Button size="sm" variant="secondary" className="w-full sm:flex-1" asChild>
-                  <Link href={marketPokemonHref(detail.id)}>
-                    <LineChart className="mr-1.5 h-4 w-4" aria-hidden />
-                    Market intel
-                  </Link>
+              <Button size="sm" variant="secondary" className="w-full sm:flex-1" asChild>
+                <Link href={marketPokemonHref(detail.id)}>
+                  <LineChart className="mr-1.5 h-4 w-4" aria-hidden />
+                  Market intel
+                </Link>
+              </Button>
+              {detail.tcgplayer?.url ? (
+                <Button size="sm" variant="secondary" className="w-full sm:w-auto" asChild>
+                  <a href={detail.tcgplayer.url} target="_blank" rel="noreferrer">
+                    TCGPlayer
+                  </a>
                 </Button>
-                {detail.tcgplayer?.url ? (
-                  <Button size="sm" variant="secondary" className="w-full sm:w-auto" asChild>
-                    <a href={detail.tcgplayer.url} target="_blank" rel="noreferrer">
-                      TCGPlayer
-                    </a>
-                  </Button>
-                ) : null}
-              </CatalogCardDetailActions>
-            </footer>
-          </div>
-        </>
+              ) : null}
+            </CatalogCardDetailActions>
+          }
+        >
+          {catalogDetailIdentity ? (
+            <CatalogCardDetailBody identity={catalogDetailIdentity} variant="sheet" hideTitle />
+          ) : null}
+        </CatalogCardDetailSheet>
       ) : null}
     </div>
   );

@@ -32,8 +32,8 @@ export const CATALOG_CARD_GRID_DEFAULT = CATALOG_CARD_GRID_4X4;
 /** @deprecated Prefer CATALOG_CARD_GRID_4X4 */
 export const CATALOG_CARD_GRID_EMBEDDED = CATALOG_CARD_GRID_4X4;
 
-/** Mobile stepped flow (one pane at a time) */
-export const CATALOG_CARD_GRID_MOBILE_STEP = "sc-catalog-card-grid-4x4 grid-cols-4 gap-1.5";
+/** Mobile stepped flow — column count tuned in scanner-chat.css */
+export const CATALOG_CARD_GRID_MOBILE_STEP = "sc-catalog-card-grid-4x4 grid gap-1.5";
 
 /** Card art fills tile width; 5:7 Pokémon aspect */
 export const CATALOG_CARD_ART_FRAME = "relative w-full aspect-[5/7] bg-subtle";

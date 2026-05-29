@@ -243,11 +243,35 @@
   }
 }
 
-/* Master catalog card grid — 4 columns, fluid tile width */
+@media (max-width: 1023px) {
+  .scanner-chat-root .sc-catalog-set-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .scanner-chat-root .sc-catalog-set-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Master catalog card grid — 4 columns desktop; mobile overrides below */
 .sc-catalog-card-grid-4x4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-auto-rows: minmax(0, auto);
   align-items: stretch;
+}
+
+@media (max-width: 1023px) {
+  .scanner-chat-root .sc-catalog-card-grid-4x4 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .scanner-chat-root .sc-catalog-card-grid-4x4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .sc-catalog-card-tile {
@@ -529,25 +553,100 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Embedded workspace (catalog, companion, etc.) — fit above composer, no overlap */
+  /* Embedded workspace (catalog, market, companion) — fill between header + composer */
   .scanner-chat-root:has(.sc-chat-output-panel) {
-    --sc-composer-height: 5.75rem;
+    --sc-mobile-chrome: calc(3.25rem + env(safe-area-inset-top, 0px));
+    --sc-composer-height: calc(7.75rem + env(safe-area-inset-bottom, 0px));
   }
 
   .scanner-chat-root:has(.sc-chat-output-panel) .sc-mobile-feed {
+    padding-top: 0.35rem;
     padding-bottom: 0.25rem;
+    padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
+  }
+
+  .scanner-chat-root:has(.sc-chat-output-panel) main > div:first-of-type {
+    padding-bottom: 0.35rem;
+  }
+
+  .scanner-chat-root:has(.sc-chat-output-panel) .sc-mobile-feed-inner {
+    max-width: 100%;
   }
 
   .scanner-chat-root:has(.sc-chat-output-panel) .sc-mobile-results-fab {
     display: none;
   }
 
-  .scanner-chat-root .sc-chat-output-panel {
-    max-height: min(52dvh, calc(100dvh - var(--sc-composer-height) - 7.5rem));
+  .scanner-chat-root:has(.sc-chat-output-panel) .pgt-music-bar {
+    display: none;
   }
 
-  .scanner-chat-root .sc-catalog-embed-panel.sc-chat-output-panel {
-    max-height: min(58dvh, calc(100dvh - var(--sc-composer-height) - 7rem));
+  .scanner-chat-root .sc-chat-output-panel {
+    max-height: calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 7.75rem));
+    min-height: min(
+      calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 7.75rem)),
+      920px
+    );
+  }
+
+  .scanner-chat-root:has(.sc-catalog-embed-panel) {
+    --sc-composer-height: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .scanner-chat-root:has(.sc-catalog-embed-panel) .sc-live-market-banner-mobile,
+  .scanner-chat-root:has(.sc-catalog-embed-panel) .pgt-music-bar {
+    display: none;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-embed-panel) .sc-catalog-embed-panel.sc-chat-output-panel {
+    max-height: calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 5.25rem));
+    min-height: calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 5.25rem));
+  }
+
+  /* Set view — hide outer chrome so cards get maximum height */
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-embed-panel__header,
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-master-catalog-chrome {
+    display: none;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .liquid-catalog-embed {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-card-pane {
+    padding: 0.5rem;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-pokedex-catalog-grid {
+    margin-top: 0;
+    min-height: 0;
+    flex: 1 1 0%;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-set-body {
+    min-height: 0;
+    flex: 1 1 0%;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-cards-scroll {
+    flex: 1 1 0%;
+    min-height: min(
+      calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 5.25rem) - 7.5rem),
+      640px
+    );
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-set-mobile-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: rgb(8 10 14 / 0.96);
+    backdrop-filter: blur(10px);
   }
 
   /* Symmetric edge padding — avoids left-heavy chat avatar gutter on wide embeds */
@@ -573,6 +672,16 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
+  }
+
+  .scanner-chat-root .sc-live-market-panel__scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+  }
+
+  .scanner-chat-root .sc-assistant-wide-embed .sc-chat-output-panel {
+    border-radius: 0.75rem;
   }
 
   .scanner-chat-root .sc-catalog-embed-panel,
@@ -826,8 +935,16 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  .scanner-chat-root .sc-catalog-embed-panel {
-    max-height: min(94dvh, 900px);
+  .scanner-chat-root .sc-catalog-embed-panel:not(:has(.sc-catalog-set-view-open)) .sc-pokedex-catalog-grid--set-open {
+    min-height: min(
+      calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 5.25rem) - 4.5rem),
+      720px
+    );
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel .liquid-catalog-embed .sc-pokedex-catalog-grid {
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .scanner-chat-root .liquid-catalog-embed .desk-surface-raised {
@@ -916,14 +1033,33 @@
   }
 }
 
-@media (max-width: 1023px) {
-  .scanner-chat-root .sc-catalog-embed-panel {
-    max-height: min(92dvh, 900px);
-  }
+/* Mobile live market banner — compact composer strip */
+.sc-live-market-banner-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
 
-  .scanner-chat-root .sc-catalog-embed-panel .liquid-catalog-embed .sc-pokedex-catalog-grid {
-    flex: 1 1 0%;
-    min-height: 0;
+.sc-live-market-banner-mobile__pill {
+  width: 100%;
+}
+
+.sc-live-market-banner-mobile__open {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(56 189 248 / 0.22);
+  background: rgb(56 189 248 / 0.08);
+  padding: 0.35rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: rgb(186 230 253 / 0.95);
+  text-align: center;
+  touch-action: manipulation;
+}
+
+@media (min-width: 1024px) {
+  .sc-live-market-banner-mobile {
+    display: none;
   }
 }
 

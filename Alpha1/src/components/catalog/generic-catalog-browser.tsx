@@ -227,25 +227,35 @@ export function GenericCatalogBrowser({
   const setsTotalPages = Math.max(1, Math.ceil(setsMeta.totalCount / setsMeta.pageSize));
 
   return (
-    <div className={cn("flex min-h-0 w-full min-w-0 max-w-full flex-col", embedded ? "flex-1 gap-2.5" : "space-y-3")}>
-      <p className={cn(embedded ? "text-[10px] leading-snug text-slate-500" : "text-[11px] text-muted")}>
-        {syncHint}
-      </p>
+    <div
+      className={cn(
+        "flex min-h-0 w-full min-w-0 max-w-full flex-col",
+        embedded ? "flex-1 gap-2.5" : "space-y-3",
+        embedded && mobileStepped && selectedSet && "sc-catalog-set-view-open",
+      )}
+    >
+      {!(embedded && mobileStepped && selectedSet) ? (
+        <>
+          <p className={cn(embedded ? "text-[10px] leading-snug text-slate-500" : "text-[11px] text-muted")}>
+            {syncHint}
+          </p>
 
-      <div className="relative">
-        <Search
-          className={cn(
-            "pointer-events-none absolute top-1/2 -translate-y-1/2 text-slate-500",
-            embedded ? "left-2 h-3.5 w-3.5" : "left-3 h-4 w-4 text-faint",
-          )}
-        />
-        <Input
-          value={setQuery}
-          onChange={(e) => setSetQuery(e.target.value)}
-          placeholder={`Search ${meta.label} sets…`}
-          className={inputClass}
-        />
-      </div>
+          <div className="relative">
+            <Search
+              className={cn(
+                "pointer-events-none absolute top-1/2 -translate-y-1/2 text-slate-500",
+                embedded ? "left-2 h-3.5 w-3.5" : "left-3 h-4 w-4 text-faint",
+              )}
+            />
+            <Input
+              value={setQuery}
+              onChange={(e) => setSetQuery(e.target.value)}
+              placeholder={`Search ${meta.label} sets…`}
+              className={inputClass}
+            />
+          </div>
+        </>
+      ) : null}
 
       {!selectedSet ? (
         <div className={cn("flex h-full min-h-0 flex-1 flex-col overflow-hidden")}>
@@ -269,7 +279,7 @@ export function GenericCatalogBrowser({
           />
         </div>
       ) : (
-        <div className={cn("space-y-3", embedded && mobileStepped && "min-h-[min(52dvh,480px)]")}>
+        <div className={cn("space-y-3", embedded && mobileStepped && "min-h-0 flex-1")}>
           <button
             type="button"
             onClick={() => {
