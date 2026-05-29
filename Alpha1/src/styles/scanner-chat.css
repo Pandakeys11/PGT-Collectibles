@@ -207,13 +207,6 @@
   -webkit-overflow-scrolling: touch;
 }
 
-@media (min-width: 1024px) {
-  .scanner-chat-root .sc-liquid-scan-nav-rail[data-collapsed="true"] + .sc-liquid-scan-main,
-  .scanner-chat-root .sc-liquid-scan-main:has(+ .sc-liquid-scan-intel-rail[data-collapsed="true"]) {
-    /* Main column grows when rails collapse — flex-1 handles width */
-  }
-}
-
 .scanner-chat-root .sc-catalog-market-intelligence-scroll {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
