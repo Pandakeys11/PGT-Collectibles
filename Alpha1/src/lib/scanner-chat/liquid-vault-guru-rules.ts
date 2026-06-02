@@ -20,6 +20,8 @@ export const LIQUID_VAULT_MODE_GENERAL = `Mode: **general / no scan loaded**.
 
 When a **live research pack** or **webBrief** is attached, answer directly using that data (names, editions, price ranges, source types). Do NOT tell the user to upload scans or run Liquid Scan steps unless the question cannot be narrowed at all.
 
+Use the full section structure (Snapshot, Market read, Recent solds, Live listings, Your move, Collection angle, Confidence). Give a clear **Buy / Hold / Sell / Acquire / Wait** stance.
+
 Rank/set questions (e.g. highest value in Base Set): name top card(s) by print edition and grade bucket with ranges from the pack. Label sold vs asking.
 
 Without live research (\`liveResearchUsed\` false), give best-effort hobby context with explicit uncertainty — no invented exact sale dates, populations, or URLs.`;

@@ -52,10 +52,41 @@ function renderInline(text: string): ReactNode[] {
 export function LiquidAskMarkdown({ text, className }: { text: string; className?: string }) {
   const blocks = text.split(/\n\n+/).filter((b) => b.trim());
 
+  function sectionAccent(heading: string): string | null {
+    const h = heading.toLowerCase();
+    if (h.includes("your move") || h.includes("collection angle")) {
+      return "border-l-2 border-amber-400/40 pl-3";
+    }
+    if (h.includes("recent sold") || h.includes("live listing")) {
+      return "border-l-2 border-emerald-400/30 pl-3";
+    }
+    if (h.includes("market read") || h.includes("sentiment")) {
+      return "border-l-2 border-sky-400/30 pl-3";
+    }
+    if (h.includes("confidence")) {
+      return "border-l-2 border-violet-400/30 pl-3";
+    }
+    return null;
+  }
+
   return (
     <div className={cn("space-y-3 text-sm leading-relaxed text-slate-200", className)}>
       {blocks.map((block, bi) => {
         const lines = block.split("\n");
+        const trimmed = block.trim();
+
+        const imageMatch = trimmed.match(/^!\[([^\]]*)\]\((https?:\/\/[^)]+)\)$/);
+        if (imageMatch) {
+          const [, alt, src] = imageMatch;
+          return (
+            <figure key={bi} className="overflow-hidden rounded-xl ring-1 ring-white/10">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt={alt ?? ""} className="mx-auto max-h-48 w-auto object-contain bg-black/30 p-2" />
+              {alt ? <figcaption className="px-2 pb-2 text-center text-[10px] text-slate-500">{alt}</figcaption> : null}
+            </figure>
+          );
+        }
+
         const isList = lines.every((l) => /^\s*[-•*]\s+/.test(l) || l.trim() === "");
         if (isList && lines.some((l) => /^\s*[-•*]\s+/.test(l))) {
           return (
@@ -77,7 +108,6 @@ export function LiquidAskMarkdown({ text, className }: { text: string; className
             </div>
           );
         }
-        const trimmed = block.trim();
         if (trimmed.startsWith("### ")) {
           return (
             <h4 key={bi} className="text-xs font-semibold uppercase tracking-wider text-emerald-200/90">
@@ -86,9 +116,17 @@ export function LiquidAskMarkdown({ text, className }: { text: string; className
           );
         }
         if (trimmed.startsWith("## ")) {
+          const title = trimmed.slice(3);
+          const accent = sectionAccent(title);
           return (
-            <h3 key={bi} className="text-sm font-semibold text-slate-100">
-              {trimmed.slice(3)}
+            <h3
+              key={bi}
+              className={cn(
+                "text-sm font-semibold text-slate-100",
+                accent,
+              )}
+            >
+              {title}
             </h3>
           );
         }

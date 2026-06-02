@@ -95,7 +95,8 @@ export type ChatOutputKind =
   | "companion"
   | "calculator"
   | "live-market"
-  | "ebay-ending";
+  | "ebay-ending"
+  | "pgt-youtube";
 
 export type ChatOutputPanel = {
   kind: ChatOutputKind;
@@ -116,6 +117,8 @@ export interface AssistantChatMessage extends ChatMessageBase {
   askStatus?: string | null;
   /** Post-scan session intelligence article (streams after pipeline completes). */
   scanReport?: boolean;
+  /** Digital Scan how-to tips block */
+  digitalScanHowTo?: boolean;
 }
 
 export interface SystemChatMessage extends ChatMessageBase {

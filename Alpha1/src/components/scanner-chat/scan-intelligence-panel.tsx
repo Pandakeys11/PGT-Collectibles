@@ -54,6 +54,8 @@ export function ScanIntelligencePanel({
   onOpenMasterCatalog,
   layoutMode = "sidebar",
   className,
+  digitalScanAsset = null,
+  onDownloadDigitalScan,
 }: {
   summary: ScanSummary | null;
   cards: CardMatch[];
@@ -88,6 +90,8 @@ export function ScanIntelligencePanel({
   /** Sidebar on desktop; drawer uses a single scroll column with external footer. */
   layoutMode?: "sidebar" | "drawer";
   className?: string;
+  digitalScanAsset?: import("@/lib/digital-scan/types").DigitalScanAsset | null;
+  onDownloadDigitalScan?: () => void;
 }) {
   const { userId } = useAuth();
   const isDrawer = layoutMode === "drawer";
@@ -218,6 +222,8 @@ export function ScanIntelligencePanel({
                 onCommitEdit={onCommitSpecimenEdit}
                 onRescan={onRescanSpecimen}
                 onRequestAdjustCrop={canCrop ? onRequestAdjustCrop : undefined}
+                digitalScanAsset={digitalScanAsset}
+                onDownloadDigitalScan={onDownloadDigitalScan}
               />
               {!canCrop ? (
                 <p className="rounded-lg border border-dashed border-white/10 px-3 py-2 text-[11px] text-slate-500">

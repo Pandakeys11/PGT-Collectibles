@@ -1,11 +1,12 @@
 import { syncSetCatalogPricesFromTcgApi } from "@/lib/catalog/catalog-set-price-sync";
 import { loadSetMarketEvidenceMap } from "@/lib/catalog/set-insight-comps";
 import { listCardsFromDb } from "@/lib/catalog/db-catalog-browse";
-import type {
-  CatalogSetInsightPayload,
-  SetInsightPriceCard,
-  SetInsightSealedProduct,
-} from "@/lib/catalog/set-insight-payload";
+import type { CatalogSetInsightPayload, SetInsightPriceCard } from "@/lib/catalog/set-insight-payload";
+import {
+  defaultModernSealedProducts,
+  mergeSealedProducts,
+  sealedProductsFromOverlay,
+} from "@/lib/catalog/set-insight-sealed";
 import {
   isSetInsightAiConfigured,
   researchSetInsightWithAi,
@@ -27,13 +28,8 @@ import {
   type SetInsightCardSource,
 } from "@/lib/catalog/set-insight-utils";
 import type { MarketEvidence } from "@/lib/scan/schemas";
-import {
-  getCatalogSetOverlay,
-  hasCatalogSetOverlay,
-  type SealedProductSpec,
-} from "@/lib/pokedex/catalog-set-overlay";
+import { getCatalogSetOverlay, hasCatalogSetOverlay } from "@/lib/pokedex/catalog-set-overlay";
 import { formatPokemonCatalogSkuLabel } from "@/lib/catalog/parse-catalog-sku";
-import { buildMarketSourceLinks } from "@/lib/market/sources";
 import { rollupCatalogSetPricing } from "@/lib/pokedex/set-pricing-aggregate";
 import {
   CATALOG_SET_PRICING_SELECT,
@@ -41,8 +37,6 @@ import {
   fetchSetById,
 } from "@/lib/pokedex/tcg-api-server";
 import type { TcgCardSummary } from "@/lib/pokedex/tcg-api-types";
-import { extractedCardSchema } from "@/lib/scan/schemas";
-
 function normalizeName(s: string): string {
   return s
     .toLowerCase()
@@ -181,23 +175,6 @@ function divisorForLivePriceFetch(cardCount: number): number {
   return 0.03;
 }
 
-function sealedFromOverlay(setName: string, products: SealedProductSpec[]): SetInsightSealedProduct[] {
-  return products.map((p) => {
-    const extracted = extractedCardSchema.parse({
-      name: p.searchQuery,
-      set: setName,
-      printStamps: "sealed pokemon tcg",
-    });
-    const links = buildMarketSourceLinks(extracted);
-    const ebay = links.find((l) => l.source === "ebay" && l.lane === "sold")?.url;
-    return {
-      label: p.label,
-      note: p.category.replace(/_/g, " "),
-      searchUrl: ebay ?? links[0]?.url ?? null,
-    };
-  });
-}
-
 export async function buildCatalogSetInsight(
   setId: string,
   options?: { refreshAi?: boolean },
@@ -258,9 +235,9 @@ export async function buildCatalogSetInsight(
   let topValue = catalogInsight.topValue;
   let momentum = catalogInsight.momentum;
   let promos = catalogInsight.promos;
-  let sealedProducts: SetInsightSealedProduct[] = hasCatalogSetOverlay(setId)
-    ? sealedFromOverlay(setName, getCatalogSetOverlay(setId)?.sealedProducts ?? [])
-    : [];
+  let sealedProducts = hasCatalogSetOverlay(setId)
+    ? sealedProductsFromOverlay(setName, getCatalogSetOverlay(setId)?.sealedProducts ?? [])
+    : sealedProductsFromOverlay(setName, defaultModernSealedProducts(setName));
   const references: { label: string; url: string }[] = [];
 
   const overlay = getCatalogSetOverlay(setId);
@@ -310,7 +287,7 @@ export async function buildCatalogSetInsight(
       promos = mergeCardLists(catalogInsight.promos, groqPromo);
 
       if (groqSealed.length) {
-        sealedProducts = groqSealed;
+        sealedProducts = mergeSealedProducts(sealedProducts, groqSealed);
       }
 
       for (const ref of groq.raw.references ?? []) {

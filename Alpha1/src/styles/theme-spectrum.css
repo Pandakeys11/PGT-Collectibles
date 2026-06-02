@@ -1,31 +1,20 @@
 /**
- * Holo mesh & spectrum layer — holo stops overridden by catalog ambient when active.
+ * Holo mesh wiring — catalog ambient overrides `--holo-*` when a set is open.
  */
 
 html {
-  --accent-tertiary: var(--accent-glow);
-  --holo-a: var(--accent);
-  --holo-b: var(--accent-glow);
-  --holo-c: var(--accent-strong);
-  --gradient-mid: var(--bg-panel);
-  --gradient-bloom: var(--bg-subtle);
-  --surface-tint: var(--accent);
-  --surface-tint-2: var(--accent-glow);
-  --spark-tertiary: var(--spark-secondary);
-  --border-accent: var(--accent) / 0.26;
-  --panel-shine: 255 255 255 / 0.05;
+  --accent-tertiary: var(--brand-violet);
+  --gradient-mid: 9 13 24;
+  --gradient-bloom: 30 42 68;
 }
 
 html:not([data-theme]),
 [data-theme="obsidian-clean"] {
-  --accent-tertiary: 255 247 168;
-  --holo-a: 141 153 174;
-  --holo-b: 255 230 0;
-  --holo-c: 201 214 223;
-  --gradient-mid: 10 12 18;
-  --gradient-bloom: 40 50 70;
-  --surface-tint: 141 153 174;
-  --surface-tint-2: 255 230 0;
-  --spark-tertiary: #fff7a8;
-  --border-accent: 201 214 223 / 0.28;
+  --holo-a: 8 145 178;
+  --holo-b: 250 204 21;
+  --holo-c: 167 139 250;
+  --surface-tint: 34 211 238;
+  --surface-tint-2: 250 204 21;
+  --spark-tertiary: #c4b5fd;
+  --border-accent: 34 211 238 / 0.28;
 }

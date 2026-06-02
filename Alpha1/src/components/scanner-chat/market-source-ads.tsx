@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import { MarketSourceLogo } from "@/components/market/market-source-logo";
 import type { MarketSourceBrand } from "@/lib/scan/specimen-market-view";
 import { cn } from "@/lib/cn";
 
@@ -64,6 +65,7 @@ function SourceAdCard({
   compact?: boolean;
 }) {
   const isEbay = /ebay/i.test(source.label);
+  const laneSuffix = source.lane === "sold" ? " sold" : " listed";
   return (
     <a
       href={source.url}
@@ -79,12 +81,7 @@ function SourceAdCard({
     >
       <div className={cn("p-2.5", compact && "p-2")}>
         <div className="flex items-start justify-between gap-2">
-          <span
-            className="text-[11px] font-bold text-white"
-            style={isEbay ? { color: "#ffb4b4" } : undefined}
-          >
-            {source.label}
-          </span>
+          <MarketSourceLogo label={`${source.label}${laneSuffix}`} />
           <ExternalLink className="h-3.5 w-3.5 shrink-0 text-white/50 group-hover:text-white/80" aria-hidden />
         </div>
         <p className="mt-1 text-[10px] leading-snug text-slate-300/90">{source.tagline}</p>

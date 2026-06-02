@@ -97,6 +97,15 @@ export function ChatMessageList({
   companion,
   onCatalogScanPrefill,
   onDismissMessage,
+  digitalScanOn,
+  digitalScanAssets,
+  digitalScanRendering,
+  digitalScanProgress,
+  digitalScanSessionTitle,
+  onDownloadDigitalScanZip,
+  onSaveDigitalScansToVault,
+  onDownloadSingleDigitalScan,
+  vaultSaving,
   className,
 }: {
   messages: ChatMessage[];
@@ -106,6 +115,15 @@ export function ChatMessageList({
   companion?: CompanionController;
   onCatalogScanPrefill?: (prefill: CatalogScanPrefill) => void;
   onDismissMessage?: (messageId: string) => void;
+  digitalScanOn?: boolean;
+  digitalScanAssets?: import("@/lib/digital-scan/types").DigitalScanAsset[];
+  digitalScanRendering?: boolean;
+  digitalScanProgress?: { done: number; total: number; currentLabel?: string } | null;
+  digitalScanSessionTitle?: string;
+  onDownloadDigitalScanZip?: (includeAttestation?: boolean) => void;
+  onSaveDigitalScansToVault?: () => void;
+  onDownloadSingleDigitalScan?: (asset: import("@/lib/digital-scan/types").DigitalScanAsset) => void;
+  vaultSaving?: boolean;
   className?: string;
 }) {
   const systemSteps = messages.filter((m): m is SystemChatMessage => m.role === "system");
@@ -130,6 +148,20 @@ export function ChatMessageList({
               onDismissOutput={
                 msg.output && onDismissMessage ? () => onDismissMessage(msg.id) : undefined
               }
+              onDismissHowTo={
+                msg.digitalScanHowTo && onDismissMessage
+                  ? () => onDismissMessage(msg.id)
+                  : undefined
+              }
+              digitalScanOn={digitalScanOn}
+              digitalScanAssets={digitalScanAssets}
+              digitalScanRendering={digitalScanRendering}
+              digitalScanProgress={digitalScanProgress}
+              digitalScanSessionTitle={digitalScanSessionTitle}
+              onDownloadDigitalScanZip={onDownloadDigitalScanZip}
+              onSaveDigitalScansToVault={onSaveDigitalScansToVault}
+              onDownloadSingleDigitalScan={onDownloadSingleDigitalScan}
+              vaultSaving={vaultSaving}
             />
           );
         }

@@ -62,6 +62,20 @@ function confidenceBlock(
   return hints ? formatConfidenceHintsForLlm(hints) : "";
 }
 
+function deskEnrichmentBlock(research: LiquidAskResearch | null | undefined): string {
+  if (!research) return "";
+  const parts: string[] = [];
+  if (research.marketPulse) {
+    parts.push(`Desk market pulse (use for Market read + Your move sections):\n${JSON.stringify(research.marketPulse)}`);
+  }
+  if (research.catalogCards.length > 0) {
+    parts.push(
+      `Master catalog visual refs (UI renders official card art — cite cards by exact name, do not use markdown images):\n${JSON.stringify(research.catalogCards.slice(0, 6))}`,
+    );
+  }
+  return parts.join("\n\n");
+}
+
 export function buildLiquidChatPayload({
   message,
   history,
@@ -98,6 +112,7 @@ export function buildLiquidChatPayload({
     const compact = buildNarrationLlmContext(focus);
     const digest = briefDigestForContext(focus);
     const confidence = confidenceBlock(research, contexts, focus);
+    const deskEnrichment = deskEnrichmentBlock(research);
     return {
       hasScanData: true,
       marketAsOf: focus.marketAsOf ?? null,
@@ -105,6 +120,7 @@ export function buildLiquidChatPayload({
       user: [
         recency ? `Recency:\n${recency}\n` : "",
         researchJson ? `Live research pack (${researchJson.length} chars, use for comps/certs/population):\n${researchJson}\n` : "",
+        deskEnrichment,
         confidence,
         `Desk brief (verified session synthesis):\n${JSON.stringify(digest)}`,
         `Focused card context:\n${JSON.stringify(compact)}`,
@@ -131,6 +147,7 @@ export function buildLiquidChatPayload({
     };
     const latestAsOf = contexts.map((c) => c.marketAsOf).filter(Boolean).sort().at(-1) ?? null;
     const confidence = confidenceBlock(research, contexts, null);
+    const deskEnrichment = deskEnrichmentBlock(research);
     return {
       hasScanData: true,
       marketAsOf: latestAsOf,
@@ -138,6 +155,7 @@ export function buildLiquidChatPayload({
       user: [
         recency ? `Recency:\n${recency}\n` : "",
         researchJson ? `Live research pack:\n${researchJson}\n` : "",
+        deskEnrichment,
         confidence,
         `Session totals:\n${JSON.stringify(totals)}`,
         `Session cards:\n${JSON.stringify(sessionCards)}`,
@@ -169,10 +187,11 @@ export function buildLiquidChatPayload({
   }
 
   const confidence = confidenceBlock(research, contexts, null);
+  const deskEnrichment = deskEnrichmentBlock(research);
   return {
     hasScanData: false,
     marketAsOf: null,
     system: buildLiquidVaultSystemPrompt("general"),
-    user: [researchBlock, confidence, `Conversation:\n${transcript}`].filter(Boolean).join("\n\n"),
+    user: [researchBlock, deskEnrichment, confidence, `Conversation:\n${transcript}`].filter(Boolean).join("\n\n"),
   };
 }

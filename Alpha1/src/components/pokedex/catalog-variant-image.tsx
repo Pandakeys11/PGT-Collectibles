@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { catalogImageSrc } from "@/lib/ui/catalog-image-url";
 import { cn } from "@/lib/cn";
 
 type Props = {
@@ -14,10 +15,12 @@ type Props = {
   missingLabel?: string;
   alt: string;
   className?: string;
+  priority?: boolean;
 };
 
 /**
  * Tries `preferredSrc` first when distinct, then falls back to `apiSrc`.
+ * Routes through `/api/img` for long-lived browser cache.
  */
 export function CatalogVariantImage({
   apiSrc,
@@ -26,17 +29,18 @@ export function CatalogVariantImage({
   missingLabel,
   alt,
   className,
+  priority = false,
 }: Props) {
   const preferred = preferredSrc?.trim();
   const api = apiSrc?.trim();
   const fallback = allowApiFallback ? api : undefined;
-  const initial = preferred || fallback;
+  const initial = catalogImageSrc(preferred || fallback);
   const [src, setSrc] = useState(initial);
   const [triedPreferred, setTriedPreferred] = useState(false);
 
   useEffect(() => {
     setTriedPreferred(false);
-    setSrc(preferred || fallback);
+    setSrc(catalogImageSrc(preferred || fallback));
   }, [preferred, fallback]);
 
   if (!src) {
@@ -58,19 +62,22 @@ export function CatalogVariantImage({
       src={src}
       alt={alt}
       className={cn(className)}
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
       decoding="async"
+      fetchPriority={priority ? "high" : "auto"}
       onError={() => {
-        if (preferred && !triedPreferred && src === preferred && fallback) {
+        const preferredResolved = catalogImageSrc(preferred);
+        const fallbackResolved = catalogImageSrc(fallback);
+        if (preferred && !triedPreferred && src === preferredResolved && fallbackResolved) {
           setTriedPreferred(true);
-          setSrc(fallback);
+          setSrc(fallbackResolved);
           return;
         }
-        if (preferred && src === preferred && !allowApiFallback) {
+        if (preferred && src === preferredResolved && !allowApiFallback) {
           setSrc("");
           return;
         }
-        if (api && src === api) {
+        if (api && src === catalogImageSrc(api)) {
           setSrc("");
         }
       }}

@@ -84,11 +84,17 @@ No guaranteed profits or price predictions. Discuss volatility, liquidity, senti
 
 export const MARKET_MASTER_RESPONSE_QUALITY = `# Response quality
 
-- Structured markdown: lead answer → evidence bullets → risks/next steps.
-- Mobile-friendly: short paragraphs, clear headers when comparing multiple cards.
-- Beginner-clear, expert-valuable.
-- UI shows comps/certs separately — interpret the research pack; do not dump every comp title.
-- End with a **Confidence** section (see format rules) when answering card-specific questions.`;
+- Structured markdown with these sections when answering card/market questions (use ## headers):
+  - **## Snapshot** — one bold lead sentence; name the card, edition, and grade bucket.
+  - **## Market read** — sold vs ask spread, liquidity, room temperature (bullish / neutral / bearish / thin).
+  - **## Recent solds** — 2–4 bullets from **SOLD** comps only; include $ and source type.
+  - **## Live listings** — 1–3 bullets from **ACTIVE** rows only; label as asks, never FMV.
+  - **## Your move** — clear stance: **Buy** · **Hold** · **Sell** · **Acquire more** · **Wait** — with 2–3 evidence-backed reasons.
+  - **## Collection angle** — one short paragraph on maximizing collection value (grade upgrade path, consolidate duplicates, JP vs EN, timing, liquidity).
+  - **## Confidence** — identity / market / grading / overall (see format rules).
+- When \`catalogCards\` are in the research pack, reference cards by exact **name**; the UI renders master catalog art automatically — do not invent image URLs.
+- Mobile-friendly: short paragraphs, scannable bullets; UI shows comps/certs separately — interpret the research pack, do not dump every comp title.
+- Be sharp and practical — write like a trusted show dealer advising a collector, not generic AI filler.`;
 
 export const MARKET_MASTER_CONFIDENCE_FORMAT = `# Confidence disclosure (required for card-specific answers)
 
@@ -143,8 +149,9 @@ export function buildMarketMasterWebBriefRules(): string {
     `3. Use ranges and "reported as of ${NARRATION_TODAY_ISO}" for prices; cite source types.`,
     `4. Separate 1st Edition / Shadowless / Unlimited for vintage Pokémon.`,
     `5. Label each price as sold vs asking vs reference.`,
-    `6. End with one-line disclaimer: web-sourced indicative intel — verify before transacting.`,
-    `Format: markdown — bold lead, 3–6 evidence bullets, optional "Also consider".`,
+    `6. Include sections: **Market read**, **Recent solds**, **Live listings**, **Your move** (Buy/Hold/Sell/Acquire/Wait), **Collection angle** (maximize value).`,
+    `7. End with one-line disclaimer: web-sourced indicative intel — verify before transacting.`,
+    `Format: markdown — bold Snapshot lead, scannable bullets, practical collector voice.`,
   ].join("\n");
 }
 

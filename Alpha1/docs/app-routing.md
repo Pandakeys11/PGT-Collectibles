@@ -11,7 +11,7 @@ PGT’s primary app shell is **PGT Liquid Scan** at `/liquid-scan`. The legacy c
 | `/liquid-scan?panel=catalog` | Master catalog embedded in Liquid Scan |
 | `/liquid-scan?panel=companion` | Companion panel |
 | `/sign-in`, `/sign-up` | Clerk auth (redirect → `/liquid-scan`) |
-| `/saved`, `/profile`, `/usage` | Account & saved cards |
+| `/saved`, `/scan-vault`, `/profile`, `/usage` | Account, digital scans & saved cards |
 
 ## Legacy redirects
 

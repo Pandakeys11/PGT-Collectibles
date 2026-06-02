@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, FileImage, Maximize2, Crop } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, FileImage, Maximize2, Crop } from "lucide-react";
 import { MarketEvidenceTable } from "@/components/scan-panels/market-evidence-table";
 import { MarketSourceHub } from "@/components/scan-panels/market-source-hub";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import type { ExtractedCard } from "@/lib/scan/schemas";
 import { formatGradedSlabTag, formatSlabLabelLine } from "@/lib/scan/graded-slab";
 import { getCardDisplayTitle, getCardImageAlt } from "@/lib/scan/card-display";
 import { cn } from "@/lib/cn";
+import type { DigitalScanAsset } from "@/lib/digital-scan/types";
 import { buildPrintIdentitySnapshot } from "@/lib/scan/print-identity-ui";
 import { formatAskingPriceCompact } from "@/lib/scan/specimen-present";
 import {
@@ -160,6 +161,8 @@ export function EvidenceRail({
   onCommitEdit,
   onRescan,
   variant = "full",
+  digitalScanAsset = null,
+  onDownloadDigitalScan,
 }: {
   specimen: ScanSpecimen | null;
   onRequestAdjustCrop?: () => void;
@@ -172,6 +175,8 @@ export function EvidenceRail({
   onRescan?: () => void;
   /** Liquid Scan: crop + identity hero only (market blocks live in SpecimenMarketHub). */
   variant?: "full" | "liquid";
+  digitalScanAsset?: DigitalScanAsset | null;
+  onDownloadDigitalScan?: () => void;
 }) {
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
@@ -243,6 +248,12 @@ export function EvidenceRail({
     maxOutputSide: 640,
     enabled: Boolean(specimen?.previewUrl),
   });
+
+  const digitalScanReady =
+    digitalScanAsset &&
+    (digitalScanAsset.status === "ready" || digitalScanAsset.status === "user_adjusted") &&
+    digitalScanAsset.dataUrl;
+  const previewDisplaySrc = digitalScanReady ? digitalScanAsset!.dataUrl : displaySrc;
 
   const closeZoom = useCallback(() => {
     zoomSession.current += 1;
@@ -328,7 +339,7 @@ export function EvidenceRail({
           "ring-1 ring-white/10",
           cropBlockCompact ? "rounded-lg" : "rounded-xl",
         )}
-        src={displaySrc}
+        src={previewDisplaySrc}
         alt={getCardImageAlt(specimen.card)}
         graded={specimen.context.lane === "graded"}
         busy={cropping}
@@ -352,6 +363,17 @@ export function EvidenceRail({
             <FileImage className="h-2.5 w-2.5" aria-hidden />
             Full
           </button>
+          {digitalScanReady && onDownloadDigitalScan ? (
+            <button
+              type="button"
+              onClick={onDownloadDigitalScan}
+              className="flex h-7 items-center gap-0.5 rounded-md border border-violet-400/30 bg-violet-500/40 px-1.5 text-[9px] font-medium text-white backdrop-blur-sm touch-manipulation"
+              title="Download scanner-grade digital scan"
+            >
+              <Download className="h-2.5 w-2.5" aria-hidden />
+              Scan
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -481,7 +503,7 @@ export function EvidenceRail({
       <div className="relative mx-auto mt-4 w-full max-w-[min(100%,13.5rem)] sm:max-w-[15rem]">
         <SpecimenFrame
           className="rounded-2xl ring-1 ring-white/5"
-          src={displaySrc}
+          src={previewDisplaySrc}
           alt={getCardImageAlt(specimen.card)}
           graded={specimen.context.lane === "graded"}
           busy={cropping}

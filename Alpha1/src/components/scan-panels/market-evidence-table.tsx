@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
+import { MarketSourceLogo } from "@/components/market/market-source-logo";
+import { normalizeMarketSource } from "@/lib/market/sources";
 import { cn } from "@/lib/cn";
 import { evidenceRowKey } from "@/lib/scan/comps-analytics";
 import {
@@ -125,7 +127,17 @@ export function MarketEvidenceTable({
               </td>
               <td className="min-w-0 break-words px-2 py-2 font-mono text-primary tabular-nums">{formatUsd(item.priceUsd)}</td>
               <td className="min-w-0 break-words px-2 py-2 text-muted">{formatDate(item.observedAt)}</td>
-              <td className="min-w-0 break-words px-2 py-2 text-muted">{item.source ?? "—"}</td>
+              <td className="min-w-0 break-words px-2 py-2">
+                {item.source ? (
+                  <MarketSourceLogo
+                    label={item.source}
+                    sourceId={normalizeMarketSource(item.source)}
+                    variant="compact"
+                  />
+                ) : (
+                  <span className="text-muted">—</span>
+                )}
+              </td>
               <td className="min-w-0 break-words px-2 py-2 text-primary">
                 {href ? (
                   <a

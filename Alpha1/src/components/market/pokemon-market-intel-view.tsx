@@ -13,6 +13,8 @@ import {
 import { ScanThisCardButton } from "@/components/pokedex/scan-this-card-button";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { MarketSourceLogo } from "@/components/market/market-source-logo";
+import { normalizeMarketSource } from "@/lib/market/sources";
 import { liquidScanHref, marketPokemonHref } from "@/lib/app-routes";
 import type { FairValueBasis } from "@/lib/market/fair-value";
 import {
@@ -373,9 +375,19 @@ export function PokemonMarketIntelView({
                     ) : null}
                   </div>
                   <p className="mt-0.5 line-clamp-2 text-xs text-primary">{row.title}</p>
-                  <p className="mt-0.5 text-[10px] text-muted">
-                    {row.source ?? "source n/a"} · {formatObserved(row.observedAt)}
-                  </p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted">
+                    {row.source ? (
+                      <MarketSourceLogo
+                        label={row.source}
+                        sourceId={normalizeMarketSource(row.source)}
+                        variant="compact"
+                      />
+                    ) : (
+                      <span>source n/a</span>
+                    )}
+                    <span>·</span>
+                    <span>{formatObserved(row.observedAt)}</span>
+                  </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="font-mono text-sm text-accent">{fmtUsd(row.priceUsd)}</p>

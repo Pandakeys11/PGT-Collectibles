@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useCatalogAmbientOptional } from "@/components/effects/catalog-ambient-provider";
+import { catalogImageSrc } from "@/lib/ui/catalog-image-url";
 import { cn } from "@/lib/cn";
 
 export type CatalogSetTileModel = {
@@ -61,13 +62,14 @@ function SetLogoMark({
     <div className={frame}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={logoUrl}
+        src={catalogImageSrc(logoUrl) ?? logoUrl}
         alt=""
         className={cn(
           "object-contain object-center drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]",
           density === "browse" ? "max-h-[78%] max-w-[88%]" : "max-h-full max-w-[82%]",
         )}
         loading="lazy"
+        decoding="async"
         onError={() => setFailed(true)}
       />
     </div>

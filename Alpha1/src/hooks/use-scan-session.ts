@@ -27,7 +27,6 @@ import {
   pickPrimaryVisionCardFromCrop,
   type VisionGridLocation,
 } from "@/lib/scan/spatial";
-import { inferCardFranchise } from "@/lib/scan/franchise";
 import { classifyCardLane } from "@/lib/scan/lane";
 import {
   CARD_EVIDENCE_VISION_RADIUS_MULTIPLIER,
@@ -83,6 +82,11 @@ import {
   scanModeUsesBinderUploadPrep,
   scanModeUsesSingleCardCrop,
 } from "@/lib/scanner-chat/scan-mode-config";
+import {
+  refreshDigitalScanSidecars,
+  renderDigitalScansForSession,
+} from "@/lib/digital-scan/render-session-scans";
+import type { DigitalScanAsset, DigitalScanProgress } from "@/lib/digital-scan/types";
 
 export type ScanLaneMode = "all" | "raw" | "graded";
 
@@ -182,13 +186,31 @@ function buildContextForUserCatalogSelection(
   });
 }
 
-export function useScanSession(options?: { speedOn?: boolean; scanMode?: ScanMode }) {
+export function useScanSession(options?: {
+  speedOn?: boolean;
+  scanMode?: ScanMode;
+  digitalScanOn?: boolean;
+  isPro?: boolean;
+  loadedSessionId?: string | null;
+}) {
   const { userId } = useAuth();
   const speedOnRef = useRef(options?.speedOn ?? false);
   speedOnRef.current = options?.speedOn ?? false;
   const scanModeRef = useRef<ScanMode>(options?.scanMode ?? "binder");
   scanModeRef.current = options?.scanMode ?? "binder";
+  const digitalScanOnRef = useRef(options?.digitalScanOn ?? false);
+  digitalScanOnRef.current = options?.digitalScanOn ?? false;
+  const isProRef = useRef(options?.isPro ?? false);
+  isProRef.current = options?.isPro ?? false;
+  const loadedSessionIdRef = useRef(options?.loadedSessionId ?? null);
+  loadedSessionIdRef.current = options?.loadedSessionId ?? null;
   const [laneMode, setLaneMode] = useState<ScanLaneMode>("all");
+  const [digitalScanAssets, setDigitalScanAssets] = useState<Record<string, DigitalScanAsset>>({});
+  const [digitalScanProgress, setDigitalScanProgress] = useState<DigitalScanProgress | null>(
+    null,
+  );
+  const [digitalScanRendering, setDigitalScanRendering] = useState(false);
+  const digitalScanRunRef = useRef(0);
   const [slots, setSlots] = useState<ScanImageSlot[]>([]);
   const [specimens, setSpecimens] = useState<ScanSpecimen[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -630,6 +652,65 @@ export function useScanSession(options?: { speedOn?: boolean; scanMode?: ScanMod
     [reEnrichAfterPrecision],
   );
 
+  const runDigitalScanBatch = useCallback(
+    async (items: ScanSpecimen[], onlySpecimenIds?: Set<string>) => {
+      if (!digitalScanOnRef.current || items.length === 0) return;
+      const runId = ++digitalScanRunRef.current;
+      setDigitalScanRendering(true);
+      setDigitalScanProgress({ done: 0, total: onlySpecimenIds ? onlySpecimenIds.size : items.length });
+      try {
+        const assets = await renderDigitalScansForSession({
+          specimens: items,
+          isPro: isProRef.current,
+          sessionId: loadedSessionIdRef.current,
+          onProgress: (p) => {
+            if (digitalScanRunRef.current !== runId) return;
+            setDigitalScanProgress(p);
+          },
+          onlySpecimenIds,
+        });
+        if (digitalScanRunRef.current !== runId) return;
+        setDigitalScanAssets((prev) => ({
+          ...(onlySpecimenIds ? prev : {}),
+          ...assets,
+        }));
+      } finally {
+        if (digitalScanRunRef.current === runId) {
+          setDigitalScanRendering(false);
+          setDigitalScanProgress(null);
+        }
+      }
+    },
+    [],
+  );
+
+  const reRenderDigitalScanForSpecimen = useCallback(
+    async (specimenId: string) => {
+      if (!digitalScanOnRef.current) return;
+      const item = specimensRef.current.find((s) => s.id === specimenId);
+      if (!item) return;
+      await runDigitalScanBatch([item], new Set([specimenId]));
+    },
+    [runDigitalScanBatch],
+  );
+
+  const sidecarMarketKey = useMemo(
+    () =>
+      specimens
+        .map((s) => `${s.id}:${s.context.fairValueUsd}:${s.context.catalogId}`)
+        .join("|"),
+    [specimens],
+  );
+
+  useEffect(() => {
+    if (!digitalScanOnRef.current) return;
+    setDigitalScanAssets((prev) => {
+      if (Object.keys(prev).length === 0) return prev;
+      return refreshDigitalScanSidecars(prev, specimens, loadedSessionIdRef.current);
+    });
+    // sidecarMarketKey tracks FMV/catalog fields; specimens needed for refresh payload.
+  }, [sidecarMarketKey, specimens]);
+
   const runScan = useCallback(async () => {
     if (scanLockRef.current || marketEnrichingRef.current) return;
     if (slots.length === 0) {
@@ -645,6 +726,10 @@ export function useScanSession(options?: { speedOn?: boolean; scanMode?: ScanMod
     setScanLimit(null);
     setSpecimens([]);
     setSelectedId(null);
+    setDigitalScanAssets({});
+    setDigitalScanProgress(null);
+    setDigitalScanRendering(false);
+    digitalScanRunRef.current += 1;
     const mode = scanModeRef.current;
     const binderGridScan = scanModeUsesBinderGrid(mode, slots.length, laneMode);
     const singleCardCrop = scanModeUsesSingleCardCrop(mode, slots.length, laneMode);
@@ -735,10 +820,15 @@ export function useScanSession(options?: { speedOn?: boolean; scanMode?: ScanMod
       setSelectedId(nextSpecimens[0]?.id ?? null);
       if (laneNotice) setError(laneNotice);
 
+      const digitalScanPromise = digitalScanOnRef.current
+        ? runDigitalScanBatch(nextSpecimens)
+        : null;
+
       // Vision finished — sheet can show extracted rows while catalog/market run.
       setScanning(false);
       setProgress("Extraction complete — matching catalog…");
       await enrichSpecimens(nextSpecimens);
+      if (digitalScanPromise) await digitalScanPromise;
       const precisionMax = precisionCropMaxForCardCount(
         nextSpecimens.length,
         speedProfile,
@@ -773,6 +863,7 @@ export function useScanSession(options?: { speedOn?: boolean; scanMode?: ScanMod
     enrichSpecimens,
     laneMode,
     runBackgroundPrecisionCrop,
+    runDigitalScanBatch,
     slots,
   ]);
 
@@ -1033,10 +1124,13 @@ export function useScanSession(options?: { speedOn?: boolean; scanMode?: ScanMod
         if (!stale()) {
           setRescanningId(null);
           setProgress(null);
+          if (digitalScanOnRef.current) {
+            void reRenderDigitalScanForSpecimen(id);
+          }
         }
       }
     },
-    [cancelEnrichForSpecimen, scanning],
+    [cancelEnrichForSpecimen, reRenderDigitalScanForSpecimen, scanning],
   );
 
   const runManualEnrich = useCallback(async (id: string) => {
@@ -1402,9 +1496,13 @@ export function useScanSession(options?: { speedOn?: boolean; scanMode?: ScanMod
 
   const clearSession = useCallback(() => {
     cancelPendingEnrich();
+    digitalScanRunRef.current += 1;
     setSlots([]);
     setSpecimens([]);
     setSelectedId(null);
+    setDigitalScanAssets({});
+    setDigitalScanProgress(null);
+    setDigitalScanRendering(false);
     setError(null);
     setProgress(null);
     setEnriching(false);
@@ -1570,5 +1668,10 @@ export function useScanSession(options?: { speedOn?: boolean; scanMode?: ScanMod
     hydrateSavedSession,
     ingestCatalogPrefill,
     ingestLiveCameraScan,
+    digitalScanAssets,
+    digitalScanProgress,
+    digitalScanRendering,
+    reRenderDigitalScanForSpecimen,
+    setDigitalScanAssets,
   };
 }

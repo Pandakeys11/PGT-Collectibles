@@ -11,6 +11,7 @@
 @import "../styles/catalog-ambient.css";
 @import "../styles/neo-energy.css";
 @import "../styles/pgt-music.css";
+@import "../styles/catalog-binder.css";
 
 @layer base {
   * {
@@ -46,29 +47,29 @@
     background-color: rgb(var(--bg-canvas));
     background-image:
       radial-gradient(
-        ellipse 130% 90% at -8% -15%,
-        rgb(var(--holo-a) / 0.22),
-        transparent 52%
-      ),
-      radial-gradient(
-        ellipse 95% 75% at 108% 5%,
-        rgb(var(--holo-b) / 0.18),
-        transparent 48%
-      ),
-      radial-gradient(
-        ellipse 85% 65% at 42% 108%,
-        rgb(var(--holo-c) / 0.14),
-        transparent 55%
-      ),
-      radial-gradient(
-        ellipse 70% 55% at 72% 38%,
-        rgb(var(--gradient-bloom) / 0.2),
+        ellipse 120% 85% at -5% -12%,
+        rgb(var(--brand-cyan-dim) / 0.2),
         transparent 50%
       ),
+      radial-gradient(
+        ellipse 90% 70% at 105% 0%,
+        rgb(var(--brand-gold) / 0.12),
+        transparent 46%
+      ),
+      radial-gradient(
+        ellipse 80% 60% at 48% 108%,
+        rgb(var(--brand-violet) / 0.14),
+        transparent 54%
+      ),
+      radial-gradient(
+        ellipse 65% 50% at 70% 36%,
+        rgb(var(--gradient-bloom) / 0.18),
+        transparent 48%
+      ),
       linear-gradient(
-        168deg,
+        165deg,
         rgb(var(--bg-canvas)) 0%,
-        rgb(var(--gradient-mid)) 42%,
+        rgb(var(--gradient-mid)) 40%,
         rgb(var(--bg-gradient-end)) 100%
       );
     background-attachment: fixed;
@@ -101,6 +102,18 @@
 }
 
 @layer utilities {
+  .bg-chrome {
+    background-color: rgb(var(--bg-panel) / 0.94);
+  }
+
+  .bg-chrome-deep {
+    background-color: rgb(var(--bg-canvas) / 0.96);
+  }
+
+  .border-chrome {
+    border-color: rgb(var(--border-subtle));
+  }
+
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
@@ -139,16 +152,16 @@
     background:
       linear-gradient(
         145deg,
-        rgb(var(--surface-tint) / 0.1) 0%,
-        transparent 38%,
-        rgb(var(--surface-tint-2) / 0.08) 100%
+        rgb(var(--brand-cyan) / 0.08) 0%,
+        transparent 40%,
+        rgb(var(--brand-gold) / 0.06) 100%
       ),
       rgb(var(--bg-panel) / 0.92);
     border-color: rgb(var(--border-accent));
     box-shadow:
       var(--shadow-panel),
       inset 0 1px 0 rgb(var(--panel-shine)),
-      0 0 48px -16px rgb(var(--holo-a) / 0.2);
+      0 0 48px -16px rgb(var(--brand-cyan) / 0.15);
   }
 
   .gradient-border {
@@ -183,15 +196,16 @@
   }
 
   .btn-gradient {
+    color: rgb(var(--text-inverse));
     background: linear-gradient(
       135deg,
-      rgb(var(--accent)) 0%,
-      rgb(var(--accent-strong)) 45%,
-      rgb(var(--accent-tertiary)) 100%
+      rgb(var(--brand-cyan)) 0%,
+      rgb(var(--brand-cyan-bright)) 42%,
+      rgb(var(--brand-violet)) 100%
     );
     box-shadow:
-      0 1px 0 rgb(255 255 255 / 0.12) inset,
-      0 12px 32px -8px rgb(var(--accent) / 0.45);
+      0 1px 0 rgb(255 255 255 / 0.14) inset,
+      var(--shadow-glow-cyan);
   }
 
   .btn-gradient:hover {

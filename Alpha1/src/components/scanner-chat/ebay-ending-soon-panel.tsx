@@ -159,7 +159,7 @@ export function EbayEndingSoonPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-2.5 scanner-chat-scrollbar sm:p-3">
+      <div className="sc-ebay-ending-panel__scroll min-h-0 flex-1 overflow-y-auto p-2.5 scanner-chat-scrollbar sm:p-3">
         {feed.loading && listings.length === 0 ? (
           <div className="flex min-h-[12rem] items-center justify-center gap-2 text-sm text-muted">
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden />

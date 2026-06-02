@@ -20,6 +20,7 @@ import type { LiveMarketTickerLaneId } from "@/lib/market/live-market-ticker-typ
 import { LIVE_MARKET_TICKER_PANEL_LANE_ORDER } from "@/lib/market/live-market-ticker-types";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
 import { WeeklyMoversStrip } from "@/components/market/weekly-movers-strip";
+import { MarketCardThumb } from "@/components/ui/market-card-thumb";
 import { cn } from "@/lib/cn";
 
 function fmtUsd(n: number | null | undefined): string {
@@ -169,12 +170,11 @@ export function LiveMarketTickerPanel({
             <div className="mx-auto w-[min(42%,7.5rem)] shrink-0 sm:mx-0 sm:w-[6.75rem]">
               <div className="aspect-[2.5/3.5] overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/10">
                 {slide.imageUrl && !imgFailed ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <MarketCardThumb
                     key={slide.catalogId}
                     src={slide.imageUrl}
-                    alt=""
-                    className="h-full w-full object-contain p-1"
+                    className="p-1"
+                    priority
                     onError={() => setImgFailed(true)}
                   />
                 ) : (

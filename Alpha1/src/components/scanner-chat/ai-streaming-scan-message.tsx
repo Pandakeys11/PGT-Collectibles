@@ -17,10 +17,12 @@ import { LiquidChatOutputPanel } from "./liquid-chat-output";
 import { LiquidAskMarkdown } from "./liquid-ask-markdown";
 import { ScanSummaryInline } from "./scan-summary-panel";
 import { ScanResultsSheet } from "./scan-results-sheet";
-import {
-  ScanResultsViewToggle,
+import { ScanResultsViewToggle,
   type ScanResultsView,
 } from "./scan-results-view-toggle";
+import { DigitalScanHowToPanel } from "./digital-scan-how-to-panel";
+import { DigitalScanResultsStrip } from "./digital-scan-results-strip";
+import type { DigitalScanAsset } from "@/lib/digital-scan/types";
 import type { CardInteractionHandlers } from "./chat-message";
 import { cn } from "@/lib/cn";
 
@@ -32,6 +34,16 @@ export function AIStreamingScanMessage({
   companion,
   onCatalogScanPrefill,
   onDismissOutput,
+  digitalScanOn,
+  digitalScanAssets,
+  digitalScanRendering,
+  digitalScanProgress,
+  digitalScanSessionTitle,
+  onDownloadDigitalScanZip,
+  onSaveDigitalScansToVault,
+  onDownloadSingleDigitalScan,
+  vaultSaving,
+  onDismissHowTo,
 }: {
   message: AssistantChatMessage;
   specimens?: ScanSpecimen[];
@@ -40,6 +52,16 @@ export function AIStreamingScanMessage({
   companion?: CompanionController;
   onCatalogScanPrefill?: (prefill: CatalogScanPrefill) => void;
   onDismissOutput?: () => void;
+  digitalScanOn?: boolean;
+  digitalScanAssets?: DigitalScanAsset[];
+  digitalScanRendering?: boolean;
+  digitalScanProgress?: { done: number; total: number; currentLabel?: string } | null;
+  digitalScanSessionTitle?: string;
+  onDownloadDigitalScanZip?: (includeAttestation?: boolean) => void;
+  onSaveDigitalScansToVault?: () => void;
+  onDownloadSingleDigitalScan?: (asset: DigitalScanAsset) => void;
+  vaultSaving?: boolean;
+  onDismissHowTo?: () => void;
 }) {
   const [resultsView, setResultsView] = useState<ScanResultsView>("cards");
 
@@ -73,7 +95,8 @@ export function AIStreamingScanMessage({
     message.output?.kind === "companion" ||
     message.output?.kind === "calculator" ||
     message.output?.kind === "live-market" ||
-    message.output?.kind === "ebay-ending";
+    message.output?.kind === "ebay-ending" ||
+    message.output?.kind === "pgt-youtube";
 
   const calculatorFmv =
     sessionSummary?.estimatedTotal ??
@@ -85,6 +108,12 @@ export function AIStreamingScanMessage({
     liveSummary?.totalDetected ??
     message.summary?.totalDetected ??
     specimens.length;
+
+  const showDigitalScanStrip =
+    digitalScanOn &&
+    !message.digitalScanHowTo &&
+    (message.id === "pending-result" || Boolean(message.cards?.length)) &&
+    Boolean(digitalScanAssets?.length || digitalScanRendering);
 
   return (
     <motion.article
@@ -127,6 +156,26 @@ export function AIStreamingScanMessage({
           <div className="rounded-xl rounded-tl-md border border-white/6 sc-glass-raised px-2.5 py-2 text-xs leading-relaxed sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
             <LiquidAskMarkdown text={message.text} />
           </div>
+        ) : null}
+
+        {message.digitalScanHowTo ? (
+          <DigitalScanHowToPanel
+            markdown={message.text}
+            onDismiss={onDismissHowTo}
+          />
+        ) : null}
+
+        {showDigitalScanStrip ? (
+          <DigitalScanResultsStrip
+            assets={digitalScanAssets ?? []}
+            rendering={digitalScanRendering}
+            progress={digitalScanProgress ?? null}
+            sessionTitle={digitalScanSessionTitle ?? ""}
+            onDownloadZip={(attest) => onDownloadDigitalScanZip?.(attest)}
+            onSaveToVault={onSaveDigitalScansToVault}
+            onDownloadOne={(asset) => onDownloadSingleDigitalScan?.(asset)}
+            savingVault={vaultSaving}
+          />
         ) : null}
 
         {isLiveScan && showResults ? (
@@ -195,12 +244,10 @@ export function AIStreamingScanMessage({
               onCatalogScanPrefill={onCatalogScanPrefill}
               onDismiss={onDismissOutput}
             />
-          ) : message.output.kind === "catalog" && onCatalogScanPrefill ? (
-            <LiquidChatOutputPanel
-              kind="catalog"
-              onCatalogScanPrefill={onCatalogScanPrefill}
-              onDismiss={onDismissOutput}
-            />
+          ) : message.output.kind === "catalog" ? (
+            <p className="text-[11px] text-slate-500">
+              Master catalog is open in the panel below.
+            </p>
           ) : message.output.kind === "calculator" ? (
             <LiquidChatOutputPanel
               kind="calculator"
@@ -216,6 +263,8 @@ export function AIStreamingScanMessage({
             />
           ) : message.output.kind === "ebay-ending" ? (
             <LiquidChatOutputPanel kind="ebay-ending" onDismiss={onDismissOutput} />
+          ) : message.output.kind === "pgt-youtube" ? (
+            <LiquidChatOutputPanel kind="pgt-youtube" onDismiss={onDismissOutput} />
           ) : null
         ) : null}
       </div>

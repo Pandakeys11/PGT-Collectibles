@@ -39,6 +39,10 @@ import type {
 } from "@/lib/catalog/catalog-types";
 import { releaseYearFromDate } from "@/lib/catalog/catalog-types";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import { fetchCatalogJson, readCatalogCache } from "@/lib/catalog/catalog-fetch-cache";
+import { prefetchImageUrls } from "@/lib/ui/image-prefetch";
+import { prefetchAdjacentCatalogPages } from "@/lib/catalog/prefetch-catalog-page";
+import { CatalogCardImage } from "@/components/ui/catalog-card-image";
 import { cn } from "@/lib/cn";
 
 const PAGE_SIZE = 48;
@@ -107,28 +111,33 @@ export function GenericCatalogBrowser({
 
   useEffect(() => {
     let cancelled = false;
-    setSetsLoading(true);
-    setSetsError(null);
     const q = new URLSearchParams({
       franchise,
       page: String(setsPage),
       pageSize: "40",
     });
     if (debouncedSetQ) q.set("q", debouncedSetQ);
+    const url = `/api/catalog/sets?${q}`;
+    const cached = readCatalogCache<CatalogPaginated<CatalogSetSummary>>(url);
+    if (cached) {
+      setSets(cached.data);
+      setSetsMeta({ totalCount: cached.totalCount, pageSize: cached.pageSize });
+      setSetsLoading(false);
+    } else {
+      setSetsLoading(true);
+    }
+    setSetsError(null);
 
-    void fetch(`/api/catalog/sets?${q}`)
-      .then(async (r) => {
-        const body = (await r.json()) as CatalogPaginated<CatalogSetSummary> & { error?: string };
-        if (!r.ok) throw new Error(body.error ?? "Failed to load sets");
-        return body;
-      })
+    void fetchCatalogJson<CatalogPaginated<CatalogSetSummary>>(url)
       .then((data) => {
         if (cancelled) return;
         setSets(data.data);
         setSetsMeta({ totalCount: data.totalCount, pageSize: data.pageSize });
       })
       .catch((e) => {
-        if (!cancelled) setSetsError(e instanceof Error ? e.message : "Failed to load sets");
+        if (!cancelled && !cached) {
+          setSetsError(e instanceof Error ? e.message : "Failed to load sets");
+        }
       })
       .finally(() => {
         if (!cancelled) setSetsLoading(false);
@@ -146,8 +155,6 @@ export function GenericCatalogBrowser({
   useEffect(() => {
     if (!selectedSet) return;
     let cancelled = false;
-    setCardsLoading(true);
-    setCardsError(null);
     const q = new URLSearchParams({
       franchise,
       setId: selectedSet.id,
@@ -155,20 +162,27 @@ export function GenericCatalogBrowser({
       pageSize: String(PAGE_SIZE),
     });
     if (debouncedCardQ) q.set("q", debouncedCardQ);
+    const url = `/api/catalog/cards?${q}`;
+    const cached = readCatalogCache<CatalogPaginated<CatalogCardSummary>>(url);
+    if (cached) {
+      setCards(cached.data);
+      setCardsMeta({ totalCount: cached.totalCount, pageSize: cached.pageSize });
+      setCardsLoading(false);
+    } else {
+      setCardsLoading(true);
+    }
+    setCardsError(null);
 
-    void fetch(`/api/catalog/cards?${q}`)
-      .then(async (r) => {
-        const body = (await r.json()) as CatalogPaginated<CatalogCardSummary> & { error?: string };
-        if (!r.ok) throw new Error(body.error ?? "Failed to load cards");
-        return body;
-      })
+    void fetchCatalogJson<CatalogPaginated<CatalogCardSummary>>(url)
       .then((data) => {
         if (cancelled) return;
         setCards(data.data);
         setCardsMeta({ totalCount: data.totalCount, pageSize: data.pageSize });
       })
       .catch((e) => {
-        if (!cancelled) setCardsError(e instanceof Error ? e.message : "Failed to load cards");
+        if (!cancelled && !cached) {
+          setCardsError(e instanceof Error ? e.message : "Failed to load cards");
+        }
       })
       .finally(() => {
         if (!cancelled) setCardsLoading(false);
@@ -177,6 +191,45 @@ export function GenericCatalogBrowser({
       cancelled = true;
     };
   }, [franchise, selectedSet, cardsPage, debouncedCardQ]);
+
+  useEffect(() => {
+    prefetchImageUrls(
+      cards.map((c) => c.images?.small ?? c.images?.large),
+      96,
+    );
+  }, [cards]);
+
+  useEffect(() => {
+    prefetchImageUrls(
+      sets.map((s) => s.images?.logo),
+      48,
+    );
+  }, [sets]);
+
+  const cardsTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(cardsMeta.totalCount / cardsMeta.pageSize)),
+    [cardsMeta.totalCount, cardsMeta.pageSize],
+  );
+
+  const buildCardsPageUrl = useCallback(
+    (page: number) => {
+      if (!selectedSet) return null;
+      const q = new URLSearchParams({
+        franchise,
+        setId: selectedSet.id,
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+      });
+      if (debouncedCardQ) q.set("q", debouncedCardQ);
+      return `/api/catalog/cards?${q}`;
+    },
+    [franchise, selectedSet, debouncedCardQ],
+  );
+
+  useEffect(() => {
+    if (!selectedSet || cardsLoading) return;
+    prefetchAdjacentCatalogPages(buildCardsPageUrl, cardsPage, cardsTotalPages);
+  }, [selectedSet, cardsLoading, cardsPage, cardsTotalPages, buildCardsPageUrl]);
 
   const syncHint = useMemo(() => {
     if (meta.cardCountEstimate && meta.cardCountEstimate > 0) {
@@ -336,7 +389,7 @@ export function GenericCatalogBrowser({
                   mobileStepped ? CATALOG_CARD_GRID_MOBILE_STEP : CATALOG_CARD_GRID_4X4
                 }
                 getKey={(c) => c.id}
-                renderItem={(card, { focused }) => (
+                renderItem={(card, { index, focused }) => (
                   <button
                     type="button"
                     onClick={() => setDetail(card)}
@@ -352,15 +405,10 @@ export function GenericCatalogBrowser({
                   >
                     <div className={cn(CATALOG_CARD_ART_FRAME, "bg-black/40")}>
                       {card.images?.small ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <CatalogCardImage
                           src={card.images.small}
-                          alt=""
-                          className={cn(
-                            "h-full w-full object-contain",
-                            CATALOG_CARD_IMAGE_PAD,
-                          )}
-                          loading="lazy"
+                          priority={index < 12}
+                          className={CATALOG_CARD_IMAGE_PAD}
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center text-[9px] text-faint">
@@ -376,6 +424,8 @@ export function GenericCatalogBrowser({
                           name={card.name}
                           number={card.number}
                           setName={card.set?.name}
+                          rawFmvUsd={card.rawFmvUsd}
+                          rawFmvSourceLabel={card.rawFmvSourceLabel}
                         />
                       ) : null}
                     </div>
@@ -423,13 +473,7 @@ export function GenericCatalogBrowser({
         onClose={() => setDetail(null)}
         onBack={() => setDetail(null)}
         title={detail?.name ?? "Card"}
-        subtitle={
-          detail
-            ? [detail.set?.name ?? selectedSet?.name, detail.number, detail.rarity]
-                .filter(Boolean)
-                .join(" · ")
-            : null
-        }
+        subtitle={null}
         footer={
           detail ? (
             <CatalogCardDetailActions>
@@ -471,7 +515,7 @@ export function GenericCatalogBrowser({
                   <img
                     src={detail.images.large ?? detail.images.small}
                     alt={detail.name}
-                    className="h-full w-full object-contain p-0.5"
+                    className="h-full w-full object-contain"
                   />
                 ) : undefined,
               extraRows: [

@@ -26,7 +26,9 @@ function buildUserPrompt(message: string, todayUtc: string): string {
 User question:
 ${message.trim()}
 
-Produce a direct, web-grounded answer. If the question is about the highest-value card in a set (e.g. Pokémon Base Set), name the top card(s) by edition (1st Ed vs Unlimited), typical grade buckets (PSA 10 vs raw), and approximate recent sale ranges with source cues. Label each price as SOLD, ACTIVE (ask), or REFERENCE.`;
+Produce a direct, web-grounded answer. If the question is about the highest-value card in a set (e.g. Pokémon Base Set), name the top card(s) by edition (1st Ed vs Unlimited), typical grade buckets (PSA 10 vs raw), and approximate recent sale ranges with source cues. Label each price as SOLD, ACTIVE (ask), or REFERENCE.
+
+Include market sentiment (room temperature), a clear buy/hold/sell/acquire stance, and one paragraph on how a collector could maximize value in this niche.`;
 }
 
 /** Free tier: Gemini + Google Search grounding (uses GEMINI_API_KEY free quota). */

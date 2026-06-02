@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
 import { marketPokemonHref } from "@/lib/app-routes";
 import type { WeeklyMoverCard, WeeklyMoversPayload } from "@/lib/market/build-weekly-movers";
+import { MarketCardThumb } from "@/components/ui/market-card-thumb";
 import { cn } from "@/lib/cn";
 
 function fmtUsd(n: number | null | undefined): string {
@@ -19,10 +20,7 @@ function MoverRow({ row, up }: { row: WeeklyMoverCard; up: boolean }) {
       className="flex items-center gap-2 rounded-lg border border-transparent px-1.5 py-1 transition hover:border-white/10 hover:bg-white/[0.04] touch-manipulation"
     >
       <div className="h-9 w-7 shrink-0 overflow-hidden rounded bg-black/35 ring-1 ring-white/10">
-        {row.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={row.imageUrl} alt="" className="h-full w-full object-contain p-0.5" />
-        ) : null}
+        <MarketCardThumb src={row.imageUrl} className="p-0.5" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="line-clamp-1 text-[10px] font-medium text-primary">{row.name}</p>

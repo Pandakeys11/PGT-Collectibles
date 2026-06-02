@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MarketSourceLogo } from "@/components/market/market-source-logo";
+import { normalizeMarketSource } from "@/lib/market/sources";
 import { marketPokemonHref } from "@/lib/app-routes";
 import { resolveCatalogGradedGuide } from "@/lib/market/catalog-graded-guide";
 import { formatCatalogFmvUsd } from "@/lib/market/catalog-raw-fmv";
@@ -63,10 +65,21 @@ function kindBadge(kind: string): string {
   return "bg-violet-500/15 text-violet-100";
 }
 
+function isPriceChartingSoldRow(source: string | null, kind: string): boolean {
+  return kind === "sold" && /pricecharting/i.test(source ?? "");
+}
+
 function sortCompsForDisplay(comps: CatalogMarketIntel["comps"], limit: number) {
   const kindOrder = (k: string) => (k === "sold" ? 0 : k === "active" ? 1 : 2);
+  const sourceOrder = (source: string | null, kind: string) => {
+    if (isPriceChartingSoldRow(source, kind)) return 0;
+    if (kind === "sold" && /ebay/i.test(source ?? "")) return 1;
+    return 2;
+  };
   return [...comps]
     .sort((a, b) => {
+      const so = sourceOrder(a.source, a.kind) - sourceOrder(b.source, b.kind);
+      if (so !== 0) return so;
       const ko = kindOrder(a.kind) - kindOrder(b.kind);
       if (ko !== 0) return ko;
       const ta = a.observedAt ? Date.parse(a.observedAt) : 0;
@@ -115,10 +128,16 @@ function RawFmvBand({
           {(knowledge.tcgPlayerUsd != null || knowledge.priceChartingUsd != null) && (
             <p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-faint">
               {knowledge.tcgPlayerUsd != null ? (
-                <span>TCG {fmtUsd(knowledge.tcgPlayerUsd)}</span>
+                <span className="inline-flex items-center gap-1">
+                  <MarketSourceLogo label="TCGPlayer" hideLaneChips />
+                  {fmtUsd(knowledge.tcgPlayerUsd)}
+                </span>
               ) : null}
               {knowledge.priceChartingUsd != null ? (
-                <span>PC {fmtUsd(knowledge.priceChartingUsd)}</span>
+                <span className="inline-flex items-center gap-1">
+                  <MarketSourceLogo label="PriceCharting" hideLaneChips />
+                  {fmtUsd(knowledge.priceChartingUsd)}
+                </span>
               ) : null}
             </p>
           )}
@@ -262,9 +281,9 @@ export function CatalogCardMarketIntelPanel({
     [knowledge?.referencePrices, knowledge?.intel],
   );
 
-  const displayComps = useMemo(() => {
+  const identityFilteredComps = useMemo(() => {
     const comps = knowledge?.intel?.comps ?? [];
-    if (!knowledge?.card) return sortCompsForDisplay(comps, isSheet ? 5 : 12);
+    if (!knowledge?.card) return comps;
     const extracted = catalogSummaryToExtractedCard({
       name: knowledge.card.name,
       number: knowledge.card.number,
@@ -285,8 +304,22 @@ export function CatalogCardMarketIntelPanel({
     const matched = filterMarketEvidenceForCardIdentity(evidence, extracted);
     const matchedTitles = new Set(matched.map((m) => m.title));
     const filtered = comps.filter((c) => matchedTitles.has(c.title));
-    return sortCompsForDisplay(filtered.length ? filtered : comps, isSheet ? 5 : 12);
-  }, [knowledge, isSheet]);
+    return filtered.length ? filtered : comps;
+  }, [knowledge]);
+
+  const priceChartingSoldComps = useMemo(() => {
+    return sortCompsForDisplay(
+      identityFilteredComps.filter((c) => isPriceChartingSoldRow(c.source, c.kind)),
+      isSheet ? 6 : 10,
+    );
+  }, [identityFilteredComps, isSheet]);
+
+  const otherComps = useMemo(() => {
+    return sortCompsForDisplay(
+      identityFilteredComps.filter((c) => !isPriceChartingSoldRow(c.source, c.kind)),
+      isSheet ? 5 : 8,
+    );
+  }, [identityFilteredComps, isSheet]);
 
   const population = knowledge?.intel?.population ?? [];
   const certifications = knowledge?.intel?.certifications ?? [];
@@ -403,20 +436,76 @@ export function CatalogCardMarketIntelPanel({
                   {tier.label}
                 </p>
                 <p className="font-mono text-sm leading-tight text-primary">{fmtUsd(tier.usd)}</p>
-                <p className="text-[7px] text-faint">{tier.source}</p>
+                <div className="mt-0.5 flex justify-center">
+                  <MarketSourceLogo
+                    label={tier.source}
+                    sourceId={normalizeMarketSource(tier.source)}
+                    variant="compact"
+                  />
+                </div>
               </div>
             ))}
           </div>
         </div>
       ) : null}
 
-      {displayComps.length > 0 ? (
+      {priceChartingSoldComps.length > 0 ? (
+        <div className="sc-catalog-comps-list">
+          <p className="mb-1 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-200/80">
+            PriceCharting recent solds
+          </p>
+          <p className="mb-1.5 px-0.5 text-[9px] leading-snug text-muted">
+            Completed auctions from the PriceCharting product page — best last-sold coverage when eBay
+            ingest is thin.
+          </p>
+          <ul className="divide-y divide-border-subtle/50 rounded-lg border border-amber-500/20 bg-amber-500/[0.04]">
+            {priceChartingSoldComps.map((row) => (
+              <li key={row.id} className="flex items-start justify-between gap-2 px-2 py-1.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="rounded bg-amber-500/20 px-1 py-px text-[7px] font-bold uppercase text-amber-100">
+                      Sold
+                    </span>
+                    {row.source ? (
+                      <MarketSourceLogo
+                        label={row.source}
+                        sourceId={normalizeMarketSource(row.source)}
+                        variant="compact"
+                      />
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-primary">
+                    {row.title}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-mono text-[11px] font-medium text-accent">
+                    {fmtUsd(row.priceUsd)}
+                  </p>
+                  {row.url ? (
+                    <a
+                      href={row.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[8px] text-accent underline-offset-2 hover:underline"
+                    >
+                      View
+                    </a>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {otherComps.length > 0 ? (
         <div className="sc-catalog-comps-list">
           <p className="mb-1 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">
-            Recent comps
+            {priceChartingSoldComps.length > 0 ? "Other market comps" : "Recent comps"}
           </p>
           <ul className="divide-y divide-border-subtle/50 rounded-lg border border-border-subtle/70 bg-panel-raised/20">
-            {displayComps.map((row) => (
+            {otherComps.map((row) => (
               <li key={row.id} className="flex items-start justify-between gap-2 px-2 py-1.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1">
@@ -428,6 +517,13 @@ export function CatalogCardMarketIntelPanel({
                     >
                       {row.kind}
                     </span>
+                    {row.source ? (
+                      <MarketSourceLogo
+                        label={row.source}
+                        sourceId={normalizeMarketSource(row.source)}
+                        variant="compact"
+                      />
+                    ) : null}
                     {row.gradeBucket ? (
                       <span className="text-[8px] text-faint">
                         {gradeBucketLabel(row.gradeBucket as GradeBucket)}
@@ -457,9 +553,9 @@ export function CatalogCardMarketIntelPanel({
             ))}
           </ul>
         </div>
-      ) : (
+      ) : priceChartingSoldComps.length === 0 ? (
         <p className="text-[10px] text-muted">No comps yet — tap refresh on Raw FMV.</p>
-      )}
+      ) : null}
 
       {population.length > 0 ? (
         <div className="rounded-lg border border-border-subtle/70 bg-panel-raised/20 p-2">

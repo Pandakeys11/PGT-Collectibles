@@ -25,8 +25,8 @@ import { ScanIntelligencePanel } from "./scan-intelligence-panel";
 import { ScannerComposer } from "./scanner-composer";
 import { ScannerHeader } from "./scanner-header";
 import { ScannerSidebar, type SidebarNavId } from "./scanner-sidebar";
-import { LiveMarketTickerBanner } from "./live-market-ticker-banner";
-import { PgtMusicBar } from "@/components/music/pgt-music-bar";
+import { MasterCatalogSessionPanel } from "@/components/catalog/master-catalog-session-panel";
+import { prefetchMasterCatalogDefaults } from "@/lib/catalog/catalog-fetch-cache";
 import { EbayEndingSoonProvider } from "./ebay-ending-soon-provider";
 import { LiveMarketTickerProvider } from "./live-market-ticker-provider";
 import { LiquidScanPanelBootstrap } from "./liquid-scan-panel-bootstrap";
@@ -39,6 +39,10 @@ export function ScannerChatShell() {
   const companion = useCompanion();
   const { quota, isPro } = useScanQuota();
   const feedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    prefetchMasterCatalogDefaults();
+  }, []);
   const [cropTargetId, setCropTargetId] = useState<string | null>(null);
 
   const cropTarget = useMemo(
@@ -58,6 +62,21 @@ export function ScannerChatShell() {
   useEffect(() => {
     scrollToBottom();
   }, [chat.messages, chat.cards, scrollToBottom]);
+
+  const catalogOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!chat.catalogPanelOpen) {
+      catalogOpenedRef.current = false;
+      return;
+    }
+    if (catalogOpenedRef.current) return;
+    catalogOpenedRef.current = true;
+    requestAnimationFrame(() => {
+      feedRef.current
+        ?.querySelector(".sc-catalog-session-slot")
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }, [chat.catalogPanelOpen]);
 
   const handleSubmit = useCallback(() => {
     if (!chat.isBusy) void chat.runComposerSubmit();
@@ -146,6 +165,16 @@ export function ScannerChatShell() {
     if (chat.selectedSpecimenId) setCropTargetId(chat.selectedSpecimenId);
   }, [chat.selectedSpecimenId]);
 
+  const selectedDigitalScanAsset = useMemo(() => {
+    if (!chat.selectedSpecimenId) return null;
+    return chat.digitalScanAssets[chat.selectedSpecimenId] ?? null;
+  }, [chat.digitalScanAssets, chat.selectedSpecimenId]);
+
+  const handleDownloadSelectedDigitalScan = useCallback(() => {
+    if (!selectedDigitalScanAsset) return;
+    chat.downloadSingleDigitalScan(selectedDigitalScanAsset);
+  }, [chat, selectedDigitalScanAsset]);
+
   const intelligenceCropProps = useMemo(
     () => ({
       onRequestAdjustCrop: openCropForSelected,
@@ -170,6 +199,7 @@ export function ScannerChatShell() {
           onOpenCalculator={chat.openCalculatorOutput}
           onOpenLiveMarket={chat.openLiveMarketOutput}
           onOpenEbayEnding={chat.openEbayEndingOutput}
+          onOpenPgtYoutube={chat.openPgtYoutubeOutput}
           onCatalogPrefill={(prefill) => void chat.loadCatalogPrefill(prefill)}
         />
       </Suspense>
@@ -207,9 +237,12 @@ export function ScannerChatShell() {
           onSaveScan={() => void chat.saveToCollection()}
           canSaveScan={chat.specimens.length > 0}
           savingScan={chat.saving}
+          onOpenLiveMarket={chat.openLiveMarketOutput}
+          onOpenPgtYoutube={chat.openPgtYoutubeOutput}
           onNav={(id: SidebarNavId) => {
             if (id === "catalog") chat.openCatalogOutput();
             else if (id === "live-market") chat.openLiveMarketOutput();
+            else if (id === "pgt-youtube") chat.openPgtYoutubeOutput();
             else if (id === "ebay-ending") chat.openEbayEndingOutput();
             else if (id === "companion") chat.openCompanionOutput();
             else if (id === "calculator") chat.openCalculatorOutput();
@@ -222,16 +255,12 @@ export function ScannerChatShell() {
             }
           }}
         />
-        <main
-          className={cn(
-            "sc-liquid-scan-main relative flex w-full min-w-0 flex-1 flex-col transition-[max-width] duration-200 ease-out",
-          )}
-        >
-          <div
-            ref={feedRef}
-            className="sc-mobile-feed sc-desktop-chat-feed flex-1 overflow-y-auto overflow-x-hidden py-4 sm:px-6 lg:px-5 lg:py-5 xl:px-6 scanner-chat-scrollbar"
-          >
-            <div className="sc-mobile-feed-inner sc-desktop-feed-inner mx-auto w-full max-w-none space-y-3 lg:max-w-none">
+        <main className="sc-liquid-scan-main relative flex min-h-0 w-full min-w-0 flex-1 flex-col transition-[max-width] duration-200 ease-out">
+          <div ref={feedRef} className="sc-mobile-workspace-scroll flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto scanner-chat-scrollbar">
+            <div
+              className="sc-mobile-feed sc-desktop-chat-feed min-h-0 flex-none overflow-x-hidden overflow-y-visible py-4 sm:px-6 lg:px-5 lg:py-5 xl:px-6"
+            >
+            <div className="sc-mobile-feed-inner sc-desktop-feed-inner mx-auto w-full max-w-none space-y-4 lg:max-w-none">
               <div className="lg:hidden">
                 <ScanQuotaTip quota={quota} />
               </div>
@@ -245,9 +274,11 @@ export function ScannerChatShell() {
               {chat.isGeneratingReport ? (
                 <p className="text-[11px] text-emerald-400/90">Writing session intelligence report…</p>
               ) : null}
-              {chat.progress && chat.isScanning && !chat.isAsking && !chat.isGeneratingReport ? (
+              {chat.progress && (chat.isScanning || chat.digitalScanRendering) && !chat.isAsking && !chat.isGeneratingReport ? (
                 <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-200/90">
-                  {chat.progress}
+                  {chat.digitalScanRendering && chat.digitalScanProgress
+                    ? `Digital Scan ${chat.digitalScanProgress.done}/${chat.digitalScanProgress.total}${chat.digitalScanProgress.currentLabel ? ` · ${chat.digitalScanProgress.currentLabel}` : ""}…`
+                    : chat.progress}
                 </p>
               ) : null}
               {!hasUserActivity ? (
@@ -261,22 +292,35 @@ export function ScannerChatShell() {
                 companion={companion}
                 onCatalogScanPrefill={(prefill) => void chat.loadCatalogPrefill(prefill)}
                 onDismissMessage={chat.dismissMessage}
+                digitalScanOn={chat.digitalScanOn}
+                digitalScanAssets={chat.digitalScanAssetsList}
+                digitalScanRendering={chat.digitalScanRendering}
+                digitalScanProgress={chat.digitalScanProgress}
+                digitalScanSessionTitle={chat.digitalScanSessionTitle}
+                onDownloadDigitalScanZip={(attest) => void chat.handleDownloadDigitalScanZip(attest)}
+                onSaveDigitalScansToVault={() => void chat.saveDigitalScansToVault()}
+                onDownloadSingleDigitalScan={chat.downloadSingleDigitalScan}
+                vaultSaving={chat.vaultSaving}
                 className={hasUserActivity ? "" : "mt-6 sm:mt-8"}
               />
             </div>
-          </div>
-          <MobileResultsFab
-            visible={!!chat.summary && !chat.resultsDrawerOpen}
-            cardCount={chat.specimens.length}
-            scanning={chat.isScanning || chat.enriching}
-            onOpen={() => chat.setResultsDrawerOpen(true)}
-          />
-          <div className="sc-composer-stack shrink-0 border-t border-white/6 bg-[rgb(6,8,12)]/90 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md sm:px-4 lg:px-5">
-            <LiveMarketTickerBanner
-              className="mb-2"
-              onOpenFull={chat.openLiveMarketOutput}
+            </div>
+            <MobileResultsFab
+              visible={!!chat.summary && !chat.resultsDrawerOpen && !chat.catalogPanelOpen}
+              cardCount={chat.specimens.length}
+              scanning={chat.isScanning || chat.enriching}
+              onOpen={() => chat.setResultsDrawerOpen(true)}
             />
-            <PgtMusicBar className="mb-2" />
+            {chat.catalogPanelMounted ? (
+              <MasterCatalogSessionPanel
+                open={chat.catalogPanelOpen}
+                onClose={chat.closeCatalogPanel}
+                onCatalogScanPrefill={(prefill) => void chat.loadCatalogPrefill(prefill)}
+                className="sc-catalog-session-slot mx-2 mb-3 mt-1 flex shrink-0 flex-col sm:mx-3 lg:mx-4"
+              />
+            ) : null}
+          </div>
+          <div className="sc-composer-stack shrink-0 border-t border-white/6 bg-chrome-deep/90 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md sm:px-4 lg:px-5">
             <ScannerComposer
             className="sc-mobile-composer"
             prompt={chat.prompt}
@@ -294,10 +338,13 @@ export function ScannerChatShell() {
             hasScanResults={chat.specimens.length > 0}
             speedOn={chat.speedOn}
             onSpeedOnChange={chat.setLiquidScanSpeedOn}
+            digitalScanOn={chat.digitalScanOn}
+            onDigitalScanOnChange={chat.setDigitalScanOn}
             onOpenLiveCamera={() => setLiveCameraOpen(true)}
             onOpenCalculator={() => chat.openCalculatorOutput()}
             onOpenLiveMarket={() => chat.openLiveMarketOutput()}
             onOpenEbayEnding={() => chat.openEbayEndingOutput()}
+            onOpenPgtYoutube={() => chat.openPgtYoutubeOutput()}
             reviewSpecimen={
               chat.selectedSpecimen?.context.catalogIdentityStatus !== "confirmed" ||
               chat.selectedSpecimen?.context.verificationStatus !== "verified"
@@ -384,6 +431,8 @@ export function ScannerChatShell() {
                 compsSectionRef={chat.compsSectionRef}
                 isPro={isPro}
                 onOpenMasterCatalog={chat.openCatalogOutput}
+                digitalScanAsset={selectedDigitalScanAsset}
+                onDownloadDigitalScan={handleDownloadSelectedDigitalScan}
                 className="min-h-0 flex-1"
               />
             </>
@@ -451,6 +500,8 @@ export function ScannerChatShell() {
         onReviewUncertain={reviewUncertain}
         isPro={isPro}
         onOpenMasterCatalog={chat.openCatalogOutput}
+        digitalScanAsset={selectedDigitalScanAsset}
+        onDownloadDigitalScan={handleDownloadSelectedDigitalScan}
       />
     </div>
     </EbayEndingSoonProvider>

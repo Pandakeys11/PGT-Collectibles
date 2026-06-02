@@ -255,6 +255,48 @@ export async function hydrateTcgCardSummariesWithLivePrices(
     }
   };
 
+  const mergeFromLiveCards = (liveCards: TcgCardSummary[]) => {
+    if (!liveCards.length) return;
+    const byApiId = new Map(liveCards.map((l) => [l.id, l]));
+    const byKey = new Map(liveCards.map((l) => [normalizeCardKey(l.name, l.number), l]));
+    working = working.map((c) => {
+      if (!needsTcgPlayerHydration(c) && tcgSummaryHasFmv(c)) return c;
+      const apiId = pokemonApiCardId(c);
+      const hit =
+        (apiId ? byApiId.get(apiId) : undefined) ??
+        byKey.get(normalizeCardKey(c.name, c.number));
+      return hit ? applyLiveHit(c, hit) : c;
+    });
+  };
+
+  const stillMissingAfterRows = () => working.filter((c) => needsTcgPlayerHydration(c) || !tcgSummaryHasFmv(c));
+
+  let missing = stillMissingAfterRows();
+  if (!missing.length) return working;
+  const initialMissing = missing.length;
+
+  const idResolvable = missing.filter((c) => pokemonApiCardId(c));
+  if (idResolvable.length >= Math.min(8, missing.length * 0.35)) {
+    const liveCards = await fetchLiveByPokemonIds(
+      idResolvable.map((c) => pokemonApiCardId(c)!),
+    );
+    mergeFromLiveCards(liveCards);
+    missing = stillMissingAfterRows();
+    if (!missing.length) return working;
+  }
+
+  if (missing.length <= 150) {
+    const ids = missing.map((c) => pokemonApiCardId(c)).filter((id): id is string => Boolean(id));
+    if (ids.length) {
+      const liveCards = await fetchLiveByPokemonIds(ids);
+      mergeFromLiveCards(liveCards);
+      missing = stillMissingAfterRows();
+      if (!missing.length || missing.length <= Math.max(2, Math.ceil(initialMissing * 0.12))) {
+        return working;
+      }
+    }
+  }
+
   try {
     const liveSet = await fetchAllCardsForSet({
       setId,
@@ -265,24 +307,13 @@ export async function hydrateTcgCardSummariesWithLivePrices(
     /* per-id fallback below */
   }
 
-  const stillMissing = working.filter((c) => !tcgSummaryHasFmv(c));
-  if (!stillMissing.length) return working;
+  missing = stillMissingAfterRows();
+  if (!missing.length) return working;
 
-  const ids = stillMissing.map((c) => pokemonApiCardId(c)).filter((id): id is string => Boolean(id));
+  const ids = missing.map((c) => pokemonApiCardId(c)).filter((id): id is string => Boolean(id));
   if (!ids.length) return working;
 
   const liveCards = await fetchLiveByPokemonIds(ids);
-  if (!liveCards.length) return working;
-
-  const byApiId = new Map(liveCards.map((l) => [l.id, l]));
-  const byKey = new Map(liveCards.map((l) => [normalizeCardKey(l.name, l.number), l]));
-
-  return working.map((c) => {
-    if (!needsTcgPlayerHydration(c)) return c;
-    const apiId = pokemonApiCardId(c);
-    const hit =
-      (apiId ? byApiId.get(apiId) : undefined) ??
-      byKey.get(normalizeCardKey(c.name, c.number));
-    return hit ? applyLiveHit(c, hit) : c;
-  });
+  mergeFromLiveCards(liveCards);
+  return working;
 }

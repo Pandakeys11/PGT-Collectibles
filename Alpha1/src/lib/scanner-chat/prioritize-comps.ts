@@ -2,12 +2,14 @@ import type { LiquidAskComp } from "@/lib/scanner-chat/liquid-ask-types";
 
 function sourceRank(source: string | null): number {
   const s = (source ?? "").toLowerCase();
-  if (s.includes("ebay")) return 0;
-  if (s.includes("card ladder")) return 1;
-  if (s === "alt") return 2;
-  if (s.includes("goldin")) return 3;
-  if (s.includes("tcgplayer")) return 4;
-  return 5;
+  if (s.includes("ebay") && !s.includes("pricecharting")) return 0;
+  if (s.includes("pricecharting")) return 1;
+  if (s.includes("ebay")) return 2;
+  if (s.includes("card ladder")) return 4;
+  if (s === "alt") return 5;
+  if (s.includes("goldin")) return 6;
+  if (s.includes("tcgplayer")) return 7;
+  return 8;
 }
 
 function kindRank(kind: LiquidAskComp["kind"]): number {
@@ -30,6 +32,7 @@ export function sortCompsForDisplay(comps: LiquidAskComp[]): LiquidAskComp[] {
 
 export function partitionComps(comps: LiquidAskComp[]): {
   ebaySold: LiquidAskComp[];
+  priceChartingSold: LiquidAskComp[];
   ebayActive: LiquidAskComp[];
   otherSold: LiquidAskComp[];
   otherActive: LiquidAskComp[];
@@ -37,19 +40,23 @@ export function partitionComps(comps: LiquidAskComp[]): {
 } {
   const sorted = sortCompsForDisplay(comps);
   const ebaySold: LiquidAskComp[] = [];
+  const priceChartingSold: LiquidAskComp[] = [];
   const ebayActive: LiquidAskComp[] = [];
   const otherSold: LiquidAskComp[] = [];
   const otherActive: LiquidAskComp[] = [];
   const reference: LiquidAskComp[] = [];
 
   for (const c of sorted) {
-    const isEbay = (c.source ?? "").toLowerCase().includes("ebay");
+    const src = (c.source ?? "").toLowerCase();
+    const isPc = src.includes("pricecharting");
+    const isEbay = src.includes("ebay") && !isPc;
     if (c.kind === "reference") {
       reference.push(c);
       continue;
     }
     if (c.kind === "sold") {
-      if (isEbay) ebaySold.push(c);
+      if (isPc) priceChartingSold.push(c);
+      else if (isEbay) ebaySold.push(c);
       else otherSold.push(c);
       continue;
     }
@@ -57,7 +64,7 @@ export function partitionComps(comps: LiquidAskComp[]): {
     else otherActive.push(c);
   }
 
-  return { ebaySold, ebayActive, otherSold, otherActive, reference };
+  return { ebaySold, priceChartingSold, ebayActive, otherSold, otherActive, reference };
 }
 
 export function countCompsBySource(comps: LiquidAskComp[]): {

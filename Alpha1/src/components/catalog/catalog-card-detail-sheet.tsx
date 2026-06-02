@@ -56,7 +56,7 @@ export function CatalogCardDetailSheet({
         aria-modal="true"
         aria-labelledby="catalog-card-detail-title"
         className={cn(
-          "sc-catalog-card-sheet desk-surface-raised fixed inset-x-0 bottom-0 z-[109] flex max-h-[min(94dvh,920px)] flex-col overflow-hidden rounded-t-[1.35rem] border border-border-subtle/80 shadow-[0_-28px_64px_rgb(0_0_0/0.55)] sm:inset-y-3 sm:left-auto sm:right-3 sm:max-h-[calc(100dvh-1.5rem)] sm:w-[min(30rem,calc(100vw-1.5rem))] sm:rounded-2xl lg:right-4 lg:w-[min(28rem,calc(100vw-2rem))]",
+          "sc-catalog-card-sheet desk-surface-raised fixed inset-x-0 bottom-0 z-[109] flex max-h-[min(96dvh,940px)] flex-col overflow-hidden rounded-t-[1.35rem] border border-border-subtle/80 shadow-[0_-28px_64px_rgb(0_0_0/0.55)] sm:inset-y-3 sm:left-auto sm:right-3 sm:max-h-[calc(100dvh-1.5rem)] sm:w-[min(22.5rem,calc(100vw-1.5rem))] sm:rounded-2xl lg:right-4 lg:w-[min(23.5rem,calc(100vw-2rem))]",
           className,
         )}
       >

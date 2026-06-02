@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { useScanSession, type ScanImageSlot } from "@/hooks/use-scan-session";
 import { scanModeToLane } from "@/lib/scanner-chat/scan-mode-config";
 import {
@@ -16,6 +17,17 @@ import {
   shouldAutoSessionReport,
   writeLiquidScanSpeedOn,
 } from "@/lib/scan/liquid-scan-speed";
+import {
+  DIGITAL_SCAN_HOW_TO_MESSAGE_ID,
+  readDigitalScanOn,
+  writeDigitalScanOn,
+} from "@/lib/digital-scan/digital-scan-profile";
+import { buildDigitalScanHowToMarkdown } from "@/lib/digital-scan/how-to-copy";
+import {
+  downloadDigitalScanZip,
+  downloadSingleDigitalScan,
+} from "@/lib/digital-scan/export-zip";
+import { useScanQuota } from "@/hooks/use-scan-quota";
 import { SCAN_REPORT_INTERNAL_MESSAGE } from "@/lib/scanner-chat/liquid-scan-report";
 import { restoreSpecimensFromSaved } from "@/lib/scanner-chat/restore-saved-specimens";
 import { getCardDisplayTitle } from "@/lib/scan/card-display";
@@ -73,10 +85,15 @@ function slotsToUploadedImages(slots: ScanImageSlot[]): UploadedImage[] {
 }
 
 export function useScannerChat() {
+  const { isSignedIn } = useAuth();
+  const { isPro } = useScanQuota();
   const [speedOn, setSpeedOn] = useState(false);
+  const [digitalScanOn, setDigitalScanOnState] = useState(false);
+  const [vaultSaving, setVaultSaving] = useState(false);
 
   useEffect(() => {
     setSpeedOn(readLiquidScanSpeedOn());
+    setDigitalScanOnState(readDigitalScanOn());
   }, []);
 
   const setLiquidScanSpeedOn = useCallback((on: boolean) => {
@@ -84,9 +101,19 @@ export function useScannerChat() {
     setSpeedOn(on);
   }, []);
 
-  const [scanMode, setScanMode] = useState<ScanMode>("binder");
+  const scanModeRef = useRef<ScanMode>("binder");
 
-  const session = useScanSession({ speedOn, scanMode });
+  const [scanMode, setScanMode] = useState<ScanMode>("binder");
+  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
+  scanModeRef.current = scanMode;
+
+  const session = useScanSession({
+    speedOn,
+    scanMode,
+    digitalScanOn,
+    isPro,
+    loadedSessionId,
+  });
   const {
     setLaneMode,
     slots,
@@ -121,6 +148,10 @@ export function useScannerChat() {
     uploadQueuedCount,
     laneMode,
     ingestLiveCameraScan,
+    digitalScanAssets,
+    digitalScanProgress,
+    digitalScanRendering,
+    reRenderDigitalScanForSpecimen,
   } = session;
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_ASSISTANT]);
   const [prompt, setPrompt] = useState("");
@@ -132,17 +163,52 @@ export function useScannerChat() {
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [recentSessions, setRecentSessions] = useState<ScanHistoryItem[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
-  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
   const [loadingSession, setLoadingSession] = useState(false);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [clearingHistory, setClearingHistory] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(true);
+  const [catalogPanelOpen, setCatalogPanelOpen] = useState(false);
+  const [catalogPanelMounted, setCatalogPanelMounted] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const finalizedScanRef = useRef<string | null>(null);
   const reportScanRef = useRef<string | null>(null);
   const specimensRef = useRef(specimens);
   const compsSectionRef = useRef<HTMLDivElement>(null);
+
+  const setDigitalScanOn = useCallback((on: boolean) => {
+    writeDigitalScanOn(on);
+    setDigitalScanOnState(on);
+    if (on) {
+      setMessages((prev) => {
+        const without = prev.filter((m) => m.id !== DIGITAL_SCAN_HOW_TO_MESSAGE_ID);
+        const howTo: AssistantChatMessage = {
+          id: DIGITAL_SCAN_HOW_TO_MESSAGE_ID,
+          role: "assistant",
+          createdAt: Date.now(),
+          text: buildDigitalScanHowToMarkdown(scanModeRef.current),
+          digitalScanHowTo: true,
+        };
+        return [...without, howTo];
+      });
+    }
+  }, []);
+
+  const setScanModeAndRefreshHowTo = useCallback(
+    (mode: ScanMode) => {
+      setScanMode(mode);
+      if (digitalScanOn) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === DIGITAL_SCAN_HOW_TO_MESSAGE_ID && m.role === "assistant"
+              ? { ...m, text: buildDigitalScanHowToMarkdown(mode) }
+              : m,
+          ),
+        );
+      }
+    },
+    [digitalScanOn],
+  );
 
   const selectedSpecimenId = selectedId;
   const setSelectedSpecimenId = setSelectedId;
@@ -690,6 +756,31 @@ export function useScannerChat() {
     [persistSpecimens, specimens],
   );
 
+  const digitalScanAssetsList = useMemo(
+    () =>
+      Object.values(digitalScanAssets).sort((a, b) => a.cardIndexOnPage - b.cardIndexOnPage),
+    [digitalScanAssets],
+  );
+
+  const digitalScanSessionTitle = useMemo(() => {
+    const saved = loadedSessionId
+      ? recentSessions.find((s) => s.id === loadedSessionId)?.title
+      : null;
+    return saved?.trim() || `PGT Digital Scan ${new Date().toLocaleString()}`;
+  }, [loadedSessionId, recentSessions]);
+
+  const handleDownloadDigitalScanZip = useCallback(
+    async (includeAttestation = false) => {
+      await downloadDigitalScanZip({
+        assets: digitalScanAssetsList,
+        sessionTitle: digitalScanSessionTitle,
+        sessionId: loadedSessionId,
+        includeAttestationPack: includeAttestation,
+      });
+    },
+    [digitalScanAssetsList, digitalScanSessionTitle, loadedSessionId],
+  );
+
   const appendAssistantMessage = useCallback((text: string) => {
     setMessages((prev) => [
       ...prev,
@@ -701,6 +792,69 @@ export function useScannerChat() {
       },
     ]);
   }, []);
+
+  const saveDigitalScansToVault = useCallback(async () => {
+    if (!isSignedIn) {
+      appendAssistantMessage("Sign in to save digital scans to your Scan Vault.");
+      return;
+    }
+    const ready = digitalScanAssetsList.filter(
+      (a) => a.status === "ready" || a.status === "user_adjusted",
+    );
+    if (ready.length === 0) {
+      appendAssistantMessage("No digital scans are ready to save yet.");
+      return;
+    }
+    setVaultSaving(true);
+    try {
+      let sessionId = loadedSessionId;
+      if (!sessionId) {
+        sessionId = await persistSpecimens(specimens, digitalScanSessionTitle, null);
+      }
+      if (!sessionId) {
+        throw new Error("Could not create a scan session for vault storage.");
+      }
+      const response = await fetch("/api/scan-vault", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          assets: ready.map((a) => ({
+            specimenKey: a.specimenId,
+            filename: a.filename,
+            mime: a.mime,
+            width: a.width,
+            height: a.height,
+            cardIndexOnPage: a.cardIndexOnPage,
+            lane: a.lane,
+            catalogId: a.sidecar.catalogId,
+            sidecar: a.sidecar,
+            imageBase64: a.dataUrl.split(",")[1] ?? "",
+          })),
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        savedCount?: number;
+      };
+      if (!response.ok) throw new Error(payload.error ?? "Vault upload failed");
+      appendAssistantMessage(
+        `Saved **${payload.savedCount ?? ready.length}** digital scan${(payload.savedCount ?? ready.length) === 1 ? "" : "s"} to your **Scan Vault**. Open Scan Vault from the sidebar to browse and download.`,
+      );
+    } catch (err) {
+      appendAssistantMessage(err instanceof Error ? err.message : "Scan Vault save failed");
+    } finally {
+      setVaultSaving(false);
+    }
+  }, [
+    appendAssistantMessage,
+    digitalScanAssetsList,
+    digitalScanSessionTitle,
+    isSignedIn,
+    loadedSessionId,
+    persistSpecimens,
+    specimens,
+  ]);
 
   const sendLiquidAsk = useCallback(
     async (text: string) => {
@@ -844,12 +998,35 @@ export function useScannerChat() {
   }, []);
 
   const openCatalogOutput = useCallback(() => {
-    pushChatOutput(
-      "catalog",
-      "Open master catalog",
-      "Browse Pokémon, Magic, Yu-Gi-Oh!, One Piece, Lorcana, and more — pick a franchise tab, open a set, then **Scan this card** to load a confirmed catalog row into this session.",
-    );
-  }, [pushChatOutput]);
+    setCatalogPanelMounted(true);
+    setCatalogPanelOpen(true);
+    setSidebarOpen(false);
+    setMessages((prev) => {
+      if (prev.some((m) => m.role === "assistant" && m.output?.kind === "catalog")) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: uid(),
+          role: "user",
+          createdAt: Date.now(),
+          text: "Open master catalog",
+        },
+        {
+          id: uid(),
+          role: "assistant",
+          createdAt: Date.now(),
+          text: "Browse Pokémon, Magic, Yu-Gi-Oh!, One Piece, Lorcana, and more — pick a franchise tab, open a set, then **Scan this card** to load a confirmed catalog row into this session.",
+          output: { kind: "catalog" as const },
+        },
+      ];
+    });
+  }, []);
+
+  const closeCatalogPanel = useCallback(() => {
+    setCatalogPanelOpen(false);
+  }, []);
 
   const openCompanionOutput = useCallback(() => {
     pushChatOutput(
@@ -884,6 +1061,14 @@ export function useScannerChat() {
       "ebay-ending",
       "Open eBay ending soon",
       "Live **Pokémon TCG auctions** ending soon on eBay (US). Countdowns refresh from the Browse API — tap a card to bid on eBay.",
+    );
+  }, [pushChatOutput]);
+
+  const openPgtYoutubeOutput = useCallback(() => {
+    pushChatOutput(
+      "pgt-youtube",
+      "Open PGT Video",
+      "Watch **PGT Pokémon** episodes and playlist videos inside Liquid Scan — prev/next through the full PGT playlist without leaving your scan session.",
     );
   }, [pushChatOutput]);
 
@@ -1066,6 +1251,15 @@ export function useScannerChat() {
         openEbayEndingOutput();
         return;
       }
+      if (
+        lower.includes("pgt video") ||
+        lower.includes("pgt tv") ||
+        lower.includes("youtube") ||
+        (lower.includes("watch") && lower.includes("pokemon"))
+      ) {
+        openPgtYoutubeOutput();
+        return;
+      }
       if (lower.includes("export") && lower.includes("csv")) {
         if (specimens.length === 0) {
           setMessages((prev) => [
@@ -1097,6 +1291,7 @@ export function useScannerChat() {
       openCompanionOutput,
       openLiveMarketOutput,
       openEbayEndingOutput,
+      openPgtYoutubeOutput,
       sendLiquidAsk,
       specimens,
     ],
@@ -1177,7 +1372,7 @@ export function useScannerChat() {
     messages,
     images,
     scanMode,
-    setScanMode,
+    setScanMode: setScanModeAndRefreshHowTo,
     prompt,
     setPrompt,
     isScanning,
@@ -1239,10 +1434,14 @@ export function useScannerChat() {
     refreshRecentSessions,
     dismissMessage,
     openCatalogOutput,
+    closeCatalogPanel,
+    catalogPanelOpen,
+    catalogPanelMounted,
     openCompanionOutput,
     openCalculatorOutput,
     openLiveMarketOutput,
     openEbayEndingOutput,
+    openPgtYoutubeOutput,
     loadCatalogPrefill,
     rescanSpecimen,
     setUserEvidenceCrop,
@@ -1256,5 +1455,17 @@ export function useScannerChat() {
     setLiquidScanSpeedOn,
     laneMode,
     ingestLiveCameraScan,
+    digitalScanOn,
+    setDigitalScanOn,
+    digitalScanAssets,
+    digitalScanAssetsList,
+    digitalScanProgress,
+    digitalScanRendering,
+    digitalScanSessionTitle,
+    handleDownloadDigitalScanZip,
+    saveDigitalScansToVault,
+    vaultSaving,
+    downloadSingleDigitalScan,
+    reRenderDigitalScanForSpecimen,
   };
 }

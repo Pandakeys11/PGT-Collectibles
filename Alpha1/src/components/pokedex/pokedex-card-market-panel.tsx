@@ -12,6 +12,8 @@ import {
   type EbayGradeHubKey,
   type MarketSourceLink,
 } from "@/lib/market/sources";
+import { MarketSourceLogo } from "@/components/market/market-source-logo";
+import { normalizeMarketSource } from "@/lib/market/sources";
 import type { MarketEvidence } from "@/lib/scan/schemas";
 
 type MarketPayload = {
@@ -57,12 +59,26 @@ function slabToEbayGradeKey(slab: string | null | undefined): EbayGradeHubKey {
   return "raw";
 }
 
-function formatEvidenceLine(item: MarketEvidence | null): string {
-  if (!item) return "No recent comp in index";
-  const price = fmtUsd(item.priceUsd);
+function EvidenceMeta({ item }: { item: MarketEvidence | null }) {
+  if (!item) return <>No recent comp in index</>;
   const date = item.observedAt ? new Date(item.observedAt).toLocaleDateString() : "date n/a";
-  const source = item.source ?? "source n/a";
-  return `${price} · ${date} · ${source}`;
+  return (
+    <span className="inline-flex flex-wrap items-center justify-end gap-1">
+      <span className="font-mono">{fmtUsd(item.priceUsd)}</span>
+      <span className="text-muted">·</span>
+      <span>{date}</span>
+      {item.source ? (
+        <>
+          <span className="text-muted">·</span>
+          <MarketSourceLogo
+            label={item.source}
+            sourceId={normalizeMarketSource(item.source)}
+            variant="compact"
+          />
+        </>
+      ) : null}
+    </span>
+  );
 }
 
 function EvidenceRow({
@@ -79,7 +95,7 @@ function EvidenceRow({
       <dt className="shrink-0 text-muted">{label}</dt>
       <dd className="min-w-0 text-right text-primary">
         <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5">
-          <span>{formatEvidenceLine(item)}</span>
+          <EvidenceMeta item={item} />
           {viewUrl ? (
             <a
               href={viewUrl}
@@ -375,11 +391,25 @@ export function PokedexCardMarketPanel({
                     className="rounded-md border border-border-subtle/80 bg-panel-raised/40 px-2 py-1.5"
                   >
                     <p className="line-clamp-2 text-primary">{item.title}</p>
-                    <p className="mt-0.5 font-mono text-muted">
-                      {fmtUsd(item.priceUsd)}
-                      {item.slab ? ` · ${item.slab}` : ""}
-                      {item.source ? ` · ${item.source}` : ""}
-                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1 font-mono text-muted">
+                      <span>{fmtUsd(item.priceUsd)}</span>
+                      {item.slab ? (
+                        <>
+                          <span>·</span>
+                          <span>{item.slab}</span>
+                        </>
+                      ) : null}
+                      {item.source ? (
+                        <>
+                          <span>·</span>
+                          <MarketSourceLogo
+                            label={item.source}
+                            sourceId={normalizeMarketSource(item.source)}
+                            variant="compact"
+                          />
+                        </>
+                      ) : null}
+                    </div>
                     {(() => {
                       const href = resolveCompUrl(item) ?? item.url;
                       return href ? (
@@ -408,12 +438,31 @@ export function PokedexCardMarketPanel({
                     className="rounded-md border border-border-subtle/80 bg-panel-raised/40 px-2 py-1.5"
                   >
                     <p className="line-clamp-2 text-primary">{item.title}</p>
-                    <p className="mt-0.5 font-mono text-muted">
-                      {fmtUsd(item.priceUsd)}
-                      {item.slab ? ` · ${item.slab}` : ""}
-                      {item.observedAt ? ` · ${new Date(item.observedAt).toLocaleDateString()}` : ""}
-                      {item.source ? ` · ${item.source}` : ""}
-                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1 font-mono text-muted">
+                      <span>{fmtUsd(item.priceUsd)}</span>
+                      {item.slab ? (
+                        <>
+                          <span>·</span>
+                          <span>{item.slab}</span>
+                        </>
+                      ) : null}
+                      {item.observedAt ? (
+                        <>
+                          <span>·</span>
+                          <span>{new Date(item.observedAt).toLocaleDateString()}</span>
+                        </>
+                      ) : null}
+                      {item.source ? (
+                        <>
+                          <span>·</span>
+                          <MarketSourceLogo
+                            label={item.source}
+                            sourceId={normalizeMarketSource(item.source)}
+                            variant="compact"
+                          />
+                        </>
+                      ) : null}
+                    </div>
                     {(() => {
                       const href = resolveCompUrl(item) ?? item.url;
                       return href ? (

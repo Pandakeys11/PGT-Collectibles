@@ -45,6 +45,9 @@ export type CatalogCardSummary = {
   tcgplayer?: { url?: string };
   /** Parsed from `tcg_catalog_cards.prices_json` when present. */
   prices?: CatalogPriceSnapshot;
+  /** Resolved Raw FMV for grid ribbons (TCGPlayer-first). */
+  rawFmvUsd?: number | null;
+  rawFmvSourceLabel?: string | null;
 };
 
 export type CatalogPaginated<T> = {

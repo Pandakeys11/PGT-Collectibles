@@ -16,13 +16,24 @@ export const SET_ERA_LABEL: Record<SetEraId, string> = {
 /** Short helper line under era control */
 export const SET_ERA_DESCRIPTION: Record<SetEraId, string> = {
   vintage: "Through 2006 · Wizards & early Nintendo",
-  mid: "2007–2022 · Diamond Pearl through Sword & Shield",
-  modern: "2023 onward · Scarlet & Violet era",
+  mid: "2007–2021 · Diamond Pearl through early Sword & Shield",
+  modern: "2022 onward · late SWSH, Scarlet & Violet, and beyond",
 };
 
-/** `releaseDate` is `YYYY/MM/DD` from the API; lexicographic compare matches chronological order. */
+/** Canonical `YYYY/MM/DD` for lexicographic compare (API format). DB rows often use ISO dashes. */
+export function normalizeSetReleaseDate(date: string | null | undefined): string {
+  if (!date?.trim()) return "";
+  const normalized = date.trim().replace(/-/g, "/");
+  const match = normalized.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (!match) return normalized;
+  const [, year, month, day] = match;
+  return `${year}/${month.padStart(2, "0")}/${day.padStart(2, "0")}`;
+}
+
+/** `releaseDate` is `YYYY/MM/DD`; lexicographic compare matches chronological order. */
 function releaseDateInWindow(date: string, start: string, end: string): boolean {
-  const d = date.trim();
+  const d = normalizeSetReleaseDate(date);
+  if (!d) return false;
   return d >= start && d <= end;
 }
 
@@ -36,9 +47,9 @@ export function setMatchesEra(releaseDate: string | undefined, era: SetEraId): b
     case "vintage":
       return releaseDateInWindow(releaseDate, "1998/01/01", "2006/12/31");
     case "mid":
-      return releaseDateInWindow(releaseDate, "2007/01/01", "2022/12/31");
+      return releaseDateInWindow(releaseDate, "2007/01/01", "2021/12/31");
     case "modern":
-      return releaseDateInWindow(releaseDate, "2023/01/01", "2100/12/31");
+      return releaseDateInWindow(releaseDate, "2022/01/01", "2100/12/31");
   }
 }
 

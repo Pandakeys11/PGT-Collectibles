@@ -6,6 +6,7 @@ import { ebaySoldScrapeAdapter } from "@/lib/market/adapters/ebay-sold-scrape";
 import { pokemonTcgPricesAdapter } from "@/lib/market/adapters/pokemon-tcg-prices";
 import { poketraceAdapter } from "@/lib/market/adapters/poketrace";
 import { priceChartingAdapter } from "@/lib/market/adapters/pricecharting";
+import { priceChartingSoldScrapeAdapter } from "@/lib/market/adapters/pricecharting-sold-scrape";
 import { pokeTraceCoversTcgPrices } from "@/lib/market/poketrace/sync-catalog";
 
 type MarketAdapter = {
@@ -14,6 +15,7 @@ type MarketAdapter = {
 
 const POKEMON_SECONDARY: MarketAdapter[] = [
   ebaySoldScrapeAdapter,
+  priceChartingSoldScrapeAdapter,
   ebayBrowseAdapter,
   priceChartingAdapter,
 ];
@@ -50,6 +52,7 @@ async function collectPokemonMarketEvidence(card: ExtractedCard): Promise<Market
 
 /** Non-Pokemon TCG + sports: PriceCharting and eBay cover most categories; skip Pokemon TCG API. */
 const GENERAL_ADAPTERS: MarketAdapter[] = [
+  priceChartingSoldScrapeAdapter,
   priceChartingAdapter,
   ebaySoldScrapeAdapter,
   ebayBrowseAdapter,
@@ -64,7 +67,11 @@ export async function collectApiMarketEvidence(card: ExtractedCard): Promise<Mar
 
   if (adapters === "pokemon_pipeline") {
     if (process.env.MARKET_FREE_ONLY === "1") {
-      const freeOnly: MarketAdapter[] = [poketraceAdapter, ebaySoldScrapeAdapter];
+      const freeOnly: MarketAdapter[] = [
+        poketraceAdapter,
+        priceChartingSoldScrapeAdapter,
+        ebaySoldScrapeAdapter,
+      ];
       if (!isPokeTracePrimary() || !isPokeTraceConfigured()) {
         freeOnly.unshift(pokemonTcgPricesAdapter);
       }

@@ -5,7 +5,7 @@ import { PgtMusicBar } from "@/components/music/pgt-music-bar";
 import { cn } from "@/lib/cn";
 import { isFullBleedScannerPath } from "@/lib/route-paths";
 
-/** Fixed PGT Player on standard routes; Liquid Scan uses composer strip instead. */
+/** Fixed PGT Player on standard routes; Liquid Scan uses the left nav player instead. */
 export function PgtMusicWidget() {
   const pathname = usePathname();
   if (isFullBleedScannerPath(pathname)) return null;

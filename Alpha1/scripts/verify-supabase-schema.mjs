@@ -127,6 +127,21 @@ async function main() {
     else fail(`table:${table}`, "missing — run 202605280001_pgt_market_intel.sql");
   }
 
+  if (await tableExists(supabase, "digital_scan_assets")) {
+    pass("table:digital_scan_assets", "present");
+  } else {
+    fail("table:digital_scan_assets", "missing — run 202605290001_digital_scan_assets.sql");
+  }
+
+  if (await tableExists(supabase, "catalog_binder_owned_cards")) {
+    pass("table:catalog_binder_owned_cards", "present");
+  } else {
+    fail(
+      "table:catalog_binder_owned_cards",
+      "missing — run npm run db:apply:binder-tracker",
+    );
+  }
+
   if (await columnExists(supabase, "extracted_cards", "pgt_card_identity_id")) {
     pass("column:extracted_cards.pgt_card_identity_id", "present");
   } else {

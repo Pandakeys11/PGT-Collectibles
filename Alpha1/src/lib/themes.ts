@@ -19,8 +19,8 @@ export type ThemeMeta = {
 export const THEMES: ReadonlyArray<ThemeMeta> = [
   {
     id: "obsidian-clean",
-    label: "Obsidian Clean",
-    hint: "Metal slate · catalog ambient wash",
+    label: "PGT Liquid",
+    hint: "Cyan holo · gold scan · violet AI",
     group: "core",
   },
 ];

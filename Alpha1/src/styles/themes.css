@@ -1,23 +1,5 @@
 /**
- * Default desk theme — catalog ambient layer tints holo mesh at runtime.
+ * Desk theme shell — PGT Liquid palette (catalog ambient overrides holo at runtime).
  */
 
-html:not([data-theme]),
-[data-theme="obsidian-clean"] {
-  --bg-canvas: 8 10 14;
-  --bg-panel: 12 16 22;
-  --bg-panel-raised: 18 22 30;
-  --bg-subtle: 24 30 40;
-  --border-subtle: 255 255 255 / 0.08;
-  --border-strong: 255 255 255 / 0.16;
-  --text-primary: 237 242 244;
-  --text-muted: 201 214 223;
-  --text-faint: 141 153 174;
-  --accent: 141 153 174;
-  --accent-strong: 201 214 223;
-  --accent-glow: 255 230 0;
-  --shadow-panel: 0 20px 55px rgba(0, 0, 0, 0.58);
-  --spark-primary: #8d99ae;
-  --spark-secondary: #ffe600;
-  --bg-gradient-end: 5 6 10;
-}
+@import "./pgt-liquid-theme.css";

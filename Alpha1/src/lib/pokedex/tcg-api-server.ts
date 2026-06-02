@@ -6,7 +6,10 @@ import {
   listCardsFromDb,
   resolveSetRecord,
 } from "@/lib/catalog/db-catalog-browse";
-import { attachRawFmvToTcgCards } from "@/lib/market/catalog-set-fmv";
+import {
+  attachRawFmvToTcgCards,
+  attachRawFmvToTcgCardsFast,
+} from "@/lib/market/catalog-set-fmv";
 import {
   hydrateTcgCardSummariesWithLivePrices,
   needsTcgPlayerHydration,
@@ -22,13 +25,13 @@ import {
   rarityMatchesTerm,
   type RarityBucketId,
 } from "@/lib/pokedex/rarity-buckets";
+import { normalizeSetReleaseDate, setEraToOrderBy, setMatchesEra, type SetEraId } from "@/lib/pokedex/set-era";
 import {
   applyCatalogFinishClause,
   supportsFinishTabs,
   type CatalogFinishBucketId,
 } from "@/lib/pokedex/set-catalog-config";
 import type { PrintingPresetId } from "@/lib/pokedex/printing-presets";
-import { setMatchesEra, type SetEraId } from "@/lib/pokedex/set-era";
 
 const BASE = "https://api.pokemontcg.io/v2";
 const ALL_SETS_CACHE_TTL_MS = 30 * 60 * 1000;
@@ -105,9 +108,48 @@ function catalogSetToTcgSet(row: CatalogSetSummary): TcgSetSummary {
     series: row.series ?? "",
     printedTotal: row.printedTotal ?? row.total ?? 0,
     total: row.total ?? row.printedTotal ?? 0,
-    releaseDate: row.releaseDate ?? "",
+    releaseDate: normalizeSetReleaseDate(row.releaseDate) || row.releaseDate || "",
     images: row.images,
   };
+}
+
+function sortSetsByReleaseDate(sets: TcgSetSummary[], orderBy: string): void {
+  sets.sort((a, b) => {
+    const cmp = normalizeSetReleaseDate(a.releaseDate).localeCompare(normalizeSetReleaseDate(b.releaseDate));
+    return orderBy.startsWith("-") ? -cmp : cmp;
+  });
+}
+
+/** Merge cached DB sets with the live API list so missing rows still appear in browse. */
+async function aggregatePokemonSets(q?: string): Promise<TcgSetSummary[]> {
+  const byId = new Map<string, TcgSetSummary>();
+
+  try {
+    for (const set of await getAllSetsCached(q)) {
+      byId.set(set.id, {
+        ...set,
+        releaseDate: normalizeSetReleaseDate(set.releaseDate) || set.releaseDate,
+      });
+    }
+  } catch {
+    /* DB-only fallback when API is unavailable */
+  }
+
+  const populated = await countCardsInDb("pokemon");
+  if (populated && populated > 0) {
+    for (const set of (await listAllSetsFromDb("pokemon", q)).map(catalogSetToTcgSet)) {
+      const existing = byId.get(set.id);
+      byId.set(set.id, {
+        ...(existing ?? set),
+        ...set,
+        releaseDate: set.releaseDate || existing?.releaseDate || "",
+        images: set.images ?? existing?.images,
+        series: set.series || existing?.series || "",
+      });
+    }
+  }
+
+  return [...byId.values()];
 }
 
 async function fetchSetsPageFromDb(params: {
@@ -117,26 +159,19 @@ async function fetchSetsPageFromDb(params: {
   orderBy?: string;
   era: SetEraId;
 }): Promise<TcgPaginated<TcgSetSummary> | null> {
-  const populated = await countCardsInDb("pokemon");
-  if (!populated || populated <= 0) return null;
-
   const orderBy = params.orderBy?.trim() || "-releaseDate";
   const outPageSize = Math.min(250, Math.max(1, params.pageSize));
   const outPage = Math.max(1, params.page);
 
-  const aggregated = (await listAllSetsFromDb("pokemon", params.q)).map(catalogSetToTcgSet);
-  const filtered = aggregated.filter((s) => setMatchesEra(s.releaseDate, params.era));
+  const aggregated = await aggregatePokemonSets(params.q);
+  if (!aggregated.length) return null;
 
-  filtered.sort((a, b) => {
-    const cmp = a.releaseDate.localeCompare(b.releaseDate);
-    return orderBy.startsWith("-") ? -cmp : cmp;
-  });
+  const filtered = aggregated.filter((s) => setMatchesEra(s.releaseDate, params.era));
+  sortSetsByReleaseDate(filtered, orderBy);
 
   const totalCount = filtered.length;
   const start = (outPage - 1) * outPageSize;
   const data = filtered.slice(start, start + outPageSize);
-
-  if (totalCount === 0) return null;
 
   return {
     data,
@@ -169,6 +204,8 @@ function catalogRowToTcgSummary(row: CatalogCardSummary): TcgCardSummary {
           releaseDate: row.set.releaseDate ?? undefined,
         }
       : undefined,
+    rawFmvUsd: row.rawFmvUsd ?? undefined,
+    rawFmvSourceLabel: row.rawFmvSourceLabel ?? undefined,
     tcgplayer: tcgEmbed,
     cardmarket: cm
       ? {
@@ -224,7 +261,7 @@ async function loadSetCardsFromDb(setId: string, variantKey?: string | null): Pr
   }
 
   try {
-    cards = await attachRawFmvToTcgCards(cards);
+    cards = attachRawFmvToTcgCardsFast(cards);
   } catch {
     /* keep hydrated rows */
   }
@@ -301,7 +338,7 @@ async function fetchCardsForSetPageFromDb(params: {
   }
 
   try {
-    data = await attachRawFmvToTcgCards(data);
+    data = attachRawFmvToTcgCardsFast(data);
   } catch {
     /* keep hydrated rows */
   }
@@ -325,38 +362,10 @@ export async function fetchSetsPage(params: {
   /** Applied in-app after aggregating API pages (API cannot filter sets by releaseDate range in `q`). */
   era: SetEraId;
 }): Promise<TcgPaginated<TcgSetSummary>> {
-  const orderBy = params.orderBy?.trim() || "-releaseDate";
-  const outPageSize = Math.min(250, Math.max(1, params.pageSize));
-  const outPage = Math.max(1, params.page);
-
   const fromDb = await fetchSetsPageFromDb(params);
   if (fromDb) return fromDb;
 
-  try {
-    const aggregated = await getAllSetsCached(params.q);
-    const filtered = aggregated.filter((s) => setMatchesEra(s.releaseDate, params.era));
-
-    filtered.sort((a, b) => {
-      const cmp = a.releaseDate.localeCompare(b.releaseDate);
-      return orderBy.startsWith("-") ? -cmp : cmp;
-    });
-
-    const totalCount = filtered.length;
-    const start = (outPage - 1) * outPageSize;
-    const data = filtered.slice(start, start + outPageSize);
-
-    return {
-      data,
-      page: outPage,
-      pageSize: outPageSize,
-      count: data.length,
-      totalCount,
-    };
-  } catch {
-    const fallback = await fetchSetsPageFromDb(params);
-    if (fallback) return fallback;
-    throw new Error("Unable to load Pokémon sets");
-  }
+  throw new Error("Unable to load Pokémon sets");
 }
 
 export async function fetchSetById(setId: string): Promise<TcgSetSummary | null> {
@@ -487,7 +496,7 @@ export async function fetchCardsForSetPage(params: {
         }
       }
       try {
-        data = await attachRawFmvToTcgCards(data);
+        data = attachRawFmvToTcgCardsFast(data);
       } catch {
         /* keep rows */
       }
@@ -531,7 +540,7 @@ export async function fetchCardsForSetPage(params: {
     }
   }
   try {
-    data = await attachRawFmvToTcgCards(data);
+    data = attachRawFmvToTcgCardsFast(data);
   } catch {
     /* keep slice */
   }

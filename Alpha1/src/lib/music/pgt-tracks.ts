@@ -10,6 +10,8 @@ export type PgtMusicPlayerConfig = {
 };
 
 export const PGT_MUSIC_TRACKS: PgtMusicTrack[] = [
+  { id: "track10", label: "Game Lofi", sublabel: "24/7 Radio" },
+  { id: "track11", label: "One Piece", sublabel: "Lofi Culture" },
   { id: "track1", label: "Blues", sublabel: "PGT Original" },
   { id: "track2", label: "Ambient", sublabel: "PGT Original" },
   { id: "track3", label: "Lo-Fi Girl", sublabel: "Live stream" },
@@ -22,6 +24,8 @@ export const PGT_MUSIC_TRACKS: PgtMusicTrack[] = [
 ];
 
 export const PGT_MUSIC_PLAYER_CONFIGS: Record<string, PgtMusicPlayerConfig> = {
+  track10: { videoId: "WGfMj5o4s1k" },
+  track11: { videoId: "hVu5_LL7iHk", playlist: "RDhVu5_LL7iHk" },
   track1: { videoId: "sF80I-TQiW0" },
   track2: { videoId: "KVq0PCi81v4" },
   track3: { videoId: "jfKfPfyJRdk" },

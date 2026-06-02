@@ -6,7 +6,10 @@ import type {
 } from "@/lib/catalog/catalog-types";
 import { releaseYearFromDate } from "@/lib/catalog/catalog-types";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
-import { tcgPlayerEmbedFromSnapshot } from "@/lib/market/catalog-raw-fmv";
+import {
+  resolveCatalogRawFmvForCard,
+  tcgPlayerEmbedFromSnapshot,
+} from "@/lib/market/catalog-raw-fmv";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 type DbSetRow = {
@@ -414,12 +417,24 @@ function dbCardToSummary(
   set: { id: string; name: string; code?: string | null },
 ): CatalogCardSummary {
   const prices = parseCatalogPriceSnapshot(row.prices_json);
+  const fmv = resolveCatalogRawFmvForCard({
+    catalogPrices: prices,
+    catalogFinish: catalogVariantKey(row) === "reverse_holo" ? "reverse_holo" : undefined,
+    rarity: resolveCatalogCardRarity(row),
+    identity: {
+      name: row.name,
+      number: row.card_number,
+      set: set.name,
+    },
+  });
   return {
     id: row.catalog_id,
     name: row.name,
     number: row.card_number,
     rarity: resolveCatalogCardRarity(row),
     prices,
+    rawFmvUsd: fmv.usd,
+    rawFmvSourceLabel: fmv.sourceLabel,
     supertype: null,
     catalogFinish: catalogVariantKey(row) === "reverse_holo" ? "reverse_holo" : undefined,
     catalogVariantKey: catalogVariantKey(row),

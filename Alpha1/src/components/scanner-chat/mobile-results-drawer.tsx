@@ -152,6 +152,8 @@ export function MobileResultsDrawer({
   rescanningId,
   isPro,
   onOpenMasterCatalog,
+  digitalScanAsset = null,
+  onDownloadDigitalScan,
 }: {
   open: boolean;
   onClose: () => void;
@@ -183,6 +185,8 @@ export function MobileResultsDrawer({
   rescanningId?: string | null;
   isPro?: boolean;
   onOpenMasterCatalog?: () => void;
+  digitalScanAsset?: import("@/lib/digital-scan/types").DigitalScanAsset | null;
+  onDownloadDigitalScan?: () => void;
 }) {
   const reviewCount = cards.filter((c) => c.status === "review").length;
   const [drawerTab, setDrawerTab] = useState<"detail" | "sheet">("detail");
@@ -372,6 +376,8 @@ export function MobileResultsDrawer({
                   compsSectionRef={compsSectionRef}
                   isPro={isPro}
                   onOpenMasterCatalog={onOpenMasterCatalog}
+                  digitalScanAsset={digitalScanAsset}
+                  onDownloadDigitalScan={onDownloadDigitalScan}
                   className="sc-mobile-drawer-intel min-h-0 border-0 bg-transparent shadow-none"
                 />
               ) : null}

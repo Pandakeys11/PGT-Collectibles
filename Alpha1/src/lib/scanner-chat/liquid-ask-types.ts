@@ -56,6 +56,27 @@ export type LiquidAskDataCoverage = {
   proMarketSkipped: boolean;
 };
 
+/** Master catalog card art surfaced in PGT Ask UI + LLM context. */
+export type LiquidAskCatalogCard = {
+  catalogId: string | null;
+  name: string;
+  setName: string | null;
+  number: string | null;
+  imageUrl: string;
+  role: "focus" | "session" | "reference";
+  rawFmvUsd?: number | null;
+};
+
+/** Sold vs ask desk read for sentiment / buy-hold-sell framing. */
+export type LiquidAskMarketPulse = {
+  soldMedianUsd: number | null;
+  activeLowUsd: number | null;
+  soldCount: number;
+  activeCount: number;
+  sentiment: "bullish" | "neutral" | "bearish" | "thin";
+  stanceHint: string;
+};
+
 export type LiquidAskResearch = {
   researchedAt: string;
   todayUtc: string;
@@ -69,4 +90,8 @@ export type LiquidAskResearch = {
   sessionMarketAsOf: string | null;
   liveResearchUsed: boolean;
   dataCoverage: LiquidAskDataCoverage;
+  /** Official catalog artwork when session match or catalog lookup succeeds. */
+  catalogCards: LiquidAskCatalogCard[];
+  /** Derived sold vs ask pulse for stance sections. */
+  marketPulse: LiquidAskMarketPulse | null;
 };

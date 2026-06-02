@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import { MarketSourceLogo } from "@/components/market/market-source-logo";
 import type { MarketSourceLink } from "@/lib/scan/schemas";
 
 export function MarketSourceHub({
@@ -32,7 +33,7 @@ export function MarketSourceHub({
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-panel-raised/90 px-2.5 py-1 text-[11px] font-medium text-primary transition hover:border-accent/40 hover:text-accent"
                 >
-                  {link.label.replace(/\s+sold$/i, "").replace(/\s+listed$/i, "")}
+                  <MarketSourceLogo label={link.label} sourceId={link.source} />
                   <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
                 </a>
               ))}
@@ -51,7 +52,7 @@ export function MarketSourceHub({
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-panel-raised/90 px-2.5 py-1 text-[11px] font-medium text-primary transition hover:border-accent/40 hover:text-accent"
                 >
-                  {link.label.replace(/\s+listed$/i, "").replace(/\s+sold$/i, "")}
+                  <MarketSourceLogo label={link.label} sourceId={link.source} />
                   <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
                 </a>
               ))}
@@ -74,7 +75,7 @@ export function MarketSourceHub({
             rel="noreferrer"
             className="flex min-h-[2.75rem] items-center justify-between rounded-xl border border-border-subtle bg-panel-raised px-3 py-3 text-sm text-primary transition active:bg-subtle/50 hover:border-accent/40 sm:min-h-0 sm:rounded-lg sm:py-2 sm:text-xs"
           >
-            <span>{link.label}</span>
+            <MarketSourceLogo label={link.label} sourceId={link.source} />
             <ExternalLink className="h-3.5 w-3.5 text-accent" />
           </a>
         ))}

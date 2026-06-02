@@ -11,7 +11,8 @@ import {
   resolveListingUrl,
 } from "@/lib/scan/specimen-market-view";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
-import type { buildEbayGradeHubs, buildHubUrlMap } from "@/lib/market/sources";
+import { MarketSourceLogo } from "@/components/market/market-source-logo";
+import { normalizeMarketSource, type buildEbayGradeHubs, type buildHubUrlMap } from "@/lib/market/sources";
 import { cn } from "@/lib/cn";
 
 const LANE_STYLE: Record<
@@ -127,7 +128,15 @@ export function MarketEvidenceRow({
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
           <span>{formatMarketDate(item.observedAt)}</span>
           <span className="text-slate-600">·</span>
-          <span>{item.source ?? "Source"}</span>
+          {item.source ? (
+            <MarketSourceLogo
+              label={item.source}
+              sourceId={normalizeMarketSource(item.source)}
+              variant="compact"
+            />
+          ) : (
+            <span>Source</span>
+          )}
           {item.slab ? (
             <>
               <span className="text-slate-600">·</span>

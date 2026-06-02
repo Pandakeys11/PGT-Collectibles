@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Calculator, Camera, ChevronDown, Gavel, Loader2, Scan, TrendingUp, Upload, Zap } from "lucide-react";
+import { Calculator, Camera, ChevronDown, FileImage, Gavel, Loader2, Scan, TrendingUp, Tv, Upload, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SCAN_MODE_OPTIONS } from "@/lib/scanner-chat/scan-mode-labels";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
@@ -35,10 +35,13 @@ export function ScannerComposer({
   hasScanResults,
   speedOn,
   onSpeedOnChange,
+  digitalScanOn,
+  onDigitalScanOnChange,
   onOpenLiveCamera,
   onOpenCalculator,
   onOpenLiveMarket,
   onOpenEbayEnding,
+  onOpenPgtYoutube,
   supportsLiveCamera,
   reviewSpecimen,
   onConfirmCatalogCandidate,
@@ -64,10 +67,13 @@ export function ScannerComposer({
   hasScanResults: boolean;
   speedOn: boolean;
   onSpeedOnChange: (on: boolean) => void;
+  digitalScanOn: boolean;
+  onDigitalScanOnChange: (on: boolean) => void;
   onOpenLiveCamera: () => void;
   onOpenCalculator?: () => void;
   onOpenLiveMarket?: () => void;
   onOpenEbayEnding?: () => void;
+  onOpenPgtYoutube?: () => void;
   supportsLiveCamera?: boolean;
   reviewSpecimen?: ScanSpecimen | null;
   onConfirmCatalogCandidate?: (specimenId: string, candidate: CatalogCandidate) => void;
@@ -124,7 +130,7 @@ export function ScannerComposer({
   return (
     <div
       className={cn(
-        "sc-mobile-composer shrink-0 border-t border-white/6 bg-[rgb(8,10,14)]/95 backdrop-blur-xl",
+        "sc-mobile-composer shrink-0 border-t border-white/6 bg-chrome-deep backdrop-blur-xl",
         className,
       )}
     >
@@ -226,6 +232,18 @@ export function ScannerComposer({
                 <Gavel className="h-4 w-4" />
               </button>
             ) : null}
+            {onOpenPgtYoutube ? (
+              <button
+                type="button"
+                onClick={onOpenPgtYoutube}
+                disabled={isBusy}
+                className="sc-composer-icon-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/5 hover:text-violet-200 disabled:opacity-40 touch-manipulation lg:hidden"
+                aria-label="Open PGT Video"
+                title="PGT Video — Pokémon episodes & playlist"
+              >
+                <Tv className="h-4 w-4" />
+              </button>
+            ) : null}
             {onOpenCalculator ? (
               <button
                 type="button"
@@ -264,6 +282,26 @@ export function ScannerComposer({
               title={liveCameraOk ? "PGT helmet HUD" : "Device camera"}
             >
               <Camera className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title={
+                digitalScanOn
+                  ? "Digital Scan on — one scanner-grade file per card"
+                  : "Digital Scan off — identity and market only"
+              }
+              onClick={() => onDigitalScanOnChange(!digitalScanOn)}
+              disabled={isBusy}
+              aria-pressed={digitalScanOn}
+              className={cn(
+                "sc-composer-icon-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition touch-manipulation lg:h-9 lg:w-9",
+                digitalScanOn
+                  ? "bg-violet-500/20 text-violet-200 ring-1 ring-violet-500/30"
+                  : "text-slate-500 hover:bg-white/5 hover:text-slate-300",
+              )}
+              aria-label={digitalScanOn ? "Digital Scan on" : "Digital Scan off"}
+            >
+              <FileImage className="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -367,6 +405,7 @@ export function ScannerComposer({
           aria-live="polite"
         >
           {activeMode?.description}
+          {digitalScanOn ? " Digital Scan on." : ""}
           {speedOn ? " Speed on." : " Speed off."}
         </p>
       </div>

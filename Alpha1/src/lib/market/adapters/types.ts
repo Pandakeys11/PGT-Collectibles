@@ -5,6 +5,7 @@ export type ApiAdapterId =
   | "ebay_browse"
   | "ebay_sold_scrape"
   | "pricecharting"
+  | "pricecharting_sold"
   | "pokemon_tcg_prices"
   | "poketrace";
 

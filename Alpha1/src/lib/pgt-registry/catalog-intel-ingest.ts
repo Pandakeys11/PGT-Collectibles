@@ -9,6 +9,8 @@ import { priceChartingUsdFromEvidence } from "@/lib/market/catalog-raw-fmv";
 import { inferEvidenceGradeBucket } from "@/lib/market/market-intelligence";
 import { isPokeTraceConfigured, isPokeTracePrimary } from "@/lib/market/env-market";
 import { refreshPokeTraceCatalogPrices } from "@/lib/market/poketrace/sync-catalog";
+import { harvestPriceChartingSoldEvidence } from "@/lib/market/pricecharting/harvest-sold";
+import { toPriceChartingHistoryUrl } from "@/lib/market/pricecharting/queries";
 import { researchCardMarket } from "@/lib/market/research";
 import { catalogSummaryToExtractedCard } from "@/lib/market/pokemon-market-knowledge";
 import { fetchPokemonCardById } from "@/lib/pokedex/tcg-api-server";
@@ -83,19 +85,24 @@ export async function refreshCatalogPricesFromTcgApi(catalogId: string): Promise
   return true;
 }
 
-/** Cache PriceCharting loose guide on the card row for instant RAW FMV in catalog UI. */
+/** Cache PriceCharting loose guide + history URL on the card row for instant RAW FMV in catalog UI. */
 async function persistPriceChartingOnCatalogCard(
   catalogId: string,
   evidence: MarketEvidence[],
+  options?: { productUrl?: string | null; historyUrl?: string | null },
 ): Promise<void> {
   const pcUsd = priceChartingUsdFromEvidence(evidence);
-  if (pcUsd == null || !isSupabaseConfigured()) return;
+  if (pcUsd == null && !options?.historyUrl && !options?.productUrl) return;
+  if (!isSupabaseConfigured()) return;
 
   const card = await getCardFromDb("pokemon", catalogId);
   if (!card) return;
 
   const snap = card.prices ?? parseCatalogPriceSnapshot(null);
-  const pcRow = evidence.find((e) => e.source === "PriceCharting" && e.url);
+  const pcRow = evidence.find((e) => /pricecharting/i.test(e.source ?? "") && e.url);
+  const historyUrl =
+    options?.historyUrl ??
+    toPriceChartingHistoryUrl(options?.productUrl ?? pcRow?.url ?? snap.priceChartingUrl);
   const pricesJson = {
     tcgPlayerUrl: snap.tcgPlayerUrl,
     tcgPlayerUpdatedAt: snap.tcgPlayerUpdatedAt,
@@ -103,8 +110,8 @@ async function persistPriceChartingOnCatalogCard(
     cardMarketUrl: snap.cardMarketUrl,
     cardMarketUpdatedAt: snap.cardMarketUpdatedAt,
     cardMarket: snap.cardMarket,
-    priceChartingLooseUsd: pcUsd,
-    priceChartingUrl: pcRow?.url ?? snap.priceChartingUrl,
+    priceChartingLooseUsd: pcUsd ?? snap.priceChartingLooseUsd ?? null,
+    priceChartingUrl: historyUrl ?? snap.priceChartingUrl,
     priceChartingUpdatedAt: new Date().toISOString().slice(0, 10),
   };
 
@@ -244,12 +251,30 @@ export async function ingestCatalogMarketIntel(
       catalogId: id,
       profile: profile === "nightly" ? "nightly" : "scan",
     });
+
+    const pcHarvest = await harvestPriceChartingSoldEvidence(card);
+    const mergedEvidence = [...market.marketEvidence];
+    const seenKeys = new Set(
+      mergedEvidence.map(
+        (e) => `${e.kind}|${e.url ?? ""}|${e.title}|${e.priceUsd ?? ""}|${e.observedAt ?? ""}`,
+      ),
+    );
+    for (const row of pcHarvest.evidence) {
+      const key = `${row.kind}|${row.url ?? ""}|${row.title}|${row.priceUsd ?? ""}|${row.observedAt ?? ""}`;
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      mergedEvidence.push(row);
+    }
+
     await persistMarketIntelFromEnrich({
       catalogId: id,
       card,
-      marketEvidence: market.marketEvidence,
+      marketEvidence: mergedEvidence,
     });
-    await persistPriceChartingOnCatalogCard(id, market.marketEvidence);
+    await persistPriceChartingOnCatalogCard(id, mergedEvidence, {
+      productUrl: pcHarvest.productUrl,
+      historyUrl: pcHarvest.historyUrl,
+    });
 
     const popSnapshots = await persistCatalogPopulationFromMarketEvidence(
       id,
@@ -270,7 +295,7 @@ export async function ingestCatalogMarketIntel(
     return {
       catalogId: id,
       ok: true,
-      comps: market.marketEvidence.length,
+      comps: mergedEvidence.length,
       popSnapshots,
       graderPopSnapshots,
       pricesRefreshed,

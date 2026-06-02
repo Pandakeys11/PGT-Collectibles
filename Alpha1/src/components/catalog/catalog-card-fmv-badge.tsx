@@ -38,20 +38,34 @@ export function useCatalogCardRawFmv(args: CatalogCardFmvProps): CatalogRawFmv {
   return computed;
 }
 
+export type CatalogFmvRibbonSize = "compact" | "default" | "binder";
+
 /** Bottom ribbon on card art — always visible in master catalog grids. */
 export function CatalogCardFmvRibbon({
   className,
   compact = true,
+  size,
   ...args
-}: CatalogCardFmvProps & { className?: string; compact?: boolean }) {
+}: CatalogCardFmvProps & {
+  className?: string;
+  /** @deprecated Prefer `size` */
+  compact?: boolean;
+  size?: CatalogFmvRibbonSize;
+}) {
   const fmv = useCatalogCardRawFmv(args);
   const hasPrice = fmv.usd != null;
+  const resolvedSize: CatalogFmvRibbonSize =
+    size ?? (compact === false ? "default" : "compact");
 
   return (
     <div
       className={cn(
-        "sc-catalog-fmv-ribbon pointer-events-none absolute inset-x-0 bottom-0 z-[3] flex items-center justify-between gap-1 border-t border-amber-400/40 bg-gradient-to-t from-black/95 via-black/88 to-black/70 px-1 py-0.5 shadow-[0_-2px_8px_rgba(0,0,0,0.45)] backdrop-blur-[3px] sm:px-1.5 sm:py-1",
-        compact ? "min-h-[1.05rem] sm:min-h-[1.15rem]" : "min-h-[1.25rem]",
+        "sc-catalog-fmv-ribbon pointer-events-none absolute inset-x-0 bottom-0 z-[3] flex items-center justify-between gap-1 border-t border-amber-400/40 bg-gradient-to-t from-black/95 via-black/88 to-black/70 shadow-[0_-2px_8px_rgba(0,0,0,0.45)] backdrop-blur-[3px]",
+        resolvedSize === "binder" &&
+          "sc-catalog-fmv-ribbon--binder min-h-[1.35rem] px-1.5 py-1 sm:min-h-[1.45rem] sm:px-2",
+        resolvedSize === "compact" &&
+          "min-h-[1.05rem] px-1 py-0.5 sm:min-h-[1.15rem] sm:px-1.5 sm:py-1",
+        resolvedSize === "default" && "min-h-[1.25rem] px-1.5 py-1",
         className,
       )}
       title={hasPrice ? `Raw FMV · ${fmv.sourceLabel}` : "Raw FMV · price pending"}
@@ -59,9 +73,9 @@ export function CatalogCardFmvRibbon({
       <span
         className={cn(
           "font-bold uppercase leading-none text-amber-200/90",
-          compact
-            ? "text-[6px] tracking-[0.1em] sm:text-[7px]"
-            : "text-[7px] tracking-[0.12em] sm:text-[8px]",
+          resolvedSize === "binder" && "text-[7px] tracking-[0.08em] sm:text-[8px]",
+          resolvedSize === "compact" && "text-[6px] tracking-[0.1em] sm:text-[7px]",
+          resolvedSize === "default" && "text-[7px] tracking-[0.12em] sm:text-[8px]",
         )}
       >
         Raw FMV
@@ -69,7 +83,9 @@ export function CatalogCardFmvRibbon({
       <span
         className={cn(
           "font-mono font-bold tabular-nums leading-none",
-          compact ? "text-[9px] sm:text-[10px]" : "text-[10px] sm:text-xs",
+          resolvedSize === "binder" && "text-[11px] sm:text-xs",
+          resolvedSize === "compact" && "text-[9px] sm:text-[10px]",
+          resolvedSize === "default" && "text-[10px] sm:text-xs",
           hasPrice ? "text-amber-50 drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]" : "text-white/40",
         )}
       >

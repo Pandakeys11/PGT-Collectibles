@@ -3,12 +3,44 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
 import { topMomentumCards, type SetInsightCardSource } from "@/lib/catalog/set-insight-utils";
+import type { SetInsightPriceCard } from "@/lib/catalog/set-insight-payload";
 import type { WeeklyMoverCard, WeeklyMoversPayload } from "@/lib/market/build-weekly-movers";
+import { MarketCardThumb } from "@/components/ui/market-card-thumb";
 import { cn } from "@/lib/cn";
 
 function fmtUsd(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
   return `$${Math.round(n).toLocaleString()}`;
+}
+
+function payloadFromInsightMomentum(
+  setName: string,
+  rows: SetInsightPriceCard[],
+): WeeklyMoversPayload | null {
+  const mapped: WeeklyMoverCard[] = rows
+    .filter((r) => r.momentumPct != null && r.momentumPct !== 0 && r.catalogId)
+    .map((r) => ({
+      catalogId: r.catalogId!,
+      name: r.name,
+      setName,
+      setCode: null,
+      cardNumber: r.number ?? null,
+      rarity: r.rarity ?? null,
+      imageUrl: r.imageUrl ?? null,
+      priceUsd: r.priceUsd ?? null,
+      momentumPct: r.momentumPct ?? 0,
+      deltaUsd: null,
+    }));
+  if (!mapped.length) return null;
+  const increases = mapped.filter((r) => r.momentumPct > 0).slice(0, 6);
+  const decreases = mapped.filter((r) => r.momentumPct < 0).slice(0, 6);
+  if (!increases.length && !decreases.length) return null;
+  return {
+    ready: true,
+    refreshedAt: new Date().toISOString(),
+    increases,
+    decreases,
+  };
 }
 
 function clientPayloadFromCards(
@@ -51,10 +83,7 @@ function MoverRow({
   const inner = (
     <>
       <div className="h-9 w-7 shrink-0 overflow-hidden rounded bg-black/35 ring-1 ring-white/10">
-        {row.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={row.imageUrl} alt="" className="h-full w-full object-contain p-0.5" />
-        ) : null}
+        <MarketCardThumb src={row.imageUrl} className="p-0.5" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="line-clamp-1 text-[10px] font-medium text-primary">{row.name}</p>
@@ -102,6 +131,8 @@ export function SetMarketPulseStrip({
   onSelectCard,
   compact = false,
   embeddedInRail = false,
+  flow = false,
+  seedMomentum,
   className,
 }: {
   setId: string;
@@ -112,15 +143,24 @@ export function SetMarketPulseStrip({
   compact?: boolean;
   /** Inside CatalogMarketIntelligenceRail — parent supplies section chrome. */
   embeddedInRail?: boolean;
+  /** Flat layout inside unified binder insight panel (no extra bordered shell). */
+  flow?: boolean;
+  /** Set-insight momentum rows when /api/market/set-movers has no Cardmarket signal yet. */
+  seedMomentum?: SetInsightPriceCard[];
   className?: string;
 }) {
   const [payload, setPayload] = useState<WeeklyMoversPayload | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const preview = useMemo(
-    () => (cards?.length ? clientPayloadFromCards(setName, cards) : null),
-    [cards, setName],
+  const seedPayload = useMemo(
+    () => (seedMomentum?.length ? payloadFromInsightMomentum(setName, seedMomentum) : null),
+    [seedMomentum, setName],
   );
+
+  const preview = useMemo(() => {
+    if (seedPayload) return seedPayload;
+    return cards?.length ? clientPayloadFromCards(setName, cards) : null;
+  }, [cards, setName, seedPayload]);
 
   useEffect(() => {
     setPayload(null);
@@ -155,14 +195,18 @@ export function SetMarketPulseStrip({
         if (!cancelled) {
           setPayload((prev) => {
             if (body.ready) return body;
-            const local = cards?.length ? clientPayloadFromCards(setName, cards) : null;
+            const local =
+              seedPayload ??
+              (cards?.length ? clientPayloadFromCards(setName, cards) : null);
             return local ?? prev;
           });
         }
       } catch {
         if (!cancelled) {
           setPayload((prev) => {
-            const local = cards?.length ? clientPayloadFromCards(setName, cards) : null;
+            const local =
+              seedPayload ??
+              (cards?.length ? clientPayloadFromCards(setName, cards) : null);
             return local ?? prev;
           });
         }
@@ -174,7 +218,7 @@ export function SetMarketPulseStrip({
     return () => {
       cancelled = true;
     };
-  }, [setId, setName]);
+  }, [setId, setName, cards, seedPayload]);
 
   const display = payload ?? preview;
   const showLoading = loading && !display?.ready;
@@ -201,11 +245,12 @@ export function SetMarketPulseStrip({
       <div
         className={cn(
           "px-1 py-2 text-[10px] text-muted",
-          !embeddedInRail && "rounded-xl border border-white/8 bg-black/20 px-2.5",
+          !embeddedInRail && !flow && "rounded-xl border border-white/8 bg-black/20 px-2.5",
           className,
         )}
       >
-        No strong 7-day movers in this set yet — sync catalog prices or check back after market updates.
+        No 7-day movers flagged yet — Cardmarket trend data may be sparse for this set; check back after
+        catalog sync.
       </div>
     );
   }
@@ -259,7 +304,7 @@ export function SetMarketPulseStrip({
     </div>
   );
 
-  if (embeddedInRail) {
+  if (embeddedInRail || flow) {
     return (
       <div className={cn("sc-set-market-pulse", className)} aria-label={`${setName} 7-day movers`}>
         {grid}

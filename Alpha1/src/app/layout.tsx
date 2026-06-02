@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Fraunces } from "next/font/google";
+import { Syne } from "next/font/google";
 import localFont from "next/font/local";
 import { AppProviders } from "@/components/providers/app-providers";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme-boot";
@@ -14,13 +14,13 @@ const geistSans = localFont({
 });
 const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
+  variable: "--font-mono",
   weight: "100 900",
 });
-const fraunces = Fraunces({
+const syne = Syne({
   subsets: ["latin"],
   variable: "--font-display",
-  weight: ["500", "600", "700"],
+  weight: ["500", "600", "700", "800"],
   display: "swap",
 });
 
@@ -38,7 +38,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#080a0e",
+  themeColor: "#05070e",
 };
 
 export default function RootLayout({
@@ -52,7 +52,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} font-sans antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${syne.variable} font-sans antialiased`}
       >
         <ClerkProvider>
           <AppProviders>{children}</AppProviders>

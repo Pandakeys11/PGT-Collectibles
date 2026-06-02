@@ -16,6 +16,79 @@ export type CatalogCardDetailIdentity = {
   extraRows?: Array<{ label: string; value: string | null | undefined }>;
 };
 
+function CatalogDetailHero({
+  identity,
+  hideTitle,
+}: {
+  identity: CatalogCardDetailIdentity;
+  hideTitle?: boolean;
+}) {
+  return (
+    <section className="sc-catalog-detail-hero" aria-label={`${identity.name} card preview`}>
+      {identity.image ? (
+        <div className="sc-catalog-detail-hero__frame">
+          <div className="sc-catalog-detail-hero__art">{identity.image}</div>
+          <div className="sc-catalog-detail-hero__shine" aria-hidden />
+        </div>
+      ) : (
+        <div className="sc-catalog-detail-hero__frame sc-catalog-detail-hero__frame--empty">
+          <span className="text-xs text-faint">No artwork</span>
+        </div>
+      )}
+
+      <div className="sc-catalog-detail-hero__meta">
+        {!hideTitle ? (
+          <h3 className="sc-catalog-detail-hero__name">{identity.name}</h3>
+        ) : null}
+        {identity.subtitle ? (
+          <p className={cn("sc-catalog-detail-hero__subtitle", !hideTitle && "mt-0.5")}>
+            {identity.subtitle}
+          </p>
+        ) : null}
+        {identity.badges ? (
+          <div className="sc-catalog-detail-hero__badges">{identity.badges}</div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function CatalogDetailIdentityRow({
+  identity,
+  hideTitle,
+}: {
+  identity: CatalogCardDetailIdentity;
+  hideTitle?: boolean;
+}) {
+  return (
+    <div className="sc-catalog-detail-identity">
+      {identity.image ? (
+        <div className="sc-catalog-detail-identity__media">{identity.image}</div>
+      ) : null}
+      <div className="sc-catalog-detail-identity__text min-w-0">
+        {!hideTitle ? (
+          <h3 className="text-sm font-semibold leading-snug text-primary sm:text-[0.9375rem]">
+            {identity.name}
+          </h3>
+        ) : null}
+        {identity.subtitle ? (
+          <p
+            className={cn(
+              "text-[11px] leading-snug text-muted",
+              hideTitle ? "line-clamp-2" : "mt-0.5 line-clamp-2 sm:line-clamp-1",
+            )}
+          >
+            {identity.subtitle}
+          </p>
+        ) : null}
+        {identity.badges ? (
+          <div className="mt-1 flex max-w-full flex-wrap gap-1">{identity.badges}</div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function CatalogCardDetailBody({
   identity,
   actions,
@@ -42,31 +115,11 @@ export function CatalogCardDetailBody({
         isSheet && "sc-catalog-card-detail--sheet",
       )}
     >
-      <div className="sc-catalog-detail-identity">
-        {identity.image ? (
-          <div className="sc-catalog-detail-identity__media">{identity.image}</div>
-        ) : null}
-        <div className="sc-catalog-detail-identity__text min-w-0">
-          {!hideTitle ? (
-            <h3 className="text-sm font-semibold leading-snug text-primary sm:text-[0.9375rem]">
-              {identity.name}
-            </h3>
-          ) : null}
-          {identity.subtitle ? (
-            <p
-              className={cn(
-                "text-[11px] leading-snug text-muted",
-                hideTitle ? "line-clamp-2" : "mt-0.5 line-clamp-2 sm:line-clamp-1",
-              )}
-            >
-              {identity.subtitle}
-            </p>
-          ) : null}
-          {identity.badges ? (
-            <div className="mt-1 flex max-w-full flex-wrap gap-1">{identity.badges}</div>
-          ) : null}
-        </div>
-      </div>
+      {isSheet ? (
+        <CatalogDetailHero identity={identity} hideTitle={hideTitle} />
+      ) : (
+        <CatalogDetailIdentityRow identity={identity} hideTitle={hideTitle} />
+      )}
 
       {showMarketIntel ? (
         <CatalogCardMarketIntelPanel

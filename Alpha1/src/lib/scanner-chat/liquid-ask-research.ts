@@ -10,6 +10,8 @@ import { filterEvidenceByPrintEdition } from "@/lib/scan/print-edition";
 import type { ExtractedCard, MarketEvidence, ScanCardContext } from "@/lib/scan/schemas";
 import { shouldRunLiveResearch } from "@/lib/scanner-chat/liquid-ask-intent";
 import { resolveLiquidAskResearchTier } from "@/lib/scanner-chat/liquid-ask-research-tier";
+import { resolveLiquidAskCatalogCards } from "@/lib/scanner-chat/liquid-ask-catalog-visuals";
+import { deriveLiquidAskMarketPulse } from "@/lib/scanner-chat/liquid-ask-market-pulse";
 import { runLiquidAskWebBriefWithBudget } from "@/lib/scanner-chat/liquid-ask-web-brief-runner";
 import { countCompsBySource, sortCompsForDisplay } from "@/lib/scanner-chat/prioritize-comps";
 import { buildGradedHubLinks } from "@/lib/market/graded-hub-urls";
@@ -485,6 +487,19 @@ export async function runLiquidAskResearch(args: {
     .sort()
     .at(-1) ?? null;
 
+  let catalogCards: LiquidAskResearch["catalogCards"] = [];
+  try {
+    catalogCards = await resolveLiquidAskCatalogCards({
+      contexts: args.contexts,
+      focusSpecimenId: args.focusSpecimenId,
+      researchCard,
+    });
+  } catch {
+    catalogCards = [];
+  }
+
+  const marketPulse = deriveLiquidAskMarketPulse(comps);
+
   return {
     researchedAt,
     todayUtc: RESEARCH_TODAY_ISO,
@@ -495,6 +510,8 @@ export async function runLiquidAskResearch(args: {
     webNotes,
     sessionMarketAsOf,
     webBrief,
+    catalogCards,
+    marketPulse,
     liveResearchUsed:
       liveResearchUsed ||
       Boolean(webBrief) ||
@@ -531,6 +548,8 @@ export function liquidAskResearchForLlm(research: LiquidAskResearch): string {
       hubLinks: research.hubLinks,
       webNotes: research.webNotes,
       webBrief: research.webBrief,
+      catalogCards: research.catalogCards,
+      marketPulse: research.marketPulse,
       liveResearchUsed: research.liveResearchUsed,
     },
     null,

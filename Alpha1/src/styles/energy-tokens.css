@@ -5,14 +5,14 @@
 
 :root,
 html {
-  /* Nexus void foundation (doc base) */
-  --nexus-void: 5 6 10;
-  --nexus-panel: 11 15 24;
-  --nexus-card: 16 22 36;
-  --nexus-elevated: 21 28 44;
+  /* Nexus void foundation */
+  --nexus-void: 5 7 14;
+  --nexus-panel: 11 16 28;
+  --nexus-card: 17 24 40;
+  --nexus-elevated: 26 34 54;
   --nexus-text: 248 250 252;
-  --nexus-text-muted: 170 180 200;
-  --nexus-text-faint: 111 122 145;
+  --nexus-text-muted: 168 178 198;
+  --nexus-text-faint: 108 118 142;
 
   /* Fire — ember core → solar flare */
   --energy-fire-1: 255 69 38;

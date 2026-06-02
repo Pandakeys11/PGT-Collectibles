@@ -3,6 +3,7 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 import type { LiveMarketTickerLaneId, LiveMarketTickerSlide } from "@/lib/market/live-market-ticker-types";
 import { slideBannerPriceUsd } from "@/lib/market/live-market-ticker-display";
+import { MarketCardThumb } from "@/components/ui/market-card-thumb";
 import { cn } from "@/lib/cn";
 
 function fmtUsd(n: number | null | undefined): string {
@@ -54,8 +55,7 @@ export function LiveMarketTickerPill({
 
       {slide.imageUrl ? (
         <div className="h-8 w-[1.45rem] shrink-0 overflow-hidden rounded-md bg-black/40 ring-1 ring-white/10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={slide.imageUrl} alt="" className="h-full w-full object-contain p-px" />
+          <MarketCardThumb src={slide.imageUrl} className="p-px" priority />
         </div>
       ) : null}
 

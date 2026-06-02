@@ -18,10 +18,14 @@ import {
   Star,
   Trash2,
   TrendingUp,
+  Tv,
   Gavel,
   X,
+  FileImage,
 } from "lucide-react";
 import { LiquidScanRailToggle } from "@/components/scanner-chat/liquid-scan-rail-toggle";
+import { SidebarChrome, SidebarPgtPlayer } from "@/components/scanner-chat/sidebar-chrome";
+import { SidebarMarketPulse } from "@/components/scanner-chat/sidebar-market-pulse";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { BrandLogo } from "@/components/branding/brand-logo";
@@ -33,10 +37,12 @@ export type SidebarNavId =
   | "calculator"
   | "catalog"
   | "live-market"
+  | "pgt-youtube"
   | "ebay-ending"
   | "companion"
   | "history"
   | "collections"
+  | "scan-vault"
   | "watchlist"
   | "exports"
   | "billing";
@@ -51,10 +57,12 @@ const NAV: {
   { id: "calculator", label: "Deal calculator", icon: Calculator },
   { id: "catalog", label: "Master catalog", icon: BookOpen },
   { id: "live-market", label: "Live market pulse", icon: TrendingUp },
+  { id: "pgt-youtube", label: "PGT Video", icon: Tv },
   { id: "ebay-ending", label: "eBay ending soon", icon: Gavel },
   { id: "companion", label: "Companion", icon: Sparkles },
   { id: "history", label: "Recent scans", icon: History },
   { id: "collections", label: "Saved Collections", icon: Bookmark, href: "/saved" },
+  { id: "scan-vault", label: "Scan Vault", icon: FileImage, href: "/scan-vault" },
   { id: "watchlist", label: "Watchlist", icon: Star },
   { id: "exports", label: "Export CSV", icon: Download },
   { id: "billing", label: "Billing / Plan", icon: CreditCard, href: "/usage" },
@@ -185,8 +193,12 @@ function SidebarContent({
   themeStripCompact = false,
   onClose,
   onCollapseDesktop,
+  onOpenLiveMarket,
+  onOpenPgtYoutube,
 }: {
   onNewScan: () => void;
+  onOpenLiveMarket: () => void;
+  onOpenPgtYoutube?: () => void;
   onNav: (id: SidebarNavId) => void;
   canExport: boolean;
   recentSessions: ScanHistoryItem[];
@@ -235,6 +247,7 @@ function SidebarContent({
           </button>
         ) : null}
       </div>
+      <SidebarChrome onOpenLiveMarket={onOpenLiveMarket} onOpenPgtYoutube={onOpenPgtYoutube} />
       <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
         {NAV.map((item) => {
           const Icon = item.icon;
@@ -360,17 +373,22 @@ function CollapsedNavRail({
   onExpand,
   onNewScan,
   onNav,
+  onOpenLiveMarket,
+  onOpenPgtYoutube,
 }: {
   onExpand: () => void;
   onNewScan: () => void;
   onNav: (id: SidebarNavId) => void;
+  onOpenLiveMarket: () => void;
+  onOpenPgtYoutube?: () => void;
 }) {
   return (
-    <div className="sc-liquid-scan-nav-collapsed flex h-full min-h-0 w-full flex-col items-center gap-1 border-r border-white/6 bg-[rgb(6,8,12)]/95 py-3">
+    <div className="sc-liquid-scan-nav-collapsed flex h-full min-h-0 w-full flex-col items-center gap-1 border-r border-white/6 bg-chrome-deep py-3">
       <LiquidScanRailToggle label="Expand navigation" onClick={onExpand} edge="strip">
         <PanelLeftOpen className="h-4 w-4" aria-hidden />
       </LiquidScanRailToggle>
       <div className="my-1 h-px w-6 bg-white/10" aria-hidden />
+      <SidebarMarketPulse compact onOpenFull={onOpenLiveMarket} />
       {COLLAPSED_NAV_QUICK.map((item) => {
         const Icon = item.icon;
         return (
@@ -387,12 +405,20 @@ function CollapsedNavRail({
           </LiquidScanRailToggle>
         );
       })}
-      <p
-        className="mt-auto select-none pb-1 text-[8px] font-semibold uppercase tracking-[0.2em] text-faint [writing-mode:vertical-rl]"
-        aria-hidden
-      >
-        Nav
-      </p>
+      <div className="mt-auto flex flex-col items-center gap-2 pb-1">
+        {onOpenPgtYoutube ? (
+          <LiquidScanRailToggle label="PGT Video" edge="strip" onClick={onOpenPgtYoutube}>
+            <Tv className="h-4 w-4" aria-hidden />
+          </LiquidScanRailToggle>
+        ) : null}
+        <SidebarPgtPlayer rail />
+        <p
+          className="select-none text-[8px] font-semibold uppercase tracking-[0.2em] text-faint [writing-mode:vertical-rl]"
+          aria-hidden
+        >
+          Nav
+        </p>
+      </div>
     </div>
   );
 }
@@ -418,11 +444,15 @@ export function ScannerSidebar({
   savingScan,
   desktopCollapsed = false,
   onToggleDesktopCollapsed,
+  onOpenLiveMarket,
+  onOpenPgtYoutube,
   className,
 }: {
   mobileOpen: boolean;
   onMobileClose: () => void;
   onNewScan: () => void;
+  onOpenLiveMarket: () => void;
+  onOpenPgtYoutube?: () => void;
   onNav: (id: SidebarNavId) => void;
   canExport: boolean;
   recentSessions: ScanHistoryItem[];
@@ -444,6 +474,8 @@ export function ScannerSidebar({
 }) {
   const sidebarProps = {
     onNewScan,
+    onOpenLiveMarket,
+    onOpenPgtYoutube,
     onNav,
     canExport,
     recentSessions,
@@ -525,6 +557,8 @@ export function ScannerSidebar({
             onExpand={onToggleDesktopCollapsed}
             onNewScan={onNewScan}
             onNav={onNav}
+            onOpenLiveMarket={onOpenLiveMarket}
+            onOpenPgtYoutube={onOpenPgtYoutube}
           />
         ) : (
           <SidebarContent

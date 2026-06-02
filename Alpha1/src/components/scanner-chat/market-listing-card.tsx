@@ -10,17 +10,9 @@ import {
 } from "@/lib/scan/specimen-market-view";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 import type { buildEbayGradeHubs, buildHubUrlMap } from "@/lib/market/sources";
+import { MarketSourceLogo } from "@/components/market/market-source-logo";
+import { normalizeMarketSource } from "@/lib/market/sources";
 import { cn } from "@/lib/cn";
-
-function sourceLabel(source: string | null | undefined): string {
-  const s = (source ?? "Market").trim();
-  if (/ebay/i.test(s)) return "eBay";
-  if (/tcgplayer/i.test(s)) return "TCGPlayer";
-  if (/cardmarket/i.test(s)) return "Cardmarket";
-  if (/pricecharting/i.test(s)) return "PriceCharting";
-  if (/pwcc|goldin|heritage/i.test(s)) return "Auction";
-  return s.length > 18 ? `${s.slice(0, 16)}…` : s;
-}
 
 function sourceAccent(source: string | null | undefined): string {
   if (/ebay/i.test(source ?? "")) return "from-[#e53238]/20 to-rose-950/40 border-rose-500/25";
@@ -67,9 +59,13 @@ export function MarketListingCard({
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="inline-flex items-center gap-1 rounded-md bg-black/35 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-200">
-          <Icon className="h-3 w-3 shrink-0" aria-hidden />
-          {sourceLabel(item.source)}
+        <span className="inline-flex items-center gap-1 rounded-md bg-black/35 px-1.5 py-0.5">
+          <Icon className="h-3 w-3 shrink-0 text-slate-300" aria-hidden />
+          <MarketSourceLogo
+            label={item.source ?? "Market"}
+            sourceId={normalizeMarketSource(item.source)}
+            variant="compact"
+          />
         </span>
         {item.slab ? (
           <span className="max-w-[5rem] truncate rounded bg-white/10 px-1 py-0.5 font-mono text-[9px] text-amber-100/95">

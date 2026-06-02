@@ -1956,3 +1956,77 @@ create table if not exists public.tcg_catalog_set_insights (
 create index if not exists tcg_catalog_set_insights_refreshed_idx
   on public.tcg_catalog_set_insights (refreshed_at desc);
 
+
+-- ========== 202605290001_digital_scan_assets.sql ==========
+-- PGT Digital Scan Vault — persisted scanner-grade card crops per user session.
+
+create table if not exists public.digital_scan_assets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.app_users(id) on delete cascade,
+  session_id uuid references public.scan_sessions(id) on delete set null,
+  extracted_card_id uuid references public.extracted_cards(id) on delete set null,
+  specimen_key text not null,
+  storage_path text not null,
+  filename text not null,
+  mime text not null default 'image/jpeg',
+  width int,
+  height int,
+  card_index_on_page int,
+  lane text not null check (lane in ('raw', 'graded')),
+  catalog_id text,
+  sidecar_json jsonb not null default '{}'::jsonb,
+  content_sha256 text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists digital_scan_assets_user_created_idx
+  on public.digital_scan_assets (user_id, created_at desc);
+
+create index if not exists digital_scan_assets_session_idx
+  on public.digital_scan_assets (session_id)
+  where session_id is not null;
+
+create unique index if not exists digital_scan_assets_session_specimen_uidx
+  on public.digital_scan_assets (session_id, specimen_key)
+  where session_id is not null;
+
+-- Explicit constraint for upsert onConflict
+do $$ begin
+  alter table public.digital_scan_assets
+    add constraint digital_scan_assets_session_specimen_unique
+    unique (session_id, specimen_key);
+exception
+  when duplicate_object then null;
+end $$;
+
+
+-- ========== 202605300001_catalog_binder_owned.sql ==========
+-- Master catalog digital binder — per-user owned cards by set (set tracker).
+-- Applied via: npm run db:apply  OR  npm run db:apply:binder-tracker
+
+create table if not exists public.catalog_binder_owned_cards (
+  user_id uuid not null references public.app_users(id) on delete cascade,
+  set_id text not null,
+  catalog_id text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, catalog_id)
+);
+
+create index if not exists catalog_binder_owned_cards_user_set_idx
+  on public.catalog_binder_owned_cards (user_id, set_id);
+
+create index if not exists catalog_binder_owned_cards_set_catalog_idx
+  on public.catalog_binder_owned_cards (set_id, catalog_id);
+
+drop trigger if exists catalog_binder_owned_cards_touch_updated_at on public.catalog_binder_owned_cards;
+create trigger catalog_binder_owned_cards_touch_updated_at
+before update on public.catalog_binder_owned_cards
+for each row execute function public.touch_updated_at();
+
+comment on table public.catalog_binder_owned_cards is
+  'Master catalog binder set tracker — cards marked owned per user/set.';
+
+alter table public.catalog_binder_owned_cards enable row level security;
+

@@ -18,16 +18,16 @@ export type CatalogAmbientSource = {
   imageUrl?: string | null;
 };
 
-/** Obsidian default — matches `theme-spectrum.css` obsidian-clean. */
+/** PGT Liquid default — matches `pgt-liquid-theme.css`. */
 export const OBSIDIAN_AMBIENT: CatalogAmbientPalette = {
-  holoA: "141 153 174",
-  holoB: "255 230 0",
-  holoC: "201 214 223",
-  gradientMid: "10 12 18",
-  gradientBloom: "40 50 70",
-  sparkPrimary: "#8d99ae",
-  sparkSecondary: "#ffe600",
-  sparkTertiary: "#fff7a8",
+  holoA: "8 145 178",
+  holoB: "250 204 21",
+  holoC: "167 139 250",
+  gradientMid: "9 13 24",
+  gradientBloom: "30 42 68",
+  sparkPrimary: "#22d3ee",
+  sparkSecondary: "#facc15",
+  sparkTertiary: "#c4b5fd",
 };
 
 const paletteCache = new Map<string, CatalogAmbientPalette>();

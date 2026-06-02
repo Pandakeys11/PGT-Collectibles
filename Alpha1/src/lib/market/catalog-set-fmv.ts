@@ -67,7 +67,27 @@ export function resolveRawFmvForTcgCard(
   });
 }
 
-/** Attach headline Raw FMV to grid cards (same stack as catalog detail intel). */
+function attachRawFmvFields(
+  card: TcgCardSummary,
+  fmv: CatalogRawFmv,
+): TcgCardSummary {
+  return {
+    ...card,
+    rawFmvUsd: fmv.usd,
+    rawFmvSourceLabel: fmv.sourceLabel,
+    rawFmvBasis: fmv.basis,
+    tcgPlayerUsd: fmv.tcgPlayerUsd,
+    priceChartingUsd: fmv.priceChartingUsd,
+  };
+}
+
+/** Fast grid FMV — TCGPlayer / Cardmarket / PriceCharting snapshot only (no comps DB). */
+export function attachRawFmvToTcgCardsFast(cards: TcgCardSummary[]): TcgCardSummary[] {
+  if (!cards.length) return cards;
+  return cards.map((card) => attachRawFmvFields(card, resolveRawFmvForTcgCard(card)));
+}
+
+/** Attach headline Raw FMV with persisted comps when available (detail / intel). */
 export async function attachRawFmvToTcgCards(
   cards: TcgCardSummary[],
 ): Promise<TcgCardSummary[]> {
@@ -77,13 +97,6 @@ export async function attachRawFmvToTcgCards(
 
   return cards.map((card) => {
     const fmv = resolveRawFmvForTcgCard(card, evidenceMap.get(card.id));
-    return {
-      ...card,
-      rawFmvUsd: fmv.usd,
-      rawFmvSourceLabel: fmv.sourceLabel,
-      rawFmvBasis: fmv.basis,
-      tcgPlayerUsd: fmv.tcgPlayerUsd,
-      priceChartingUsd: fmv.priceChartingUsd,
-    };
+    return attachRawFmvFields(card, fmv);
   });
 }

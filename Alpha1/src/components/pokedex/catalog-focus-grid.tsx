@@ -16,7 +16,7 @@ export function CatalogFocusGrid<T>({
   /** Replaces default grid column template (e.g. CATALOG_CARD_GRID_4X4). */
   gridClassName?: string;
   className?: string;
-  renderItem: (item: T, state: { focused: boolean; dimmed: boolean }) => ReactNode;
+  renderItem: (item: T, state: { focused: boolean; dimmed: boolean; index: number }) => ReactNode;
 }) {
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
 
@@ -27,7 +27,7 @@ export function CatalogFocusGrid<T>({
       className={cn("sc-catalog-card-grid grid", gridClassName, className)}
       onMouseLeave={clearFocus}
     >
-      {items.map((item) => {
+      {items.map((item, index) => {
         const key = getKey(item);
         const focused = focusedKey === key;
         const dimmed = focusedKey != null && !focused;
@@ -48,7 +48,7 @@ export function CatalogFocusGrid<T>({
               }
             }}
           >
-            {renderItem(item, { focused, dimmed })}
+            {renderItem(item, { focused, dimmed, index })}
           </div>
         );
       })}

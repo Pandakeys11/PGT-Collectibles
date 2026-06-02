@@ -261,11 +261,16 @@ export function topMomentumCards(
   limit = 4,
   evidenceByCatalogId?: Map<string, MarketEvidence[]>,
 ): SetInsightCardRow[] {
-  return cards
+  const rows = cards
     .map((c) => cardInsightRow(c, evidenceByCatalogId?.get(c.id)))
-    .filter((r) => r.momentumPct != null && Math.abs(r.momentumPct!) >= 3)
-    .sort((a, b) => Math.abs(b.momentumPct ?? 0) - Math.abs(a.momentumPct ?? 0))
-    .slice(0, limit);
+    .filter((r) => r.momentumPct != null && r.momentumPct !== 0);
+
+  const strong = rows
+    .filter((r) => Math.abs(r.momentumPct!) >= 3)
+    .sort((a, b) => Math.abs(b.momentumPct ?? 0) - Math.abs(a.momentumPct ?? 0));
+
+  const pool = strong.length > 0 ? strong : rows.sort((a, b) => Math.abs(b.momentumPct ?? 0) - Math.abs(a.momentumPct ?? 0));
+  return pool.slice(0, limit);
 }
 
 export function promoCardsInSet(

@@ -7,6 +7,8 @@ import type {
   CatalogSetInsightPayload,
   SetInsightPriceCard,
 } from "@/lib/catalog/set-insight-payload";
+import { CatalogChaseCardTile } from "@/components/catalog/catalog-chase-card-tile";
+import { CatalogSetSealedFmvPanel } from "@/components/catalog/catalog-set-sealed-fmv-panel";
 import { cn } from "@/lib/cn";
 
 function fmtUsd(n: number | null | undefined): string {
@@ -65,12 +67,15 @@ export function CatalogSetInsightRail({
   setName,
   cards,
   onSelectCard,
+  hideChaseCard = false,
   className,
 }: {
   setId: string;
   setName: string;
   cards: SetInsightCardSource[];
   onSelectCard?: (catalogId: string) => void;
+  /** Skip chase hero when shown in the set header / binder insight panel. */
+  hideChaseCard?: boolean;
   className?: string;
 }) {
   const [insight, setInsight] = useState<CatalogSetInsightPayload | null>(null);
@@ -228,26 +233,13 @@ export function CatalogSetInsightRail({
               </section>
             ) : null}
 
-            {insight.chaseCard ? (
+            {!hideChaseCard && insight.chaseCard ? (
               <section className="mb-3">
-                <p className="px-1 text-[9px] font-semibold uppercase tracking-wide text-faint">Chase card</p>
-                <InsightCardRow
-                  row={insight.chaseCard}
-                  onClick={
-                    insight.chaseCard.catalogId && onSelectCard
-                      ? () => onSelectCard(insight.chaseCard!.catalogId!)
-                      : undefined
-                  }
-                  trailing={
-                    <div className="text-right">
-                      <span className="font-mono text-[12px] font-semibold text-amber-200">
-                        {fmtUsd(insight.chaseCard.priceUsd)}
-                      </span>
-                      {insight.chaseSku ? (
-                        <p className="font-mono text-[8px] text-faint">{insight.chaseSku}</p>
-                      ) : null}
-                    </div>
-                  }
+                <CatalogChaseCardTile
+                  card={insight.chaseCard}
+                  chaseSku={insight.chaseSku}
+                  onSelect={onSelectCard}
+                  className="w-full"
                 />
               </section>
             ) : null}
@@ -294,6 +286,14 @@ export function CatalogSetInsightRail({
               )}
             </section>
 
+            <CatalogSetSealedFmvPanel
+              setId={setId}
+              setName={setName}
+              sealedProducts={sealed}
+              loading={loading}
+              className="mb-3"
+            />
+
             {promos.length > 0 ? (
               <section className="mb-3">
                 <p className="px-1 text-[9px] font-semibold uppercase tracking-wide text-faint">
@@ -315,42 +315,6 @@ export function CatalogSetInsightRail({
                     />
                   ))}
                 </div>
-              </section>
-            ) : null}
-
-            {sealed.length > 0 ? (
-              <section className="mb-3">
-                <p className="px-1 text-[9px] font-semibold uppercase tracking-wide text-faint">Sealed product</p>
-                <ul className="mt-1 space-y-1.5">
-                  {sealed.map((row, i) => (
-                    <li
-                      key={`${row.label}-${i}`}
-                      className="rounded-lg border border-white/8 bg-black/20 px-2 py-1.5"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-[10px] font-medium text-primary">{row.label}</p>
-                        <span className="shrink-0 font-mono text-[10px] text-amber-200">
-                          {fmtUsd(row.priceUsd)}
-                        </span>
-                      </div>
-                      {row.priceLabel ? (
-                        <p className="text-[8px] uppercase tracking-wide text-faint">{row.priceLabel}</p>
-                      ) : null}
-                      {row.note ? <p className="mt-0.5 text-[9px] text-muted">{row.note}</p> : null}
-                      {row.searchUrl ? (
-                        <a
-                          href={row.searchUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-1 inline-flex items-center gap-1 text-[9px] font-medium text-amber-300 hover:underline"
-                        >
-                          Market search
-                          <ExternalLink className="h-2.5 w-2.5" aria-hidden />
-                        </a>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
               </section>
             ) : null}
 

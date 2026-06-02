@@ -7,13 +7,14 @@
   --sc-bg: var(--bg-canvas);
   --sc-panel: var(--bg-panel);
   --sc-panel-raised: var(--bg-panel-raised);
-  --sc-cyan: var(--semantic-flow);
+  --sc-cyan: var(--brand-cyan);
   --sc-emerald: var(--semantic-verified);
-  --sc-amber: var(--semantic-warning);
-  --sc-rose: var(--semantic-danger);
+  --sc-amber: var(--brand-gold);
+  --sc-rose: var(--brand-rose);
   --sc-border: 255 255 255;
-  --sc-glow-emerald: var(--semantic-verified);
-  --sc-glow-blue: var(--accent-strong);
+  --sc-glow-emerald: var(--brand-mint);
+  --sc-glow-blue: var(--brand-cyan-bright);
+  --sc-glow-gold: var(--brand-gold);
   --sc-accent: var(--accent);
   --sc-text: var(--text-primary);
   --sc-text-muted: var(--text-muted);
@@ -59,9 +60,9 @@
   padding: 1px;
   background: linear-gradient(
     135deg,
-    rgb(var(--sc-glow-emerald) / 0.45),
-    rgb(var(--sc-glow-blue) / 0.35),
-    rgb(var(--sc-glow-emerald) / 0.2)
+    rgb(var(--brand-cyan) / 0.5),
+    rgb(var(--brand-gold) / 0.35),
+    rgb(var(--brand-violet) / 0.4)
   );
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
@@ -124,9 +125,15 @@
 }
 
 /* Master catalog embedded in Liquid Scan chat */
-.scanner-chat-root .sc-catalog-embed-panel,
-.scanner-chat-root .sc-chat-output-panel {
+.scanner-chat-root .sc-catalog-embed-panel {
   min-height: min(20rem, 50dvh);
+}
+
+/* Stacked chat embeds — natural height; workspace feed scrolls */
+.scanner-chat-root .sc-chat-output-panel--stacked {
+  min-height: 0;
+  max-height: none;
+  flex: none;
 }
 
 .scanner-chat-root .liquid-catalog-embed .desk-surface-raised,
@@ -192,6 +199,296 @@
   border-radius: 0.75rem;
 }
 
+/* Master catalog binder page — insights + market + set research above binder */
+.sc-catalog-set-binder-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.sc-catalog-set-binder-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+/* Unified binder insight — single flowing column (no nested scroll rails) */
+.sc-catalog-binder-insight-flow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+}
+
+.sc-catalog-set-binder-rail:has(.sc-catalog-binder-insight-flow) {
+  overflow: visible;
+  gap: 0.5rem;
+}
+
+.sc-catalog-set-binder-layout--split .sc-catalog-set-binder-rail:has(.sc-catalog-binder-insight-flow) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sc-catalog-binder-insight-flow .sc-catalog-sealed-fmv {
+  flex-shrink: 0;
+}
+
+.sc-catalog-binder-insight-flow .sc-set-market-pulse {
+  min-width: 0;
+}
+
+.sc-catalog-set-binder-layout .sc-catalog-rail--binder-inline {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  max-height: none;
+  overflow: hidden;
+}
+
+.sc-catalog-set-binder-layout .sc-catalog-market-intelligence-rail {
+  max-height: min(26vh, 220px);
+}
+
+.sc-catalog-set-binder-layout .sc-catalog-set-insight-rail {
+  max-height: min(40vh, 360px);
+}
+
+.sc-catalog-set-binder-layout .sc-catalog-market-intelligence-scroll,
+.sc-catalog-set-binder-layout .sc-catalog-set-insight-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sc-catalog-set-binder-layout .sc-catalog-cards-scroll--in-binder-stack {
+  flex: none;
+  min-width: 0;
+}
+
+/* Set insight — chase card tile (header band + insight rail) */
+.sc-catalog-chase-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+.sc-catalog-chase-card--featured {
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgb(251 191 36 / 0.22);
+  background: linear-gradient(135deg, rgb(0 0 0 / 0.35) 0%, rgb(251 191 36 / 0.06) 100%);
+}
+
+.sc-catalog-chase-card--interactive {
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.sc-catalog-chase-card--interactive:hover {
+  border-color: rgb(251 191 36 / 0.42);
+  background: linear-gradient(135deg, rgb(0 0 0 / 0.42) 0%, rgb(251 191 36 / 0.1) 100%);
+  box-shadow: 0 8px 20px -12px rgb(0 0 0 / 0.65);
+}
+
+.sc-catalog-chase-card__art {
+  width: 4.75rem;
+  aspect-ratio: 63 / 88;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 0.4rem;
+  background: linear-gradient(180deg, rgb(18 20 26) 0%, rgb(8 10 14) 100%);
+  box-shadow:
+    0 0 0 1px rgb(251 191 36 / 0.18),
+    0 6px 14px -8px rgb(0 0 0 / 0.75);
+}
+
+.sc-catalog-chase-card__img {
+  display: block;
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  object-position: center top;
+}
+
+.sc-catalog-chase-card__placeholder {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-catalog-chase-card__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sc-catalog-chase-card__eyebrow {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(252 211 77 / 0.88);
+}
+
+.sc-catalog-chase-card__name {
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 1.25;
+  color: rgb(var(--sc-primary));
+  overflow-wrap: anywhere;
+}
+
+.sc-catalog-chase-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.45rem;
+  font-size: 0.5625rem;
+  line-height: 1.35;
+  color: rgb(var(--sc-muted));
+}
+
+.sc-catalog-chase-card__number {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-weight: 600;
+}
+
+.sc-catalog-chase-card__sku {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: rgb(var(--sc-faint));
+}
+
+.sc-catalog-chase-card__price-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  margin-top: 0.15rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.sc-catalog-chase-card__price {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: rgb(254 243 199);
+}
+
+.sc-catalog-chase-card__source {
+  font-size: 0.5625rem;
+  line-height: 1.3;
+  color: rgb(var(--sc-faint));
+  overflow-wrap: anywhere;
+}
+
+.sc-catalog-set-binder-rail .sc-catalog-chase-card__art {
+  width: 5.25rem;
+}
+
+@media (min-width: 640px) {
+  .sc-catalog-chase-card__art {
+    width: 5.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sc-catalog-set-binder-layout--split {
+    display: grid;
+    grid-template-columns: minmax(248px, 288px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0.65rem;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  .sc-catalog-set-binder-rail {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .sc-catalog-set-binder-stage {
+    min-height: 0;
+    min-width: 0;
+    border-radius: 0.75rem;
+    background: linear-gradient(180deg, rgb(10 12 16 / 0.35) 0%, rgb(6 8 11 / 0.55) 100%);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+  }
+
+  .sc-catalog-set-binder-layout--split .sc-catalog-set-binder-insights {
+    gap: 0.45rem;
+  }
+
+  .sc-catalog-set-binder-layout--split .sc-catalog-market-intelligence-rail {
+    max-height: min(28%, 190px);
+    flex-shrink: 0;
+  }
+
+  .sc-catalog-set-binder-layout--split .sc-catalog-rail--binder-insight {
+    flex: 1 1 auto;
+    min-height: 10rem;
+    max-height: none;
+  }
+
+  .sc-catalog-set-binder-layout--split .sc-catalog-set-insight-scroll {
+    max-height: min(42vh, 340px);
+  }
+
+  .sc-catalog-set-binder-layout--split .sc-catalog-binder-insight-flow {
+    max-height: none;
+  }
+
+  .sc-catalog-set-binder-layout--split .sc-catalog-cards-scroll--in-binder-stack {
+    flex: 1 1 0%;
+    min-height: 0 !important;
+    height: 100%;
+    overflow: hidden;
+    padding-top: 0.2rem;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-set-binder-layout--split {
+    overflow: hidden;
+    overflow-y: hidden;
+    scrollbar-gutter: auto;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-set-binder-layout--split .sc-catalog-cards-scroll--binder {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    max-height: none;
+    overflow: hidden !important;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-set-binder-layout--split .sc-binder-root--embedded {
+    height: 100%;
+    min-height: 0;
+  }
+}
+
 /* Liquid Scan — collapsible nav + market intelligence rails (desktop) */
 .scanner-chat-root .sc-liquid-scan-nav-rail,
 .scanner-chat-root .sc-liquid-scan-intel-rail {
@@ -226,6 +523,64 @@
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
+}
+
+.scanner-chat-root .sc-binder-stage {
+  touch-action: pan-y pinch-zoom;
+}
+
+/* Master catalog open — composer height + desktop fill layout */
+.scanner-chat-root:has(.sc-catalog-session-panel--open) {
+  --sc-composer-height: calc(4.85rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Desktop: master catalog stacks in workspace scroll (chat stays visible above) */
+@media (min-width: 1024px) {
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-session-slot {
+    flex: none;
+    overflow: visible;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-session-panel {
+    flex: none;
+    height: auto;
+    min-height: min(28rem, 52vh);
+    max-height: none;
+    overflow: visible;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .liquid-catalog-embed {
+    flex: none;
+    overflow: visible;
+    min-height: min(24rem, 48vh);
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-pokedex-catalog-grid,
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .liquid-catalog-embed > * {
+    flex: none !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-pokedex-catalog-grid--set-open {
+    display: flex;
+    flex-direction: column;
+    min-height: min(56vh, 680px);
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-set-binder-layout--split {
+    min-height: min(50vh, 640px);
+    max-height: min(68vh, 780px);
+    overflow: hidden;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-set-binder-layout--split .sc-catalog-cards-scroll--in-binder-stack {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+  }
 }
 
 .scanner-chat-root .sc-catalog-set-scroll {
@@ -294,32 +649,129 @@
   gap: 0.625rem;
 }
 
-.sc-catalog-card-detail--sheet .sc-catalog-detail-identity {
+/* Sheet variant — trading-card hero (large art, meta below) */
+.sc-catalog-card-detail--sheet .sc-catalog-detail-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.15rem;
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-hero__frame {
+  position: relative;
+  display: flex;
+  width: min(100%, 15.5rem);
+  max-height: min(58dvh, 28rem);
+  aspect-ratio: 63 / 88;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 0.85rem;
+  padding: 0.55rem 0.45rem 0.65rem;
+  background:
+    linear-gradient(165deg, rgb(42 48 58 / 0.95) 0%, rgb(14 16 20 / 0.98) 55%, rgb(8 10 14) 100%);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.1),
+    0 0 0 2px rgb(0 0 0 / 0.35),
+    0 18px 40px -14px rgb(0 0 0 / 0.65),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-hero__frame--empty {
+  min-height: 12rem;
+  color: rgb(var(--sc-muted));
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-hero__art {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-hero__art img {
+  height: 100%;
+  width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+  filter: drop-shadow(0 10px 18px rgb(0 0 0 / 0.45));
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-hero__shine {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  background: linear-gradient(
+    125deg,
+    transparent 38%,
+    rgb(255 255 255 / 0.07) 48%,
+    rgb(180 220 255 / 0.1) 52%,
+    transparent 62%
+  );
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-hero__meta {
+  width: 100%;
+  text-align: center;
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-hero__name {
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: rgb(var(--sc-primary));
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-hero__subtitle {
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: rgb(var(--sc-muted));
+}
+
+.sc-catalog-card-detail--sheet .sc-catalog-detail-hero__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+@media (min-width: 640px) {
+  .sc-catalog-card-detail--sheet .sc-catalog-detail-hero__frame {
+    width: min(100%, 16.75rem);
+    max-height: min(62dvh, 30rem);
+    padding: 0.65rem 0.5rem 0.75rem;
+  }
+
+  .sc-catalog-card-detail--sheet .sc-catalog-detail-hero__name {
+    font-size: 1.0625rem;
+  }
+}
+
+/* Full-page variant — compact horizontal identity row */
+.sc-catalog-card-detail:not(.sc-catalog-card-detail--sheet) .sc-catalog-detail-identity {
   display: grid;
-  grid-template-columns: 2.75rem 1fr;
-  gap: 0.5rem 0.625rem;
+  grid-template-columns: 3.25rem 1fr;
+  gap: 0.5rem 0.75rem;
   align-items: start;
 }
 
-.sc-catalog-card-detail--sheet .sc-catalog-detail-identity__media {
-  width: 2.75rem;
-  height: 3.65rem;
+.sc-catalog-card-detail:not(.sc-catalog-card-detail--sheet) .sc-catalog-detail-identity__media {
+  width: 3.25rem;
+  height: 4.35rem;
   overflow: hidden;
   border-radius: 0.5rem;
   background: rgb(var(--sc-panel-raised) / 0.45);
   box-shadow: 0 0 0 1px rgb(var(--sc-border) / 0.35);
-}
-
-@media (min-width: 640px) {
-  .sc-catalog-card-detail--sheet .sc-catalog-detail-identity {
-    grid-template-columns: 3.25rem 1fr;
-    gap: 0.5rem 0.75rem;
-  }
-
-  .sc-catalog-card-detail--sheet .sc-catalog-detail-identity__media {
-    width: 3.25rem;
-    height: 4.35rem;
-  }
 }
 
 .sc-catalog-fmv-badge {
@@ -344,6 +796,10 @@
 
 .sc-catalog-card-detail--sheet .sc-catalog-fmv-band p.font-mono.text-\[1\.75rem\] {
   font-size: 1.375rem;
+}
+
+.sc-catalog-card-detail--sheet {
+  gap: 0.75rem;
 }
 
 .sc-pokedex-card-detail-sheet {
@@ -420,9 +876,21 @@
   }
 }
 
-/* Live market pulse — desktop banner + chat embed */
+/* Live market pulse — sidebar + legacy banner */
 .sc-composer-stack {
   max-width: 100%;
+}
+
+.sc-sidebar-chrome {
+  background: linear-gradient(180deg, rgb(var(--bg-panel-raised) / 0.55) 0%, transparent 100%);
+}
+
+.sc-sidebar-market-pulse__pill {
+  flex: none;
+}
+
+.sc-sidebar-market-pulse__pill .sc-live-market-pill {
+  width: 100%;
 }
 
 .sc-live-market-banner-row {
@@ -482,8 +950,38 @@
 
   .sc-live-market-embed-panel.sc-chat-output-panel,
   .sc-ebay-ending-embed-panel.sc-chat-output-panel {
-    max-height: min(calc(100dvh - 12rem), 640px);
+    max-height: none;
   }
+}
+
+/* PGT Video — classic 4:3 episodes fill width without side bars */
+.sc-pgt-youtube-player__stage {
+  aspect-ratio: 4 / 3;
+  width: 100%;
+}
+
+.sc-pgt-youtube-player__mount,
+.sc-pgt-youtube-player__mount iframe {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0;
+}
+
+.sc-pgt-youtube-embed-panel.sc-chat-output-panel--stacked {
+  min-height: 0;
+  max-height: none;
+}
+
+.sc-live-market-embed-panel.sc-chat-output-panel--stacked .sc-live-market-panel__scroll,
+.sc-ebay-ending-embed-panel.sc-chat-output-panel--stacked .sc-ebay-ending-panel__scroll {
+  max-height: min(28rem, 52vh);
+}
+
+.sc-assistant-wide-embed {
+  scroll-margin-top: 0.75rem;
+  scroll-margin-bottom: 0.75rem;
 }
 
 .scanner-chat-scrollbar {
@@ -546,7 +1044,7 @@
     max-height: 100dvh;
     max-height: 100svh;
     overflow: hidden;
-    --sc-composer-height: 6.25rem;
+    --sc-composer-height: calc(6.75rem + env(safe-area-inset-bottom, 0px));
     font-size: 12px;
     line-height: 1.4;
     -webkit-font-smoothing: antialiased;
@@ -556,7 +1054,11 @@
   /* Embedded workspace (catalog, market, companion) — fill between header + composer */
   .scanner-chat-root:has(.sc-chat-output-panel) {
     --sc-mobile-chrome: calc(3.25rem + env(safe-area-inset-top, 0px));
-    --sc-composer-height: calc(7.75rem + env(safe-area-inset-bottom, 0px));
+    --sc-composer-height: calc(6.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .scanner-chat-root:has(.sc-composer-modes-open) {
+    --sc-composer-height: calc(8.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .scanner-chat-root:has(.sc-chat-output-panel) .sc-mobile-feed {
@@ -578,11 +1080,7 @@
     display: none;
   }
 
-  .scanner-chat-root:has(.sc-chat-output-panel) .pgt-music-bar {
-    display: none;
-  }
-
-  .scanner-chat-root .sc-chat-output-panel {
+  .scanner-chat-root .sc-chat-output-panel:not(.sc-catalog-session-panel--open):not(.sc-catalog-embed-panel):not(.sc-chat-output-panel--stacked) {
     max-height: calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 7.75rem));
     min-height: min(
       calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 7.75rem)),
@@ -590,24 +1088,137 @@
     );
   }
 
-  .scanner-chat-root:has(.sc-catalog-embed-panel) {
+  .scanner-chat-root .sc-chat-output-panel--stacked {
+    max-height: none;
+    min-height: 0;
+  }
+
+  .scanner-chat-root .sc-catalog-session-slot .sc-catalog-session-panel.sc-chat-output-panel {
+    flex: none;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel.sc-chat-output-panel) {
     --sc-composer-height: calc(5.25rem + env(safe-area-inset-bottom, 0px));
   }
 
-  .scanner-chat-root:has(.sc-catalog-embed-panel) .sc-live-market-banner-mobile,
-  .scanner-chat-root:has(.sc-catalog-embed-panel) .pgt-music-bar {
-    display: none;
+  /* One native scroll: chat outputs, then catalog — composer stays fixed */
+  .scanner-chat-root .sc-mobile-workspace-scroll {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
   }
 
-  .scanner-chat-root:has(.sc-catalog-embed-panel) .sc-catalog-embed-panel.sc-chat-output-panel {
-    max-height: calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 5.25rem));
-    min-height: calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 5.25rem));
+  .scanner-chat-root .sc-mobile-workspace-scroll > .sc-mobile-feed {
+    flex: none !important;
+    overflow: visible !important;
+    max-height: none !important;
+    min-height: auto !important;
   }
 
-  /* Set view — hide outer chrome so cards get maximum height */
-  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-embed-panel__header,
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-liquid-scan-main {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 0%;
+    flex-direction: column;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-session-slot {
+    flex: none;
+    overflow: visible;
+    margin-left: max(0.25rem, env(safe-area-inset-left, 0px));
+    margin-right: max(0.25rem, env(safe-area-inset-right, 0px));
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-session-panel {
+    flex: none;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .liquid-catalog-embed {
+    flex: none;
+    overflow: visible;
+    min-height: 0;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-pokedex-catalog-grid--set-open {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-card-pane,
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-set-body {
+    overflow: visible;
+    min-height: 0;
+  }
+
+  .scanner-chat-root .sc-catalog-cards-scroll--in-binder-stack {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    overflow: visible !important;
+    min-height: 0;
+    padding-top: 0.15rem;
+  }
+
+  /* Set view — hide franchise tabs on mobile; keep panel header for Close */
   .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-master-catalog-chrome {
     display: none;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-set-binder-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: none;
+    overflow: visible;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-set-binder-insights {
+    flex: none;
+    gap: 0.5rem;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-set-binder-filters {
+    flex-shrink: 0;
+  }
+
+  .scanner-chat-root:has(.sc-catalog-session-panel--open) .sc-catalog-set-binder-layout {
+    overflow: visible;
+    flex: none;
+  }
+
+  .scanner-chat-root .sc-catalog-set-binder-layout .sc-catalog-market-intelligence-rail,
+  .scanner-chat-root .sc-catalog-set-binder-layout .sc-catalog-set-insight-rail {
+    max-height: none;
+  }
+
+  .scanner-chat-root .sc-catalog-set-binder-layout .sc-catalog-market-intelligence-scroll,
+  .scanner-chat-root .sc-catalog-set-binder-layout .sc-catalog-set-insight-scroll {
+    overflow: visible;
+    flex: none;
+    max-height: none;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-pokedex-catalog-grid {
+    flex: none;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-card-pane {
+    overflow: visible;
+    min-height: 0;
   }
 
   .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .liquid-catalog-embed {
@@ -633,12 +1244,20 @@
     flex: 1 1 0%;
   }
 
-  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-cards-scroll {
+  .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-set-mobile-stack {
     flex: 1 1 0%;
-    min-height: min(
-      calc(100dvh - var(--sc-mobile-chrome, 3.25rem) - var(--sc-composer-height, 5.25rem) - 7.5rem),
-      640px
-    );
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .scanner-chat-root
+    .sc-catalog-embed-panel:has(.sc-catalog-set-view-open)
+    .sc-catalog-set-mobile-stack
+    .sc-catalog-cards-scroll {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
   }
 
   .scanner-chat-root .sc-catalog-embed-panel:has(.sc-catalog-set-view-open) .sc-catalog-set-mobile-toolbar {
@@ -747,7 +1366,7 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    padding-bottom: calc(var(--sc-composer-height, 6.25rem) + 0.35rem);
+    padding-bottom: calc(var(--sc-composer-height, 6.75rem) + 0.35rem);
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
     overscroll-behavior-x: none;
@@ -864,7 +1483,7 @@
 
   /* FAB sits above composer + home indicator */
   .sc-mobile-results-fab {
-    bottom: calc(var(--sc-composer-height, 7.5rem) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--sc-composer-height, 6.75rem) + env(safe-area-inset-bottom, 0px));
   }
 
   .sc-mobile-composer {
@@ -966,6 +1585,22 @@
 
 /* —— Desktop Liquid Scan (lg+) — full-width chat column —— */
 @media (min-width: 1024px) {
+  .scanner-chat-root .sc-mobile-workspace-scroll {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  .scanner-chat-root .sc-mobile-workspace-scroll > .sc-mobile-feed {
+    flex: none !important;
+    overflow: visible !important;
+    max-height: none !important;
+    min-height: auto !important;
+  }
+
   .scanner-chat-root .sc-desktop-chat-feed {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
@@ -1012,16 +1647,17 @@
     max-height: 100%;
   }
 
-  .scanner-chat-root .sc-catalog-embed-panel {
+  .scanner-chat-root .sc-catalog-embed-panel:not(.sc-catalog-session-panel--open) {
     min-height: min(78vh, 780px);
+  }
+
+  .scanner-chat-root .sc-catalog-session-panel.sc-catalog-session-panel--open {
+    min-height: min(28rem, 52vh);
+    max-height: none;
   }
 
   .scanner-chat-root .sc-catalog-embed-panel .liquid-catalog-embed {
     --catalog-tile-gap: 0.5rem;
-  }
-
-  .scanner-chat-root .sc-catalog-embed-panel .sc-pokedex-catalog-grid--set-open {
-    min-height: min(68vh, 640px);
   }
 
   .scanner-chat-root .sc-scan-results-block {

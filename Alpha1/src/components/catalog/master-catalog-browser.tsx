@@ -7,6 +7,7 @@ import { GenericCatalogBrowser } from "@/components/catalog/generic-catalog-brow
 import type { CatalogFranchiseId, CatalogFranchiseMeta } from "@/lib/catalog/catalog-types";
 import { defaultFranchiseMeta, sortFranchiseMetas } from "@/lib/catalog/franchise-registry";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import { fetchCatalogJson, readCatalogCache } from "@/lib/catalog/catalog-fetch-cache";
 import { cn } from "@/lib/cn";
 
 const TAB_ORDER: CatalogFranchiseId[] = [
@@ -48,18 +49,22 @@ export function MasterCatalogBrowser({
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/catalog/franchises")
-      .then(async (r) => {
-        const body = (await r.json()) as { franchises?: CatalogFranchiseMeta[]; error?: string };
-        if (!r.ok) throw new Error(body.error ?? "Failed to load franchises");
-        return body.franchises ?? [];
-      })
-      .then((list) => {
+    const url = "/api/catalog/franchises";
+    const cached = readCatalogCache<{ franchises?: CatalogFranchiseMeta[] }>(url);
+    if (cached?.franchises?.length) {
+      setMetas(sortFranchiseMetas(cached.franchises));
+      setLoadingMeta(false);
+    }
+    void fetchCatalogJson<{ franchises?: CatalogFranchiseMeta[] }>(url)
+      .then((body) => {
         if (cancelled) return;
+        const list = body.franchises ?? [];
         setMetas(sortFranchiseMetas(list.length ? list : TAB_ORDER.map((id) => defaultFranchiseMeta(id))));
       })
       .catch(() => {
-        if (!cancelled) setMetas(TAB_ORDER.map((id) => defaultFranchiseMeta(id)));
+        if (!cancelled && !cached?.franchises?.length) {
+          setMetas(TAB_ORDER.map((id) => defaultFranchiseMeta(id)));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingMeta(false);
@@ -104,8 +109,8 @@ export function MasterCatalogBrowser({
                   "shrink-0 rounded-md px-2.5 py-1.5 text-[10px] font-semibold transition touch-manipulation sm:px-3 sm:text-[11px]",
                   embedded && "lg:px-3.5 lg:py-2 lg:text-xs",
                   active
-                    ? "bg-amber-400/95 text-black shadow-sm"
-                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+                    ? "bg-brand-gold text-inverse shadow-sm shadow-brand-gold/20"
+                    : "text-muted hover:bg-subtle/50 hover:text-primary",
                 )}
               >
                 <span className="sm:hidden">{short}</span>

@@ -8,8 +8,10 @@ import {
   ShieldCheck,
   TrendingUp,
 } from "lucide-react";
-import type { LiquidAskDataCoverage, LiquidAskResearch } from "@/lib/scanner-chat/liquid-ask-types";
+import type { LiquidAskCatalogCard, LiquidAskDataCoverage, LiquidAskMarketPulse, LiquidAskResearch } from "@/lib/scanner-chat/liquid-ask-types";
 import { partitionComps } from "@/lib/scanner-chat/prioritize-comps";
+import { MarketSourceLogo } from "@/components/market/market-source-logo";
+import { normalizeMarketSource } from "@/lib/market/sources";
 import { LiquidAskMarkdown } from "./liquid-ask-markdown";
 import { cn } from "@/lib/cn";
 
@@ -123,6 +125,100 @@ function DataCoverageBanner({
   );
 }
 
+function sentimentTone(sentiment: LiquidAskMarketPulse["sentiment"]): string {
+  switch (sentiment) {
+    case "bullish":
+      return "border-emerald-500/25 bg-emerald-500/8 text-emerald-100";
+    case "bearish":
+      return "border-rose-500/25 bg-rose-500/8 text-rose-100";
+    case "neutral":
+      return "border-sky-500/25 bg-sky-500/8 text-sky-100";
+    default:
+      return "border-amber-500/20 bg-amber-500/6 text-amber-100";
+  }
+}
+
+function sentimentLabel(sentiment: LiquidAskMarketPulse["sentiment"]): string {
+  switch (sentiment) {
+    case "bullish":
+      return "Bullish";
+    case "bearish":
+      return "Bearish";
+    case "neutral":
+      return "Neutral";
+    default:
+      return "Thin market";
+  }
+}
+
+function CatalogVisualStrip({ cards }: { cards: LiquidAskCatalogCard[] }) {
+  if (cards.length === 0) return null;
+
+  return (
+    <section className="space-y-2" aria-label="Catalog card references">
+      <div>
+        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          Master catalog
+        </h4>
+        <p className="mt-0.5 text-[11px] text-slate-500">
+          Official artwork from your scan or catalog match — referenced in the answer below.
+        </p>
+      </div>
+      <div className="sc-liquid-ask-catalog-strip flex gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5">
+        {cards.map((card) => (
+          <article
+            key={`${card.catalogId ?? card.name}-${card.role}`}
+            className={cn(
+              "flex w-[4.75rem] shrink-0 flex-col gap-1 sm:w-[5.25rem]",
+              card.role === "focus" && "ring-1 ring-amber-400/30 rounded-xl p-0.5",
+            )}
+          >
+            <div className="aspect-[5/7] overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={card.imageUrl}
+                alt=""
+                className="h-full w-full object-contain p-0.5"
+                loading="lazy"
+              />
+            </div>
+            <p className="line-clamp-2 text-[9px] font-medium leading-tight text-slate-200">
+              {card.name}
+            </p>
+            <p className="line-clamp-1 text-[8px] text-slate-500">
+              {[card.setName, card.number ? `#${card.number}` : null].filter(Boolean).join(" · ")}
+            </p>
+            {card.rawFmvUsd != null && Number.isFinite(card.rawFmvUsd) ? (
+              <p className="font-mono text-[9px] text-amber-200/90">{money(card.rawFmvUsd)} FMV</p>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MarketPulseBanner({ pulse }: { pulse: LiquidAskMarketPulse }) {
+  return (
+    <section
+      className={cn("rounded-xl border px-3 py-2.5", sentimentTone(pulse.sentiment))}
+      aria-label="Market pulse"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <TrendingUp className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+        <span className="text-[10px] font-semibold uppercase tracking-wider">
+          {sentimentLabel(pulse.sentiment)}
+        </span>
+        <span className="text-[10px] opacity-80">
+          {pulse.soldCount} sold{pulse.activeCount > 0 ? ` · ${pulse.activeCount} listed` : ""}
+          {pulse.soldMedianUsd != null ? ` · med ${money(pulse.soldMedianUsd)}` : ""}
+        </span>
+      </div>
+      <p className="mt-1.5 text-xs leading-relaxed opacity-95">{pulse.stanceHint}</p>
+    </section>
+  );
+}
+
 function PlatformHubStrip({ research }: { research: LiquidAskResearch }) {
   if (research.hubLinks.length === 0) return null;
 
@@ -153,7 +249,7 @@ function PlatformHubStrip({ research }: { research: LiquidAskResearch }) {
               hubStyles(hub.platform),
             )}
           >
-            <span>{hub.label}</span>
+            <MarketSourceLogo label={hub.label} />
             <ExternalLink className="h-4 w-4 shrink-0 opacity-80" />
           </a>
         ))}
@@ -171,7 +267,7 @@ function PlatformHubStrip({ research }: { research: LiquidAskResearch }) {
                 hubStyles(hub.platform),
               )}
             >
-              {hub.label}
+              <MarketSourceLogo label={hub.label} />
               <ExternalLink className="h-3 w-3 opacity-70" />
             </a>
           ))}
@@ -208,6 +304,12 @@ export function LiquidAskResponsePanel({
           todayUtc={research.todayUtc}
         />
       ) : null}
+
+      {research && research.catalogCards.length > 0 ? (
+        <CatalogVisualStrip cards={research.catalogCards} />
+      ) : null}
+
+      {research?.marketPulse ? <MarketPulseBanner pulse={research.marketPulse} /> : null}
 
       {research && research.hubLinks.length > 0 ? (
         <PlatformHubStrip research={research} />
@@ -268,6 +370,15 @@ export function LiquidAskResponsePanel({
               icon={TrendingUp}
               comps={parts.ebaySold}
               accent="ebay"
+            />
+          ) : null}
+
+          {parts.priceChartingSold.length > 0 ? (
+            <CompSection
+              title="PriceCharting recent solds"
+              subtitle="Completed auctions from PriceCharting product history (often eBay-backed)"
+              icon={TrendingUp}
+              comps={parts.priceChartingSold}
             />
           ) : null}
 
@@ -432,13 +543,15 @@ function CompCard({
       ) : (
         <div
           className={cn(
-            "flex h-14 w-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-white/10",
+            "flex h-14 w-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-white/10 px-0.5",
             accent === "ebay" ? "bg-amber-500/10" : "bg-slate-800/80",
           )}
         >
-          <span className="text-[9px] font-bold text-slate-500">
-            {(comp.source ?? "—").slice(0, 3).toUpperCase()}
-          </span>
+          <MarketSourceLogo
+            label={comp.source ?? "Market"}
+            sourceId={normalizeMarketSource(comp.source)}
+            variant="compact"
+          />
         </div>
       )}
       <div className="min-w-0 flex-1">
@@ -449,9 +562,22 @@ function CompCard({
           <span className="font-mono text-sm text-emerald-100">{money(comp.priceUsd)}</span>
         </div>
         <p className="mt-1 line-clamp-2 text-xs text-slate-300">{comp.title}</p>
-        <p className="mt-0.5 text-[10px] text-slate-500">
-          {[comp.source, comp.slab, formatDate(comp.observedAt)].filter(Boolean).join(" · ")}
-        </p>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+          {comp.source ? (
+            <MarketSourceLogo
+              label={comp.source}
+              sourceId={normalizeMarketSource(comp.source)}
+              variant="compact"
+            />
+          ) : null}
+          {comp.slab ? <span>{comp.slab}</span> : null}
+          {comp.observedAt ? (
+            <>
+              {(comp.source || comp.slab) && <span className="text-slate-600">·</span>}
+              <span>{formatDate(comp.observedAt)}</span>
+            </>
+          ) : null}
+        </div>
         {comp.url ? (
           <a
             href={comp.url}

@@ -1,12 +1,14 @@
 /**
- * Non-theme layout tokens (radii). Color themes live in `themes.css`.
+ * Layout rhythm — color lives in `pgt-liquid-theme.css`.
  */
 :root {
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
-  --radius-xl: 1.25rem;
+  --radius-xl: 1.375rem;
   --radius-desk: 1.125rem;
   --space-section: 1.25rem;
   --space-section-lg: 1.75rem;
+  --space-inline: 0.75rem;
+  --space-stack: 1rem;
 }

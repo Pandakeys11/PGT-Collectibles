@@ -123,6 +123,18 @@ export function priceChartingUsdFromSnapshot(
   return isUsd(n) ? Math.round(n) : null;
 }
 
+/** Cardmarket trend / avg when TCGPlayer has no US market row. */
+export function primaryCardMarketFromSnapshot(
+  prices: CatalogPriceSnapshot | null | undefined,
+): number | null {
+  const cm = prices?.cardMarket;
+  if (!cm) return null;
+  for (const n of [cm.trendPrice, cm.averageSellPrice, cm.avg30, cm.avg7, cm.lowPrice]) {
+    if (isUsd(n)) return Math.round(n);
+  }
+  return null;
+}
+
 export function priceChartingUsdFromEvidence(evidence: MarketEvidence[]): number | null {
   const rows = evidence.filter(
     (e) =>
@@ -226,6 +238,17 @@ export function resolveCatalogRawFmv(args: {
       tcgPlayerUsd: Math.round(tcgPlayerUsd),
       priceChartingUsd,
       sourceLabel,
+    };
+  }
+
+  const cardMarketUsd = primaryCardMarketFromSnapshot(args.prices);
+  if (cardMarketUsd != null) {
+    return {
+      usd: cardMarketUsd,
+      basis: "reference_median",
+      tcgPlayerUsd: null,
+      priceChartingUsd,
+      sourceLabel: priceChartingUsd != null ? "Cardmarket · PriceCharting" : "Cardmarket",
     };
   }
 

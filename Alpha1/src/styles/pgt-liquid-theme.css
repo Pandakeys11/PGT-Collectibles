@@ -1,0 +1,86 @@
+/**
+ * PGT Liquid — global design tokens (surfaces, brand spectrum, semantics).
+ * RGB triplets for `rgb(var(--token) / <alpha>)`. Legacy aliases map here.
+ */
+
+:root,
+html {
+  /* —— Void & surfaces —— */
+  --bg-canvas: 5 7 14;
+  --bg-panel: 11 16 28;
+  --bg-panel-raised: 17 24 40;
+  --bg-subtle: 26 34 54;
+  --bg-overlay: 2 4 10;
+  --bg-gradient-end: 3 5 12;
+
+  /* —— Ink & type —— */
+  --text-primary: 248 250 252;
+  --text-secondary: 210 218 232;
+  --text-muted: 168 178 198;
+  --text-faint: 108 118 142;
+  --text-inverse: 5 7 14;
+
+  /* —— Brand spectrum —— */
+  --brand-cyan: 34 211 238;
+  --brand-cyan-dim: 8 145 178;
+  --brand-cyan-bright: 103 232 249;
+  --brand-gold: 250 204 21;
+  --brand-gold-dim: 202 138 4;
+  --brand-violet: 167 139 250;
+  --brand-violet-dim: 124 58 237;
+  --brand-mint: 52 211 153;
+  --brand-rose: 251 113 133;
+  --brand-sky: 56 189 248;
+  --brand-amber: 251 191 36;
+
+  /* —— Legacy accent aliases (Tailwind + components) —— */
+  --accent: var(--brand-cyan);
+  --accent-strong: var(--brand-cyan-bright);
+  --accent-glow: var(--brand-gold);
+  --accent-tertiary: var(--brand-violet);
+
+  /* —— Borders & shine —— */
+  --border-subtle: 255 255 255 / 0.07;
+  --border-strong: 255 255 255 / 0.14;
+  --border-accent: var(--brand-cyan) / 0.32;
+  --panel-shine: 255 255 255 / 0.06;
+  --focus-ring: var(--brand-cyan) / 0.45;
+
+  /* —— Holo mesh stops —— */
+  --holo-a: var(--brand-cyan-dim);
+  --holo-b: var(--brand-gold);
+  --holo-c: var(--brand-violet);
+  --gradient-mid: 9 13 24;
+  --gradient-bloom: 30 42 68;
+  --surface-tint: var(--brand-cyan);
+  --surface-tint-2: var(--brand-gold);
+
+  /* —— Spark (charts, highlights) —— */
+  --spark-primary: #22d3ee;
+  --spark-secondary: #facc15;
+  --spark-tertiary: #a78bfa;
+
+  /* —— Elevation —— */
+  --shadow-panel: 0 24px 64px -12px rgba(0, 0, 0, 0.62),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  --shadow-glow-cyan: 0 0 40px -8px rgb(var(--brand-cyan) / 0.35);
+  --shadow-glow-gold: 0 0 36px -10px rgb(var(--brand-gold) / 0.4);
+
+  /* —— Feature lanes —— */
+  --lane-scan: var(--brand-mint);
+  --lane-market: var(--brand-sky);
+  --lane-fmv: var(--brand-amber);
+  --lane-ai: var(--brand-violet);
+  --lane-danger: var(--brand-rose);
+
+  /* —— Radius (also in tokens.css; mirrored for theme scope) —— */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+}
+
+html:not([data-theme]),
+[data-theme="obsidian-clean"] {
+  color-scheme: dark;
+}

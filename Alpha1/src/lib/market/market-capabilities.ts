@@ -22,6 +22,7 @@ import {
   isPokeTraceConfigured,
   isPokeTraceWsEnabled,
 } from "@/lib/market/env-market";
+import { isPriceChartingSoldScrapeEnabled } from "@/lib/market/pricecharting/config";
 import { getApifyEbaySoldBlockReason } from "@/lib/market/provider-health";
 
 export type MarketCapabilities = {
@@ -44,6 +45,7 @@ export type MarketCapabilities = {
   gemrate: boolean;
   psaPublicApi: boolean;
   apifyPsa: boolean;
+  priceChartingSoldScrape: boolean;
   /** Human-readable gaps when credentials exist but paths are down. */
   ebaySoldGaps: string[];
 };
@@ -87,6 +89,7 @@ export function getMarketCapabilities(): MarketCapabilities {
     gemrate: Boolean(process.env.GEMRATE_API_KEY?.trim()),
     psaPublicApi: psaPublicApiConfigured(),
     apifyPsa: isApifyPsaPopConfigured(),
+    priceChartingSoldScrape: isPriceChartingSoldScrapeEnabled(),
     ebaySoldGaps: gaps,
   };
 }
@@ -106,6 +109,7 @@ export function marketCapabilitiesSummary(caps: MarketCapabilities): string {
   if (caps.poketraceRest) parts.push("PokeTrace REST");
   if (caps.poketraceWs) parts.push("PokeTrace WS");
   if (caps.ebayInsights) parts.push("Insights (stub)");
+  if (caps.priceChartingSoldScrape) parts.push("PriceCharting sold scrape");
   if (caps.geminiSearch) parts.push("live search");
   if (caps.gemrate) parts.push("GemRate");
   if (caps.psaPublicApi) parts.push("PSA API");

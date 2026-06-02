@@ -1,3 +1,5 @@
+import type { MarketSourceLink } from "@/lib/market/sources";
+
 /** Structured set insight for Master Catalog / Liquid Scan (catalog + Groq web research). */
 
 export type SetInsightPriceCard = {
@@ -19,6 +21,8 @@ export type SetInsightSealedProduct = {
   priceLabel?: string | null;
   note?: string | null;
   searchUrl?: string | null;
+  marketLinks?: MarketSourceLink[];
+  trackedSource?: "pricecharting" | "ebay_sold" | null;
 };
 
 export type CatalogSetInsightPayload = {
