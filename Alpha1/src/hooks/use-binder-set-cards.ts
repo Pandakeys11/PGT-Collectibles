@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { sortCatalogCards, type CatalogCardSortId } from "@/lib/catalog/catalog-card-sort";
 import { fetchCatalogJson, readCatalogCache } from "@/lib/catalog/catalog-fetch-cache";
 import { useHydrateCatalogFmv } from "@/hooks/use-hydrate-catalog-fmv";
-import { tcgSummaryHasFmv } from "@/lib/pokedex/tcg-price-hydrate";
 import type { TcgCardSummary, TcgPaginated } from "@/lib/pokedex/tcg-api-types";
 import type { RarityBucketId } from "@/lib/pokedex/rarity-buckets";
 import {
@@ -60,6 +59,7 @@ export function useBinderSetCards({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const prevSetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!setId || !enabled) {
@@ -67,25 +67,28 @@ export function useBinderSetCards({
       setTotalCount(0);
       setError(null);
       setLoading(false);
+      prevSetIdRef.current = null;
       return;
+    }
+
+    if (prevSetIdRef.current !== setId) {
+      setCards([]);
+      prevSetIdRef.current = setId;
     }
 
     let cancelled = false;
     setLoading(true);
     setError(null);
-    setCards([]);
 
     void (async () => {
       try {
         const all: TcgCardSummary[] = [];
         let page = 1;
         let expectedTotal = 0;
-        let servedFromCache = false;
 
         for (;;) {
           const url = buildBinderCardsUrl(setId, page, rarityBucket, finishBucket, printingPreset);
           const cached = readCatalogCache<TcgPaginated<TcgCardSummary>>(url);
-          if (cached) servedFromCache = true;
           const payload =
             cached ?? (await fetchCatalogJson<TcgPaginated<TcgCardSummary>>(url));
 
@@ -94,6 +97,12 @@ export function useBinderSetCards({
           expectedTotal = payload.totalCount;
           all.push(...payload.data);
 
+          if (!cancelled && all.length > 0) {
+            setCards([...all]);
+            setTotalCount(expectedTotal || all.length);
+            setLoading(false);
+          }
+
           if (all.length >= expectedTotal || payload.data.length < BINDER_FETCH_PAGE_SIZE) {
             break;
           }
@@ -101,42 +110,7 @@ export function useBinderSetCards({
         }
 
         if (!cancelled) {
-          const needsFmv = all.some(
-            (c) => c.rawFmvUsd == null && !tcgSummaryHasFmv(c),
-          );
-          if (needsFmv && servedFromCache) {
-            try {
-              const freshPages: TcgCardSummary[] = [];
-              let p = 1;
-              for (;;) {
-                const freshUrl = buildBinderCardsUrl(
-                  setId,
-                  p,
-                  rarityBucket,
-                  finishBucket,
-                  printingPreset,
-                );
-                const payload = await fetchCatalogJson<TcgPaginated<TcgCardSummary>>(
-                  freshUrl,
-                  { cache: "no-store" },
-                );
-                freshPages.push(...payload.data);
-                if (
-                  freshPages.length >= payload.totalCount ||
-                  payload.data.length < BINDER_FETCH_PAGE_SIZE
-                ) {
-                  break;
-                }
-                p += 1;
-              }
-              if (!cancelled && freshPages.length) {
-                all.splice(0, all.length, ...freshPages);
-              }
-            } catch {
-              /* keep cached rows; client FMV hook will backfill */
-            }
-          }
-          setCards(all);
+          setCards([...all]);
           setTotalCount(expectedTotal || all.length);
         }
       } catch (e) {
@@ -160,7 +134,7 @@ export function useBinderSetCards({
     [cards, cardSort],
   );
 
-  const withFmv = useHydrateCatalogFmv(sorted, setId, enabled && !loading);
+  const withFmv = useHydrateCatalogFmv(sorted, setId, enabled);
 
   return { cards: withFmv, loading, error, totalCount };
 }

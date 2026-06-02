@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
+import { useSetInsight } from "@/hooks/use-set-insight";
 import { CatalogChaseCardTile } from "@/components/catalog/catalog-chase-card-tile";
 import { CatalogSetSealedFmvPanel } from "@/components/catalog/catalog-set-sealed-fmv-panel";
+import { MarketMoversSectionHeader } from "@/components/market/market-movers-explainer";
 import { SetMarketPulseStrip } from "@/components/market/set-market-pulse-strip";
+import { SET_INSIGHT_TOP_VALUE_LIMIT } from "@/lib/catalog/set-insight-limits";
 import {
   CATALOG_CARD_SORT_OPTIONS,
   type CatalogCardSortId,
 } from "@/lib/catalog/catalog-card-sort";
-import type { CatalogSetInsightPayload, SetInsightPriceCard } from "@/lib/catalog/set-insight-payload";
+import type { SetInsightPriceCard } from "@/lib/catalog/set-insight-payload";
 import type { SetInsightCardSource } from "@/lib/catalog/set-insight-utils";
 import { cn } from "@/lib/cn";
 
@@ -20,13 +23,20 @@ function fmtUsd(n: number | null | undefined): string {
 
 function ValueRow({
   row,
+  rank,
   onSelect,
 }: {
   row: SetInsightPriceCard;
+  rank?: number;
   onSelect?: (catalogId: string) => void;
 }) {
   const inner = (
     <>
+      {rank != null ? (
+        <span className="w-4 shrink-0 text-center font-mono text-[9px] font-semibold text-faint">
+          {rank}
+        </span>
+      ) : null}
       <div className="h-10 w-7 shrink-0 overflow-hidden rounded bg-black/30 ring-1 ring-white/10">
         {row.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -84,39 +94,9 @@ export function CatalogSetBinderInsightPanel({
   onSelectChase?: (catalogId: string) => void;
   className?: string;
 }) {
-  const [insight, setInsight] = useState<CatalogSetInsightPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(
-    async (refresh = false) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const q = new URLSearchParams({ setId });
-        if (refresh) q.set("refresh", "1");
-        const res = await fetch(`/api/catalog/set-insight?${q}`, { credentials: "same-origin" });
-        const body = (await res.json()) as CatalogSetInsightPayload & { error?: string };
-        if (!res.ok) {
-          throw new Error(body.error ?? `Request failed (${res.status})`);
-        }
-        if (!body.setWide?.cardCount && !body.ready) {
-          throw new Error(body.error ?? "Set insight unavailable");
-        }
-        setInsight({ ...body, ready: true });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load set insight");
-        setInsight(null);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [setId],
-  );
-
-  useEffect(() => {
-    void load(false);
-  }, [load]);
+  const { insight, loading, error, refresh } = useSetInsight(setId, setName, {
+    deferMs: 350,
+  });
 
   const chase = insight?.chaseCard ?? insight?.topValue?.[0] ?? null;
   const topValue = useMemo(() => {
@@ -154,7 +134,7 @@ export function CatalogSetBinderInsightPanel({
           <button
             type="button"
             disabled={loading}
-            onClick={() => void load(true)}
+            onClick={() => void refresh()}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition hover:bg-white/5 hover:text-primary disabled:opacity-50"
             aria-label="Refresh set insight"
           >
@@ -205,10 +185,7 @@ export function CatalogSetBinderInsightPanel({
       />
 
       <div className="mt-2.5 border-t border-white/6 pt-2.5">
-        <p className="text-[9px] font-semibold uppercase tracking-wide text-sky-200/90">
-          7-day market movers
-        </p>
-        <p className="mb-1 text-[8px] text-muted">Cardmarket trend vs 7-day avg</p>
+        <MarketMoversSectionHeader className="mb-1.5" />
         <SetMarketPulseStrip
           setId={setId}
           setName={setName}
@@ -228,15 +205,19 @@ export function CatalogSetBinderInsightPanel({
       ) : null}
 
       <div className="mt-2.5 border-t border-white/6 pt-2.5">
-        <p className="text-[9px] font-semibold uppercase tracking-wide text-faint">Highest value</p>
+        <p className="text-[9px] font-semibold uppercase tracking-wide text-faint">
+          Highest value · top {SET_INSIGHT_TOP_VALUE_LIMIT}
+        </p>
+        <p className="text-[8px] text-muted">TCGPlayer catalog · Groq refreshes sold/active comps</p>
         {topValue.length === 0 && !loading ? (
           <p className="py-1 text-[10px] text-muted">No additional priced cards yet.</p>
         ) : (
           <div className="mt-0.5 space-y-0.5">
-            {topValue.slice(0, 8).map((row) => (
+            {topValue.slice(0, SET_INSIGHT_TOP_VALUE_LIMIT).map((row, i) => (
               <ValueRow
                 key={`${row.catalogId ?? row.name}-${row.number ?? ""}`}
                 row={row}
+                rank={chase ? i + 2 : i + 1}
                 onSelect={onSelectCard}
               />
             ))}

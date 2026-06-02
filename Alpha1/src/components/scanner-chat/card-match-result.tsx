@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   BadgeCheck,
   CircleHelp,
-  DollarSign,
   ExternalLink,
   Plus,
   Tag,
@@ -18,6 +17,8 @@ import type { CardMatch } from "@/lib/scanner-chat/types";
 import { buildEbayHubForCard } from "@/lib/market/sources";
 import { isJapanesePokemonCard } from "@/lib/scan/japanese-pokemon";
 import { printEditionBlocker } from "@/lib/scan/print-edition";
+import { FmvHeadlineBlock } from "@/components/market/fmv-headline-block";
+import { buildFmvHeadlineFromCardMatch } from "@/lib/market/fmv-display";
 import { cn } from "@/lib/cn";
 
 function statusMeta(status: CardMatch["status"]) {
@@ -219,7 +220,10 @@ export function CardMatchResult({
               </span>
             ) : null}
           </div>
-          {card.hasSticker || (card.fmvUsd != null && card.fmvUsd > 0) || card.soldCompCount > 0 ? (
+          {card.fmvHeld ||
+          card.hasSticker ||
+          (card.fmvUsd != null && card.fmvUsd > 0) ||
+          card.soldCompCount > 0 ? (
             <div className="mt-2 space-y-2">
               <div
                 className={cn(
@@ -231,32 +235,10 @@ export function CardMatchResult({
                       : "grid-cols-1",
                 )}
               >
-                <div
-                  className={cn(
-                    "rounded-lg border px-2.5 py-2",
-                    card.fmvUsd != null && card.fmvUsd > 0
-                      ? "border-emerald-500/25 bg-emerald-500/8"
-                      : "border-white/10 bg-white/[0.03]",
-                  )}
-                >
-                  <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-400/90">
-                    <DollarSign className="h-3 w-3 shrink-0" aria-hidden />
-                    Fair market value
-                  </p>
-                  <p
-                    className={cn(
-                      "font-mono text-base font-semibold tabular-nums sm:text-lg",
-                      card.fmvUsd != null && card.fmvUsd > 0
-                        ? "text-emerald-300"
-                        : "text-slate-500",
-                    )}
-                  >
-                    {card.fmvUsd != null && card.fmvUsd > 0 ? card.fmvDisplay : "—"}
-                  </p>
-                  <p className="mt-0.5 text-[9px] leading-snug text-slate-500">
-                    From sold comps &amp; market data
-                  </p>
-                </div>
+                <FmvHeadlineBlock
+                  headline={buildFmvHeadlineFromCardMatch(card)}
+                  size="default"
+                />
 
                 {card.hasSticker ? (
                   <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2">

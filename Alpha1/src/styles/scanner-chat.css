@@ -1044,7 +1044,7 @@
     max-height: 100dvh;
     max-height: 100svh;
     overflow: hidden;
-    --sc-composer-height: calc(6.75rem + env(safe-area-inset-bottom, 0px));
+    --sc-composer-height: calc(7.75rem + env(safe-area-inset-bottom, 0px));
     font-size: 12px;
     line-height: 1.4;
     -webkit-font-smoothing: antialiased;
@@ -1054,11 +1054,11 @@
   /* Embedded workspace (catalog, market, companion) — fill between header + composer */
   .scanner-chat-root:has(.sc-chat-output-panel) {
     --sc-mobile-chrome: calc(3.25rem + env(safe-area-inset-top, 0px));
-    --sc-composer-height: calc(6.75rem + env(safe-area-inset-bottom, 0px));
+    --sc-composer-height: calc(7.75rem + env(safe-area-inset-bottom, 0px));
   }
 
   .scanner-chat-root:has(.sc-composer-modes-open) {
-    --sc-composer-height: calc(8.5rem + env(safe-area-inset-bottom, 0px));
+    --sc-composer-height: calc(9.75rem + env(safe-area-inset-bottom, 0px));
   }
 
   .scanner-chat-root:has(.sc-chat-output-panel) .sc-mobile-feed {
@@ -1351,9 +1351,133 @@
   /* Safe areas (notch, home indicator) */
   .sc-mobile-header {
     padding-top: env(safe-area-inset-top, 0px);
-    background: rgb(var(--sc-panel) / 0.92);
+    background: linear-gradient(
+      180deg,
+      rgb(var(--sc-panel) / 0.97) 0%,
+      rgb(var(--sc-panel) / 0.88) 100%
+    );
     backdrop-filter: blur(20px) saturate(120%);
     -webkit-backdrop-filter: blur(20px) saturate(120%);
+    box-shadow: 0 1px 0 rgb(var(--brand-cyan) / 0.08);
+  }
+
+  .sc-mobile-header__bar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 3rem;
+    padding-inline: max(0.625rem, env(safe-area-inset-left, 0px))
+      max(0.625rem, env(safe-area-inset-right, 0px));
+  }
+
+  @media (min-width: 640px) {
+    .sc-mobile-header__bar {
+      min-height: 3.25rem;
+      gap: 0.5rem;
+      padding-inline: max(0.875rem, env(safe-area-inset-left, 0px))
+        max(0.875rem, env(safe-area-inset-right, 0px));
+    }
+  }
+
+  .sc-mobile-header__icon-btn {
+    display: flex;
+    height: 2.75rem;
+    width: 2.75rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    color: rgb(var(--nexus-text-muted));
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+    touch-action: manipulation;
+  }
+
+  .sc-mobile-header__icon-btn:hover {
+    background: rgb(255 255 255 / 0.05);
+    color: rgb(var(--nexus-text-primary));
+  }
+
+  .sc-mobile-header__brand {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.4375rem;
+    padding-inline: 0.0625rem;
+  }
+
+  .sc-mobile-header__logo {
+    height: 1.625rem;
+    width: auto;
+  }
+
+  @media (min-width: 640px) {
+    .sc-mobile-header__logo {
+      height: 1.875rem;
+    }
+  }
+
+  .sc-mobile-header__titles {
+    min-width: 0;
+    flex: 1 1 auto;
+    text-align: left;
+  }
+
+  .sc-mobile-header__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-display, var(--font-sans, system-ui)), sans-serif;
+    font-size: clamp(0.875rem, 4.4vw, 1.0625rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+  }
+
+  .sc-mobile-header__subtitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(0.5625rem, 2.6vw, 0.625rem);
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(var(--nexus-text-muted));
+    line-height: 1.2;
+  }
+
+  .sc-mobile-header__actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.125rem;
+  }
+
+  .sc-mobile-header__badge {
+    position: absolute;
+    right: 0.125rem;
+    top: 0.125rem;
+    display: flex;
+    height: 1rem;
+    min-width: 1rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgb(var(--brand-cyan));
+    padding-inline: 0.25rem;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    color: rgb(var(--sc-canvas));
+    box-shadow: 0 0 0 2px rgb(var(--sc-panel));
+  }
+
+  .sc-mobile-header__signin {
+    max-width: 4.75rem;
   }
 
   .sc-mobile-quota-bar {
@@ -1398,6 +1522,42 @@
 
   .sc-composer-panel {
     padding: 0.375rem;
+    overflow: visible;
+  }
+
+  .sc-composer-actions {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sc-composer-tools-row {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    padding-bottom: 1px;
+    mask-image: linear-gradient(to right, #000 92%, transparent 100%);
+  }
+
+  .sc-composer-tools-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (min-width: 1024px) {
+    .sc-composer-tools-row {
+      overflow: visible;
+      mask-image: none;
+    }
+
+    .sc-composer-actions {
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+
+  .sc-composer-more-menu {
+    backdrop-filter: blur(12px);
   }
 
   .sc-composer-icon-btn {
@@ -1406,8 +1566,16 @@
   }
 
   .sc-composer-submit {
-    min-height: 2.25rem;
-    height: 2.25rem;
+    min-height: 2.5rem;
+    height: 2.5rem;
+  }
+
+  @media (min-width: 1024px) {
+    .sc-composer-submit {
+      min-height: 2.25rem;
+      height: 2.25rem;
+      width: auto;
+    }
   }
 
   .sc-composer-modes {
@@ -1483,7 +1651,7 @@
 
   /* FAB sits above composer + home indicator */
   .sc-mobile-results-fab {
-    bottom: calc(var(--sc-composer-height, 6.75rem) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--sc-composer-height, 7.75rem) + env(safe-area-inset-bottom, 0px));
   }
 
   .sc-mobile-composer {
@@ -1493,14 +1661,17 @@
 
   .sc-composer-stack {
     z-index: 45;
+    overflow: visible;
   }
 
   .sc-mobile-composer-inner {
     padding-bottom: max(0.375rem, env(safe-area-inset-bottom, 0px));
+    overflow: visible;
   }
 
   .sc-composer-panel {
     border-radius: 0.875rem;
+    overflow: visible;
   }
 
   .sc-mobile-drawer-sheet {

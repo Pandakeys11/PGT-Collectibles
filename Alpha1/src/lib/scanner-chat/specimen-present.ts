@@ -84,6 +84,8 @@ export function specimenToCardMatch(specimen: ScanSpecimen, index: number): Card
     fmvUsd: fmv.fmvUsd,
     fmvDisplay: fmv.fmvDisplay,
     fmvSubline: fmv.fmvSubline,
+    fmvHeld: fmv.fmvHeld,
+    fmvHoldMessage: fmv.fmvHoldMessage,
     stickerUsd: fmv.stickerUsd,
     stickerDisplay: fmv.stickerDisplay,
     hasSticker: fmv.hasSticker,

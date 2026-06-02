@@ -1,12 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
+import { useSetInsight } from "@/hooks/use-set-insight";
 import { ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { rollupSetInsightCards, type SetInsightCardSource } from "@/lib/catalog/set-insight-utils";
-import type {
-  CatalogSetInsightPayload,
-  SetInsightPriceCard,
-} from "@/lib/catalog/set-insight-payload";
+import type { SetInsightPriceCard } from "@/lib/catalog/set-insight-payload";
 import { CatalogChaseCardTile } from "@/components/catalog/catalog-chase-card-tile";
 import { CatalogSetSealedFmvPanel } from "@/components/catalog/catalog-set-sealed-fmv-panel";
 import { cn } from "@/lib/cn";
@@ -19,14 +17,17 @@ function fmtUsd(n: number | null | undefined): string {
 function InsightCardRow({
   row,
   onClick,
+  leading,
   trailing,
 }: {
   row: SetInsightPriceCard;
   onClick?: () => void;
+  leading?: ReactNode;
   trailing?: ReactNode;
 }) {
   const inner = (
     <>
+      {leading ? <div className="w-4 shrink-0 text-center">{leading}</div> : null}
       <div className="h-11 w-8 shrink-0 overflow-hidden rounded-md bg-black/30 ring-1 ring-white/10">
         {row.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -78,71 +79,13 @@ export function CatalogSetInsightRail({
   hideChaseCard?: boolean;
   className?: string;
 }) {
-  const [insight, setInsight] = useState<CatalogSetInsightPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const loadedSetIdRef = useRef<string | null>(null);
+  const { insight, loading, error, refresh } = useSetInsight(setId, setName);
 
   const inViewRollup = useMemo(() => rollupSetInsightCards(cards), [cards]);
   const inViewPct =
     inViewRollup.cardCount > 0
       ? Math.round((100 * inViewRollup.pricedSlots) / inViewRollup.cardCount)
       : 0;
-
-  const load = useCallback(
-    async (refresh = false) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const q = new URLSearchParams({ setId });
-        if (refresh) q.set("refresh", "1");
-        const res = await fetch(`/api/catalog/set-insight?${q}`, { credentials: "same-origin" });
-        const body = (await res.json()) as CatalogSetInsightPayload & { error?: string };
-        if (!res.ok) {
-          throw new Error(body.error ?? `Request failed (${res.status})`);
-        }
-        const pricedFromApi = (body.setWide?.pricedSlots ?? 0) > 0;
-        if (!body.ready && !pricedFromApi) {
-          throw new Error(
-            body.error === "insight_empty"
-              ? "No prices loaded for this set — confirm POKEMON_TCG_API_KEY and run catalog sync."
-              : body.error ?? "Set insight unavailable",
-          );
-        }
-        setInsight(
-          body.ready
-            ? body
-            : {
-                ...body,
-                ready: true,
-                summary:
-                  body.summary ??
-                  `${setName}: ${body.setWide.pricedSlots} of ${body.setWide.cardCount} cards priced from catalog.`,
-                setWide: body.setWide,
-              },
-        );
-        loadedSetIdRef.current = setId;
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load set insight");
-        if (loadedSetIdRef.current !== setId) {
-          setInsight(null);
-        }
-      } finally {
-        setLoading(false);
-      }
-    },
-    [setId, setName],
-  );
-
-  useEffect(() => {
-    if (loadedSetIdRef.current === setId && insight?.setId === setId) {
-      return;
-    }
-    if (insight?.setId && insight.setId !== setId) {
-      setInsight(null);
-    }
-    void load(false);
-  }, [setId, load, insight?.setId]);
 
   const setWide = insight?.setWide;
   const topValue = insight?.topValue ?? [];
@@ -169,7 +112,7 @@ export function CatalogSetInsightRail({
           <button
             type="button"
             disabled={loading}
-            onClick={() => void load(true)}
+            onClick={() => void refresh()}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-white/5 hover:text-primary disabled:opacity-50"
             aria-label="Refresh set insight"
           >
@@ -209,7 +152,7 @@ export function CatalogSetInsightRail({
             <p className="text-[11px] text-rose-300">{error}</p>
             <button
               type="button"
-              onClick={() => void load(true)}
+              onClick={() => void refresh()}
               className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-medium text-primary"
             >
               Retry
@@ -256,15 +199,23 @@ export function CatalogSetInsightRail({
             ) : null}
 
             <section className="mb-3">
-              <p className="px-1 text-[9px] font-semibold uppercase tracking-wide text-faint">Highest value</p>
+              <p className="px-1 text-[9px] font-semibold uppercase tracking-wide text-faint">
+                Highest value · top 10
+              </p>
+              <p className="px-1 text-[8px] text-muted">TCGPlayer catalog · Groq sold/active refresh</p>
               {topValue.length === 0 ? (
                 <p className="px-1 py-2 text-[10px] text-muted">No priced chase cards found yet.</p>
               ) : (
                 <div className="mt-1 space-y-0.5">
-                  {topValue.map((row) => (
+                  {topValue.map((row, i) => (
                     <InsightCardRow
                       key={`${row.catalogId ?? row.name}-${row.number ?? ""}`}
                       row={row}
+                      leading={
+                        <span className="font-mono text-[9px] font-semibold text-faint tabular-nums">
+                          {i + 1}
+                        </span>
+                      }
                       onClick={
                         row.catalogId && onSelectCard
                           ? () => onSelectCard(row.catalogId!)

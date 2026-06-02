@@ -12,8 +12,9 @@ const root = path.join(__dirname, "..");
 
 const nextDir = path.join(root, ".next");
 console.log("Preparing production build…");
+console.log("Stopping local Next dev processes (stop npm run dev if build still fails)…");
 stopProjectNextProcesses(root);
-await sleep(400);
+await sleep(1200);
 if (await removeDirWithRetry(nextDir, ".next")) {
   console.log("Removed .next");
 }

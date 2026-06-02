@@ -7,6 +7,7 @@ import { buildScanCardContext } from "@/lib/scan/context-builder";
 import { mergeRegistrySlabIntoCard, normalizeGradedSlabFields } from "@/lib/scan/graded-slab";
 import { extractedCardSchema } from "@/lib/scan/schemas";
 
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /** Lazy cert registry + cert-specific comps when a graded row is selected. */

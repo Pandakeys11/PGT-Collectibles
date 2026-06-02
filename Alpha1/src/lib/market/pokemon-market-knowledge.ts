@@ -10,6 +10,7 @@ import {
 } from "@/lib/market/catalog-reference-evidence";
 import {
   catalogRawFmvToFairValueBasis,
+  filterMarketEvidenceForRawLane,
   resolveCatalogRawFmv,
 } from "@/lib/market/catalog-raw-fmv";
 import { deriveFairValueResult, type FairValueBasis } from "@/lib/market/fair-value";
@@ -100,6 +101,113 @@ export function catalogSummaryToExtractedCard(
   });
 }
 
+function rawIdentityFromCatalogCard(
+  catalogCard: CatalogCardSummary | null,
+  gradeCard: ExtractedCard | null,
+): { name: string; number: string | null; set: string | null } | null {
+  if (catalogCard) {
+    return {
+      name: catalogCard.name,
+      number: catalogCard.number,
+      set: catalogCard.set?.name ?? catalogCard.set?.code ?? null,
+    };
+  }
+  if (gradeCard) {
+    return {
+      name: gradeCard.name ?? gradeCard.printedName ?? "",
+      number: gradeCard.number ?? null,
+      set: gradeCard.set ?? null,
+    };
+  }
+  return null;
+}
+
+/**
+ * Fast path: catalog row + reference prices only (no comp DB / intel tables).
+ * Used for instant Raw FMV on master catalog card detail.
+ */
+export async function buildPokemonMarketKnowledgeLite(
+  catalogId: string,
+): Promise<PokemonMarketKnowledge | null> {
+  const raw = catalogId.trim();
+  if (!raw) return null;
+
+  const canonical = pokemonCatalogIdFromSku(raw) ?? raw;
+  let catalogCard = await getCardFromDb("pokemon", canonical);
+  if (!catalogCard) {
+    const parsed = parsePokemonCatalogSku(raw);
+    if (parsed?.kind === "set_number") {
+      catalogCard = await getCardFromDbBySetNumber(
+        "pokemon",
+        parsed.setCode,
+        parsed.cardNumber,
+      );
+    }
+  }
+
+  const resolvedId = catalogCard?.id ?? canonical;
+  const referencePrices = catalogCard?.prices ?? parseCatalogPriceSnapshot(null);
+
+  // Load persisted comps from the intel tables for fast UI paint.
+  // We intentionally keep this "lite" builder away from any live/LLM research.
+  const compLimit = 24;
+  const loaded = await loadPersistedMarketEvidence(resolvedId, { compLimit });
+  const marketEvidence = loaded.evidence;
+
+  const gradeCard = catalogCard ? catalogSummaryToExtractedCard(catalogCard) : null;
+  const identity = rawIdentityFromCatalogCard(catalogCard, gradeCard);
+
+  const rawFmv = resolveCatalogRawFmv({
+    prices: referencePrices,
+    marketEvidence,
+    catalogFinish: catalogCard?.catalogFinish,
+    rarity: catalogCard?.rarity,
+    identity,
+  });
+
+  const rawBasis = catalogRawFmvToFairValueBasis(rawFmv.basis);
+
+  const intelligence = analyzeMarketEvidence(marketEvidence, {
+    card: gradeCard,
+    gradeCard: gradeCard ?? undefined,
+  });
+
+  return {
+    catalogId: resolvedId,
+    card: catalogCard
+      ? {
+          name: catalogCard.name,
+          setName: catalogCard.set?.name ?? null,
+          setCode: catalogCard.set?.code ?? null,
+          number: catalogCard.number,
+          year: catalogCard.set?.releaseDate?.slice(0, 4) ?? null,
+          rarity: catalogCard.rarity,
+          imageSmallUrl: catalogCard.images?.small ?? null,
+          imageLargeUrl: catalogCard.images?.large ?? null,
+        }
+      : null,
+    referencePrices,
+    intel: loaded.intel,
+    marketEvidence,
+    intelligence,
+    fairValueUsd: rawFmv.usd,
+    fairValueBasis: rawBasis,
+    rawFmvUsd: rawFmv.usd,
+    rawFmvBasis: rawBasis,
+    tcgPlayerUsd: rawFmv.tcgPlayerUsd,
+    priceChartingUsd: rawFmv.priceChartingUsd,
+    rawFmvSourceLabel: rawFmv.sourceLabel,
+    institutionalMemory: hasInstitutionalMarketMemory(marketEvidence),
+    dataDepth: {
+      persistedComps: loaded.intel?.comps.length ?? 0,
+      catalogReferenceRows: 0,
+      populationSnapshots: loaded.intel?.population.length ?? 0,
+      certifications: loaded.intel?.certifications.length ?? 0,
+    },
+    refreshedAt: new Date().toISOString(),
+  };
+}
+
 /**
  * Unified read model: catalog spine + institutional comps + reference prices + FMV intelligence.
  * This is the backend “market master” view for a locked `catalog_id`.
@@ -133,7 +241,7 @@ export async function buildPokemonMarketKnowledge(
 
   const resolvedId = catalogCard?.id ?? canonical;
 
-  const [_, loaded] = await Promise.all([
+  const [, loaded] = await Promise.all([
     Promise.resolve(catalogCard),
     loadPersistedMarketEvidence(resolvedId, { compLimit }),
   ]);
@@ -156,38 +264,29 @@ export async function buildPokemonMarketKnowledge(
     (catalogCard ? catalogSummaryToExtractedCard(catalogCard) : null);
 
   const isRawContext = !gradeCard?.grader && !gradeCard?.grade;
+  const identity = rawIdentityFromCatalogCard(catalogCard, gradeCard);
+  const rawLaneEvidence = isRawContext
+    ? filterMarketEvidenceForRawLane(marketEvidence, identity)
+    : marketEvidence;
+
   const rawFmv = resolveCatalogRawFmv({
     prices: referencePrices,
-    marketEvidence,
+    marketEvidence: rawLaneEvidence,
     catalogFinish: catalogCard?.catalogFinish,
     rarity: catalogCard?.rarity,
-    identity: catalogCard
-      ? {
-          name: catalogCard.name,
-          number: catalogCard.number,
-          set: catalogCard.set?.name ?? catalogCard.set?.code ?? null,
-        }
-      : gradeCard
-        ? {
-            name: gradeCard.name ?? gradeCard.printedName,
-            number: gradeCard.number,
-            set: gradeCard.set,
-          }
-        : null,
+    identity,
   });
 
   const { fairValueUsd: compFmv, fairValueBasis: compBasis } = deriveFairValueResult(
-    marketEvidence,
+    isRawContext ? rawLaneEvidence : marketEvidence,
     {
       card: gradeCard,
       gradeCard: gradeCard ?? undefined,
-      targetGradeBucket: gradeCard ? undefined : "raw",
+      targetGradeBucket: isRawContext ? "raw" : undefined,
     },
   );
 
-  const fairValueUsd = isRawContext
-    ? (rawFmv.usd ?? compFmv)
-    : compFmv;
+  const fairValueUsd = isRawContext ? (rawFmv.usd ?? compFmv) : compFmv;
   const fairValueBasis = isRawContext
     ? (catalogRawFmvToFairValueBasis(rawFmv.basis) ?? compBasis)
     : compBasis;

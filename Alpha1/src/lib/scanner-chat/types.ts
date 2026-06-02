@@ -42,6 +42,8 @@ export interface CardMatch {
   fmvUsd: number | null;
   fmvDisplay: string;
   fmvSubline: string | null;
+  fmvHeld?: boolean;
+  fmvHoldMessage?: string | null;
   /** Sticker or handwritten ask on the card/slab photo. */
   stickerUsd: number | null;
   stickerDisplay: string;

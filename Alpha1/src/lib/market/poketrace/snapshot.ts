@@ -4,6 +4,7 @@ import {
   pickPriceUsd,
   pickPrimaryTierRow,
   pickSpotUsd,
+  pickUsMomentumTierRow,
   pokeTraceTrendPct,
   trendLabelFromPct,
   isPokeTraceAnomaly,
@@ -80,29 +81,36 @@ export function buildCatalogSnapshotFromPokeTrace(
 ): { snapshot: CatalogPriceSnapshot; meta: PokeTraceCatalogMeta } {
   const base = options?.existing ?? parseCatalogPriceSnapshot(null);
   const primary = pickPrimaryTierRow(card, pokeCard);
+  const usMomentum = pickUsMomentumTierRow(card, pokeCard);
   const observedAt = pokeCard.lastUpdated?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
   const tcgUrl = pokeCard.refs?.tcgplayerId
     ? `https://www.tcgplayer.com/product/${pokeCard.refs.tcgplayerId}`
     : `https://poketrace.com/cards/${pokeCard.id}`;
 
-  if (primary) {
+  if (usMomentum?.sourceKey === "tcgplayer") {
+    const priceUsd = pickPriceUsd(usMomentum.row) ?? 0;
+    mergeTcgFromSource(base, "tcgplayer", usMomentum.tier, priceUsd, tcgUrl, observedAt);
+  } else if (primary) {
     const priceUsd = pickPriceUsd(primary.row) ?? 0;
     mergeTcgFromSource(base, primary.sourceKey, primary.tier, priceUsd, tcgUrl, observedAt);
     mergeCardMarketFromSource(base, primary.sourceKey, primary.row, tcgUrl, observedAt);
   }
 
-  const momentumPct = primary ? pokeTraceTrendPct(primary.row) : null;
+  const momentumRow = usMomentum;
+  const momentumPct = momentumRow ? pokeTraceTrendPct(momentumRow.row) : null;
   const meta: PokeTraceCatalogMeta = {
     cardId: pokeCard.id,
     syncedAt: new Date().toISOString(),
     market: options?.market ?? "US",
-    primaryTier: primary?.tier ?? null,
-    primarySource: primary?.sourceKey ?? null,
+    primaryTier: momentumRow?.tier ?? null,
+    primarySource: momentumRow?.sourceKey ?? null,
     momentumPct,
     trendLabel: trendLabelFromPct(momentumPct),
-    anomalyFlag: primary ? isPokeTraceAnomaly(primary.row) : false,
+    anomalyFlag: momentumRow ? isPokeTraceAnomaly(momentumRow.row) : false,
     historyPoints: options?.historyPoints ?? 0,
-    lastSpotUsd: primary ? pickSpotUsd(primary.row) : null,
+    lastSpotUsd: momentumRow ? pickSpotUsd(momentumRow.row) : null,
+    median7dUsd: momentumRow ? pickPriceUsd(momentumRow.row, "7d") : null,
+    median30dUsd: momentumRow ? pickPriceUsd(momentumRow.row, "30d") : null,
   };
 
   return {

@@ -213,7 +213,6 @@ export function ScannerChatShell() {
         onResultsClick={() => chat.setResultsDrawerOpen(true)}
         showResultsToggle={chat.specimens.length > 0}
         resultsCount={chat.specimens.length}
-        scanning={chat.isBusy}
         quota={quota}
       />
       <div className="flex min-h-0 w-full min-w-0 flex-1">

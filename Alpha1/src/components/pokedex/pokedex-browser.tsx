@@ -37,6 +37,7 @@ import {
   CATALOG_CARD_SORT_OPTIONS,
   type CatalogCardSortId,
 } from "@/lib/catalog/catalog-card-sort";
+import { catalogRawFmvSeedFromCard } from "@/lib/catalog/catalog-card-fmv-seed";
 import { formatPokemonCatalogSkuLabel } from "@/lib/catalog/parse-catalog-sku";
 import {
   CatalogCardDetailActions,
@@ -544,6 +545,7 @@ export function PokedexBrowser({
       subtitle,
       image,
       badges,
+      initialRawFmv: catalogRawFmvSeedFromCard(detail),
       extraRows: [
         {
           label: "Catalog SKU",
@@ -843,7 +845,10 @@ export function PokedexBrowser({
                       </Button>
                     </div>
 
-                    {selectedSetId && selectedSetName && !(embedded && embeddedSetOpen) ? (
+                    {selectedSetId &&
+                    selectedSetName &&
+                    !(embedded && embeddedSetOpen) &&
+                    !embeddedSetBinder ? (
                       <CatalogSetHeaderBand
                         setId={selectedSetId}
                         setName={selectedSetName}

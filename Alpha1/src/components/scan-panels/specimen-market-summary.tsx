@@ -22,6 +22,7 @@ import {
   summarizeSources,
 } from "@/lib/scan/sheet-present";
 import { printIdentityMarketScopeLabel } from "@/lib/scan/print-identity-ui";
+import { assessFmvReadiness } from "@/lib/scan/fmv-readiness";
 import { cn } from "@/lib/cn";
 
 function catalogStatusLabel(status: ScanSpecimen["context"]["catalogIdentityStatus"]): string {
@@ -66,9 +67,16 @@ export function SpecimenMarketSummary({
   const indexReady = catalogMarketReady(snapshot);
   const ready = scanReady || indexReady;
 
+  const readiness = assessFmvReadiness(specimen);
   const scanHero = formatFairMarketValueHero(specimen);
   const indexHero = snapshot ? formatCatalogFmvHero(snapshot) : { amount: "—", basis: null };
-  const hero = scanReady ? scanHero : indexReady ? indexHero : scanHero;
+  const hero = !readiness.ready
+    ? { amount: "—", basis: readiness.message }
+    : scanReady
+      ? scanHero
+      : indexReady
+        ? indexHero
+        : scanHero;
 
   const rawComp = scanReady
     ? formatCompChipRawSold(specimen)

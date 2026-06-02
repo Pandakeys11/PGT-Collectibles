@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { CatalogChaseCardTile } from "@/components/catalog/catalog-chase-card-tile";
 import { CatalogSetSealedFmvPanel } from "@/components/catalog/catalog-set-sealed-fmv-panel";
-import type { CatalogSetInsightPayload } from "@/lib/catalog/set-insight-payload";
+import { useSetInsight } from "@/hooks/use-set-insight";
 import {
   CATALOG_CARD_SORT_OPTIONS,
   type CatalogCardSortId,
@@ -31,28 +30,7 @@ export function CatalogSetHeaderBand({
   onSelectChase?: (catalogId: string) => void;
   className?: string;
 }) {
-  const [insight, setInsight] = useState<CatalogSetInsightPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/catalog/set-insight?setId=${encodeURIComponent(setId)}`, {
-        credentials: "same-origin",
-      });
-      const body = (await res.json()) as CatalogSetInsightPayload;
-      if (body.setWide?.cardCount) setInsight(body);
-      else setInsight(null);
-    } catch {
-      setInsight(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [setId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { insight, loading } = useSetInsight(setId, setName);
 
   const chase = insight?.chaseCard ?? insight?.topValue?.[0] ?? null;
 

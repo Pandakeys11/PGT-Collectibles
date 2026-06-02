@@ -52,7 +52,8 @@ Rules:
 - Label each price basis in priceLabel: SOLD, ACTIVE, REFERENCE, or TCGPlayer market.
 - Name real cards from the set; do not invent card names not in the set.
 - Prefer cards the user catalog hints mention when they match your research.
-- momentumPct is Cardmarket-style % move vs recent average when you find it; else null.
+- Omit momentumCards or leave empty — 7-day movers are computed from catalog/PokeTrace feeds, not web search.
+- topValueCards: return up to 10 highest-value singles in the set with your best current USD price (sold comps preferred when recent).
 - sealedProducts: booster box, ETB, booster bundle, PC ETB, etc. with realistic street ranges.
 - references: 2–4 authoritative URLs you actually used (TCGPlayer set page, Bulbapedia, etc.).
 - Be concise, institutional, and accurate — no hype.
@@ -129,7 +130,7 @@ export function groqRawToCards(
       note: asString(r.note),
     }))
     .filter((r) => r.name !== "Unknown")
-    .slice(0, 8);
+    .slice(0, 10);
 }
 
 export function groqRawToMomentum(

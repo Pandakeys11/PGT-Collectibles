@@ -12,6 +12,9 @@ export type SetInsightPriceCard = {
   /** SOLD | ACTIVE | REFERENCE | TCGPlayer market | etc. */
   priceLabel?: string | null;
   momentumPct?: number | null;
+  momentumLabel?: string | null;
+  momentumDeltaUsd?: number | null;
+  momentumRegion?: "us" | "eu" | null;
   note?: string | null;
 };
 

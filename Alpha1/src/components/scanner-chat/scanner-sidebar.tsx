@@ -17,7 +17,6 @@ import {
   Sparkles,
   Star,
   Trash2,
-  TrendingUp,
   Tv,
   Gavel,
   X,
@@ -47,26 +46,83 @@ export type SidebarNavId =
   | "exports"
   | "billing";
 
-const NAV: {
+type NavItem = {
   id: SidebarNavId;
   label: string;
   icon: typeof Plus;
   href?: string;
-}[] = [
-  { id: "new", label: "New Scan", icon: Plus },
+};
+
+const NAV_TOOLS: NavItem[] = [
   { id: "calculator", label: "Deal calculator", icon: Calculator },
   { id: "catalog", label: "Master catalog", icon: BookOpen },
-  { id: "live-market", label: "Live market pulse", icon: TrendingUp },
-  { id: "pgt-youtube", label: "PGT Video", icon: Tv },
   { id: "ebay-ending", label: "eBay ending soon", icon: Gavel },
   { id: "companion", label: "Companion", icon: Sparkles },
-  { id: "history", label: "Recent scans", icon: History },
-  { id: "collections", label: "Saved Collections", icon: Bookmark, href: "/saved" },
-  { id: "scan-vault", label: "Scan Vault", icon: FileImage, href: "/scan-vault" },
-  { id: "watchlist", label: "Watchlist", icon: Star },
-  { id: "exports", label: "Export CSV", icon: Download },
-  { id: "billing", label: "Billing / Plan", icon: CreditCard, href: "/usage" },
 ];
+
+const NAV_LIBRARY: NavItem[] = [
+  { id: "collections", label: "Saved collections", icon: Bookmark, href: "/saved" },
+  { id: "scan-vault", label: "Scan vault", icon: FileImage, href: "/scan-vault" },
+  { id: "watchlist", label: "Watchlist", icon: Star },
+];
+
+const NAV_ACCOUNT: NavItem[] = [
+  { id: "exports", label: "Export CSV", icon: Download },
+  { id: "billing", label: "Billing / plan", icon: CreditCard, href: "/usage" },
+];
+
+function NavSectionLabel({ children }: { children: string }) {
+  return (
+    <p className="px-3 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-faint first:pt-1">
+      {children}
+    </p>
+  );
+}
+
+function NavRow({
+  item,
+  onNewScan,
+  onNav,
+  canExport,
+}: {
+  item: NavItem;
+  onNewScan: () => void;
+  onNav: (id: SidebarNavId) => void;
+  canExport: boolean;
+}) {
+  const Icon = item.icon;
+  const disabled = item.id === "exports" && !canExport;
+  const className = cn(
+    "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition",
+    disabled
+      ? "cursor-not-allowed text-slate-600 opacity-50"
+      : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+  );
+
+  if (item.href) {
+    return (
+      <Link href={item.href} className={className}>
+        <Icon className="h-4 w-4 shrink-0 opacity-80" />
+        {item.label}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        if (item.id === "new") onNewScan();
+        else onNav(item.id);
+      }}
+      className={className}
+    >
+      <Icon className="h-4 w-4 shrink-0 opacity-80" />
+      {item.label}
+    </button>
+  );
+}
 
 function formatHistoryWhen(ts: number): string {
   const d = new Date(ts);
@@ -110,9 +166,8 @@ function RecentScansList({
   }
   if (sessions.length === 0) {
     return (
-      <p className="px-3 py-2 text-[11px] leading-relaxed text-slate-600">
-        Tap <span className="text-slate-400">Save scan</span> in results to store this session. Cards,
-        comps, and FMV restore when you reopen it here.
+      <p className="px-3 py-1.5 text-[11px] leading-snug text-slate-600">
+        Use <span className="text-slate-400">Save scan</span> in results to reopen sessions here.
       </p>
     );
   }
@@ -248,108 +303,104 @@ function SidebarContent({
         ) : null}
       </div>
       <SidebarChrome onOpenLiveMarket={onOpenLiveMarket} onOpenPgtYoutube={onOpenPgtYoutube} />
-      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-        {NAV.map((item) => {
-          const Icon = item.icon;
-          const disabled = item.id === "exports" && !canExport;
-          const className = cn(
-            "flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition",
-            item.id === "new"
-              ? "bg-emerald-500/12 text-emerald-100"
-              : disabled
-                ? "cursor-not-allowed text-slate-600 opacity-50"
+      <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
+        <button
+          type="button"
+          onClick={onNewScan}
+          className="mt-2 flex w-full items-center gap-2.5 rounded-xl bg-emerald-500/12 px-3 py-2.5 text-left text-sm font-medium text-emerald-100 transition hover:bg-emerald-500/18"
+        >
+          <Plus className="h-4 w-4 shrink-0 opacity-90" />
+          New scan
+        </button>
+
+        <NavSectionLabel>Tools</NavSectionLabel>
+        <div className="flex flex-col gap-0.5">
+          {NAV_TOOLS.map((item) => (
+            <NavRow key={item.id} item={item} onNewScan={onNewScan} onNav={onNav} canExport={canExport} />
+          ))}
+        </div>
+
+        <NavSectionLabel>Recent</NavSectionLabel>
+        <div className="space-y-0.5">
+          <button
+            type="button"
+            onClick={onToggleHistory}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition",
+              historyExpanded
+                ? "bg-white/[0.04] text-slate-200"
                 : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
-          );
-
-          if (item.id === "history") {
-            return (
-              <div key={item.id} className="space-y-1">
-                <button
-                  type="button"
-                  onClick={onToggleHistory}
-                  className={cn(className, historyExpanded && "bg-white/[0.04] text-slate-200")}
-                >
-                  <Icon className="h-4 w-4 shrink-0 opacity-80" />
-                  <span className="flex-1">{item.label}</span>
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 shrink-0 opacity-60 transition",
-                      historyExpanded && "rotate-180",
+            )}
+          >
+            <History className="h-4 w-4 shrink-0 opacity-80" />
+            <span className="flex-1">Recent scans</span>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 shrink-0 opacity-60 transition",
+                historyExpanded && "rotate-180",
+              )}
+            />
+          </button>
+          <AnimatePresence initial={false}>
+            {historyExpanded ? (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="overflow-hidden"
+              >
+                <RecentScansList
+                  sessions={recentSessions}
+                  loading={recentLoading}
+                  activeSessionId={activeSessionId}
+                  loadingSessionId={loadingSessionId}
+                  onSelect={onLoadSession}
+                  onDelete={onDeleteSession}
+                  onClearAll={onClearRecentSessions}
+                  clearing={clearingHistory}
+                />
+                {canSaveScan && onSaveScan ? (
+                  <button
+                    type="button"
+                    disabled={savingScan}
+                    onClick={onSaveScan}
+                    className="mx-1 mt-1.5 flex w-[calc(100%-0.5rem)] items-center justify-center gap-1.5 rounded-lg border border-sky-500/25 bg-sky-500/10 py-1.5 text-[11px] font-medium text-sky-100 transition hover:bg-sky-500/20 disabled:opacity-50"
+                  >
+                    {savingScan ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Bookmark className="h-3.5 w-3.5" />
                     )}
-                  />
-                </button>
-                <AnimatePresence initial={false}>
-                  {historyExpanded ? (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.18 }}
-                      className="overflow-hidden"
-                    >
-                      <RecentScansList
-                        sessions={recentSessions}
-                        loading={recentLoading}
-                        activeSessionId={activeSessionId}
-                        loadingSessionId={loadingSessionId}
-                        onSelect={onLoadSession}
-                        onDelete={onDeleteSession}
-                        onClearAll={onClearRecentSessions}
-                        clearing={clearingHistory}
-                      />
-                      {canSaveScan && onSaveScan ? (
-                        <button
-                          type="button"
-                          disabled={savingScan}
-                          onClick={onSaveScan}
-                          className="mx-2 mt-2 flex w-[calc(100%-1rem)] items-center justify-center gap-1.5 rounded-lg border border-sky-500/25 bg-sky-500/10 py-2 text-[11px] font-medium text-sky-100 transition hover:bg-sky-500/20 disabled:opacity-50"
-                        >
-                          {savingScan ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Bookmark className="h-3.5 w-3.5" />
-                          )}
-                          {savingScan ? "Saving…" : "Save current scan"}
-                        </button>
-                      ) : null}
-                      <Link
-                        href="/saved"
-                        className="mx-2 mb-1 mt-1 block rounded-lg px-2 py-1.5 text-[11px] text-slate-500 transition hover:bg-white/5 hover:text-slate-300"
-                      >
-                        View all saved cards →
-                      </Link>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </div>
-            );
-          }
+                    {savingScan ? "Saving…" : "Save current scan"}
+                  </button>
+                ) : null}
+                <Link
+                  href="/saved"
+                  className="mx-1 mb-0.5 mt-1 block rounded-lg px-2 py-1 text-[11px] text-slate-500 transition hover:bg-white/5 hover:text-slate-300"
+                >
+                  All saved cards →
+                </Link>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
 
-          if (item.href) {
-            return (
-              <Link key={item.id} href={item.href} className={className}>
-                <Icon className="h-4 w-4 shrink-0 opacity-80" />
-                {item.label}
-              </Link>
-            );
-          }
+        <NavSectionLabel>Library</NavSectionLabel>
+        <div className="flex flex-col gap-0.5">
+          {NAV_LIBRARY.map((item) => (
+            <NavRow key={item.id} item={item} onNewScan={onNewScan} onNav={onNav} canExport={canExport} />
+          ))}
+        </div>
 
-          return (
-            <button
-              key={item.id}
-              type="button"
-              disabled={disabled}
-              onClick={() => {
-                if (item.id === "new") onNewScan();
-                else onNav(item.id);
-              }}
-              className={className}
-            >
-              <Icon className="h-4 w-4 shrink-0 opacity-80" />
-              {item.label}
-            </button>
-          );
-        })}
+        <div className="mt-auto border-t border-white/6 pt-1">
+          <NavSectionLabel>Account</NavSectionLabel>
+          <div className="flex flex-col gap-0.5">
+            {NAV_ACCOUNT.map((item) => (
+              <NavRow key={item.id} item={item} onNewScan={onNewScan} onNav={onNav} canExport={canExport} />
+            ))}
+          </div>
+        </div>
       </nav>
       {!themeStripCompact ? (
         <div className="mt-auto border-t border-white/6 p-3">
@@ -365,7 +416,6 @@ function SidebarContent({
 const COLLAPSED_NAV_QUICK: { id: SidebarNavId; label: string; icon: typeof Plus }[] = [
   { id: "new", label: "New scan", icon: Plus },
   { id: "catalog", label: "Master catalog", icon: BookOpen },
-  { id: "live-market", label: "Live market pulse", icon: TrendingUp },
   { id: "calculator", label: "Deal calculator", icon: Calculator },
 ];
 

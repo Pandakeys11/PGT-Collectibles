@@ -6,6 +6,8 @@ import {
 } from "@/lib/market/cert-registry-capabilities";
 import { certFallbackProvidersWithoutPartner } from "@/lib/market/hydrate-registry-from-card";
 
+export const dynamic = "force-dynamic";
+
 /** Which cert/registry providers are configured (no secrets returned). */
 export async function GET() {
   await auth.protect();

@@ -16,6 +16,9 @@ export const POKETRACE_PRICE_SOURCES: PokeTracePriceSource[] = [
   "cardmarket_unsold",
 ];
 
+/** US lanes for 7d vs 30d momentum (never Cardmarket EU). */
+export const US_MOMENTUM_SOURCES: PokeTracePriceSource[] = ["tcgplayer", "ebay"];
+
 export function isJapaneseCard(card: ExtractedCard): boolean {
   const set = `${card.set ?? ""} ${card.details ?? ""}`.toLowerCase();
   return /japanese|japan|日本|sv\d+[a-z]?$/i.test(set) || /\bjp\b/.test(set);
@@ -202,6 +205,19 @@ export function pickPrimaryTierRow(
 ): { tier: string; sourceKey: PokeTracePriceSource; row: PokeTraceTierPrice } | null {
   const preferred = tierForLane(card);
   for (const sourceKey of POKETRACE_PRICE_SOURCES) {
+    const rows = pickTierPrices(pokeCard.prices?.[sourceKey], preferred);
+    if (rows[0]) return { ...rows[0], sourceKey };
+  }
+  return null;
+}
+
+/** Best US tier row for 7d vs 30d momentum (TCGPlayer, then eBay). */
+export function pickUsMomentumTierRow(
+  card: ExtractedCard,
+  pokeCard: { prices?: Partial<Record<PokeTracePriceSource, Record<string, unknown>>> },
+): { tier: string; sourceKey: PokeTracePriceSource; row: PokeTraceTierPrice } | null {
+  const preferred = tierForLane(card);
+  for (const sourceKey of US_MOMENTUM_SOURCES) {
     const rows = pickTierPrices(pokeCard.prices?.[sourceKey], preferred);
     if (rows[0]) return { ...rows[0], sourceKey };
   }

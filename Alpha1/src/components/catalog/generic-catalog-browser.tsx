@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, LineChart, Loader2, Search } from "lucide-react";
 import { marketPokemonHref } from "@/lib/app-routes";
+import { catalogRawFmvSeedFromCard } from "@/lib/catalog/catalog-card-fmv-seed";
 import { catalogVariantLabelFromCatalogId } from "@/lib/scan/print-identity-ui";
 import { CatalogCardDetailSheet } from "@/components/catalog/catalog-card-detail-sheet";
 import {
@@ -527,6 +528,7 @@ export function GenericCatalogBrowser({
                 { label: "Number", value: detail.number },
                 { label: "Rarity", value: detail.rarity },
               ],
+              initialRawFmv: catalogRawFmvSeedFromCard(detail),
             }}
             showMarketIntel={franchise === "pokemon"}
             variant="sheet"

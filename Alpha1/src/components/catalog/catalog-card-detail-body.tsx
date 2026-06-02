@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { CatalogCardMarketIntelPanel } from "@/components/catalog/catalog-card-market-intel-panel";
+import type { CatalogRawFmvSeed } from "@/lib/market/fmv-display";
 import { cn } from "@/lib/cn";
 
 export type CatalogCardDetailIdentity = {
@@ -14,6 +15,8 @@ export type CatalogCardDetailIdentity = {
   badges?: ReactNode;
   /** Shown in collapsed “More details” */
   extraRows?: Array<{ label: string; value: string | null | undefined }>;
+  /** Instant Raw FMV while market intel hydrates (from catalog row prices). */
+  initialRawFmv?: CatalogRawFmvSeed | null;
 };
 
 function CatalogDetailHero({
@@ -126,6 +129,7 @@ export function CatalogCardDetailBody({
           catalogId={identity.catalogId}
           variant={isSheet ? "sheet" : "full"}
           autoRefreshWhenThin
+          initialRawFmv={identity.initialRawFmv}
         />
       ) : null}
 

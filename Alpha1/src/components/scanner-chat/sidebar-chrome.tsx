@@ -76,24 +76,19 @@ export function SidebarChrome({
   className?: string;
 }) {
   return (
-    <div className={cn("sc-sidebar-chrome shrink-0 space-y-3 border-b border-white/6 px-2.5 py-3", className)}>
+    <div className={cn("sc-sidebar-chrome shrink-0 space-y-2 border-b border-white/6 px-2 py-2.5", className)}>
       <SidebarMarketPulse onOpenFull={onOpenLiveMarket} />
-      <div className="space-y-1.5">
-        <p className="px-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-faint">PGT radio</p>
+      <div className="space-y-1">
+        <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">Media</p>
         <SidebarPgtPlayer />
         {onOpenPgtYoutube ? (
           <button
             type="button"
             onClick={onOpenPgtYoutube}
-            className="flex w-full items-center gap-2 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-2.5 py-2 text-left transition hover:border-violet-400/35 hover:bg-violet-500/10"
+            className="flex w-full items-center gap-2 rounded-lg border border-white/8 bg-white/[0.03] px-2 py-1.5 text-left transition hover:border-violet-400/30 hover:bg-violet-500/[0.08]"
           >
-            <Tv className="h-3.5 w-3.5 shrink-0 text-violet-300" aria-hidden />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide text-violet-100/90">
-                PGT Video
-              </span>
-              <span className="block truncate text-[9px] text-slate-500">Pokémon episodes & playlist</span>
-            </span>
+            <Tv className="h-3.5 w-3.5 shrink-0 text-violet-300/90" aria-hidden />
+            <span className="min-w-0 flex-1 truncate text-xs text-slate-300">PGT Video</span>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
           </button>
         ) : null}

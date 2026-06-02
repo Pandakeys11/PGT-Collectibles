@@ -1,3 +1,4 @@
+import { eurToUsd } from "@/lib/market/cardmarket-eur";
 import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
 import { primaryTcgPlayerFromSnapshot } from "@/lib/market/catalog-raw-fmv";
@@ -64,8 +65,8 @@ export function tcgSnapshotToMarketEvidence(args: {
   if (cm?.trendPrice != null && isUsd(cm.trendPrice) && prices.cardMarketUrl?.trim()) {
     out.push({
       kind: "reference",
-      title: `${args.name} · Cardmarket trend`,
-      priceUsd: Math.round(cm.trendPrice),
+      title: `${args.name} · Cardmarket trend (EUR→USD)`,
+      priceUsd: eurToUsd(cm.trendPrice),
       observedAt: observedYmd(prices.cardMarketUpdatedAt),
       url: prices.cardMarketUrl.trim(),
       source: "Cardmarket",

@@ -3,11 +3,16 @@ const nextConfig = {
   transpilePackages: ["three", "@react-three/fiber"],
   // Avoid corrupted webpack pack files on Windows when .next is cleared mid-compile.
   webpack: (config, { dev }) => {
-    if (dev && process.platform === "win32") {
+    // Avoid missing chunk errors when .next is cleared mid-compile (common on Windows).
+    if (process.platform === "win32") {
       config.cache = false;
     }
     return config;
   },
+  // Reduce parallel static generation races on Windows (ENOENT _document / API routes).
+  ...(process.platform === "win32"
+    ? { experimental: { staticGenerationMaxConcurrency: 1 } }
+    : {}),
   async redirects() {
     return [
       {

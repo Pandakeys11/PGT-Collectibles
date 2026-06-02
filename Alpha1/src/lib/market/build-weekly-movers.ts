@@ -1,35 +1,37 @@
 import { loadSetCardsForCatalogInsight } from "@/lib/catalog/build-catalog-set-insight";
 import { resolveSetRecord } from "@/lib/catalog/db-catalog-browse";
-import { topMomentumCards, type SetInsightCardSource } from "@/lib/catalog/set-insight-utils";
+import {
+  cardInsightRow,
+  topMomentumCards,
+  type SetInsightCardSource,
+} from "@/lib/catalog/set-insight-utils";
 import { listPokemonSetsVintageFirst } from "@/lib/market/build-live-market-ticker";
-import { bestCatalogUsd, hasParseableCatalogPrices } from "@/lib/market/catalog-price-utils";
+import { resolveCatalogMomentum } from "@/lib/market/catalog-momentum";
+import { hasParseableCatalogPrices, moverDisplayUsd } from "@/lib/market/catalog-price-utils";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
-import { resolvedCatalogMomentumPct } from "@/lib/market/poketrace/momentum";
+import { hydrateSetUsMomentum } from "@/lib/market/hydrate-catalog-momentum";
+import type {
+  MoversSignalKind,
+  WeeklyMoverCard,
+  WeeklyMoversPayload,
+} from "@/lib/market/weekly-movers-types";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
-export type WeeklyMoverCard = {
-  catalogId: string;
-  name: string;
-  setName: string;
-  setCode: string | null;
-  cardNumber: string | null;
-  rarity: string | null;
-  imageUrl: string | null;
-  priceUsd: number | null;
-  momentumPct: number;
-  deltaUsd: number | null;
-};
-
-export type WeeklyMoversPayload = {
-  ready: boolean;
-  refreshedAt: string;
-  increases: WeeklyMoverCard[];
-  decreases: WeeklyMoverCard[];
-  error?: string | null;
-};
+export type { MoversSignalKind, WeeklyMoverCard, WeeklyMoversPayload } from "@/lib/market/weekly-movers-types";
+export { moversSignalSubtitle } from "@/lib/market/weekly-movers-types";
 
 const SET_LIMIT = 48;
 const MIN_ABS_MOMENTUM = 3;
+import {
+  SET_INSIGHT_MOVER_SEED_LIMIT,
+  SET_MOVER_COLUMN_SIZE,
+} from "@/lib/catalog/set-insight-limits";
+
+export {
+  SET_INSIGHT_MOVER_SEED_LIMIT,
+  SET_MOVER_COLUMN_SIZE,
+} from "@/lib/catalog/set-insight-limits";
+
 const LIST_SIZE = 6;
 
 type CardRow = {
@@ -64,15 +66,10 @@ export async function moversForSetCode(
 
   for (const row of rows) {
     if (!hasParseableCatalogPrices(row.prices_json)) continue;
-    const momentum = resolvedCatalogMomentumPct(row.prices_json);
-    if (momentum == null || Math.abs(momentum) < MIN_ABS_MOMENTUM) continue;
     const prices = parseCatalogPriceSnapshot(row.prices_json);
-    const priceUsd = bestCatalogUsd(prices);
-    const cm = prices.cardMarket;
-    const deltaUsd =
-      cm?.trendPrice != null && cm.avg7 != null
-        ? Math.round((cm.trendPrice - cm.avg7) * 100) / 100
-        : null;
+    const mom = resolveCatalogMomentum(prices);
+    if (mom.pct == null || Math.abs(mom.pct) < MIN_ABS_MOMENTUM) continue;
+    const priceUsd = moverDisplayUsd(prices);
 
     out.push({
       catalogId: row.catalog_id,
@@ -83,19 +80,19 @@ export async function moversForSetCode(
       rarity: row.rarity,
       imageUrl: row.image_large_url ?? row.image_small_url,
       priceUsd,
-      momentumPct: momentum,
-      deltaUsd,
+      priceLabel: priceUsd != null ? "TCGPlayer market" : null,
+      momentumPct: mom.pct,
+      momentumLabel: mom.label,
+      momentumRegion: mom.region,
+      deltaUsd: mom.deltaUsd,
     });
   }
 
   return out;
 }
 
-function moversFromInsightCards(
-  cards: SetInsightCardSource[],
-  setName: string,
-): WeeklyMoverCard[] {
-  return topMomentumCards(cards, 24).map((row) => ({
+function insightRowToMover(row: ReturnType<typeof cardInsightRow>, setName: string): WeeklyMoverCard {
+  return {
     catalogId: row.catalogId,
     name: row.name,
     setName,
@@ -104,20 +101,44 @@ function moversFromInsightCards(
     rarity: row.rarity,
     imageUrl: row.imageUrl,
     priceUsd: row.priceUsd,
+    priceLabel: row.priceLabel ?? null,
     momentumPct: row.momentumPct ?? 0,
-    deltaUsd: null,
-  }));
+    momentumLabel: row.momentumLabel ?? null,
+    momentumRegion: row.momentumRegion ?? null,
+    deltaUsd: row.momentumDeltaUsd ?? null,
+  };
 }
 
-function splitMovers(pool: WeeklyMoverCard[]): Pick<WeeklyMoversPayload, "increases" | "decreases"> {
+function moversFromInsightCards(
+  cards: SetInsightCardSource[],
+  setName: string,
+  poolLimit = SET_INSIGHT_MOVER_SEED_LIMIT,
+): WeeklyMoverCard[] {
+  return topMomentumCards(cards, poolLimit).map((row) => insightRowToMover(row, setName));
+}
+
+function countMomentumRegions(pool: WeeklyMoverCard[]): { us: number; eu: number } {
+  let us = 0;
+  let eu = 0;
+  for (const row of pool) {
+    if (row.momentumRegion === "us") us += 1;
+    else if (row.momentumRegion === "eu") eu += 1;
+  }
+  return { us, eu };
+}
+
+function splitMovers(
+  pool: WeeklyMoverCard[],
+  columnSize = LIST_SIZE,
+): Pick<WeeklyMoversPayload, "increases" | "decreases"> {
   const increases = pool
     .filter((c) => c.momentumPct > 0)
     .sort((a, b) => b.momentumPct - a.momentumPct)
-    .slice(0, LIST_SIZE);
+    .slice(0, columnSize);
   const decreases = pool
     .filter((c) => c.momentumPct < 0)
     .sort((a, b) => a.momentumPct - b.momentumPct)
-    .slice(0, LIST_SIZE);
+    .slice(0, columnSize);
   return { increases, decreases };
 }
 
@@ -147,10 +168,24 @@ export async function buildSetMovers(
     const setName = record?.name ?? setNameHint ?? needle;
 
     // Same full-set + live TCG enrichment as set insight (not DB set_code scan alone).
-    const { cards } = await loadSetCardsForCatalogInsight(needle);
+    let { cards } = await loadSetCardsForCatalogInsight(needle);
+    if (process.env.CATALOG_MOMENTUM_HYDRATE !== "0") {
+      cards = await hydrateSetUsMomentum(cards);
+    }
     const pool = cards.length > 0 ? moversFromInsightCards(cards, setName) : [];
+    const regions = countMomentumRegions(pool);
+    const hasStrong = pool.some((r) => Math.abs(r.momentumPct) >= MIN_ABS_MOMENTUM);
+    const signalKind: MoversSignalKind =
+      pool.length === 0 ? "none" : hasStrong ? "strong" : "weak";
 
-    const { increases, decreases } = splitMovers(pool);
+    let { increases, decreases } = splitMovers(pool, SET_MOVER_COLUMN_SIZE);
+    if (increases.length === 0 && decreases.length === 0 && pool.length > 0) {
+      const ups = pool.filter((r) => r.momentumPct > 0).slice(0, SET_MOVER_COLUMN_SIZE);
+      const downs = pool.filter((r) => r.momentumPct < 0).slice(0, SET_MOVER_COLUMN_SIZE);
+      increases = ups;
+      decreases = downs;
+    }
+
     return {
       setId: needle,
       setName,
@@ -158,6 +193,9 @@ export async function buildSetMovers(
       refreshedAt,
       increases,
       decreases,
+      momentumUsCount: regions.us,
+      momentumEuCount: regions.eu,
+      signalKind,
     };
   } catch (e) {
     return {

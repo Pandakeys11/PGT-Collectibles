@@ -95,16 +95,16 @@ export function SidebarMarketPulse({
 
   return (
     <div
-      className={cn("sc-sidebar-market-pulse space-y-1.5", className)}
+      className={cn("sc-sidebar-market-pulse space-y-1", className)}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <p className="flex items-center gap-1.5 px-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-300/80">
+      <p className="flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-300/80">
         <span className="relative flex h-1.5 w-1.5">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-50" />
           <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-sky-400" />
         </span>
-        Market pulse
+        Live pulse
       </p>
       {active ? (
         <LiveMarketTickerPill
@@ -119,9 +119,9 @@ export function SidebarMarketPulse({
       <button
         type="button"
         onClick={onOpenFull}
-        className="w-full rounded-lg border border-sky-500/20 bg-sky-500/10 py-1.5 text-center text-[10px] font-semibold text-sky-200/95 transition hover:bg-sky-500/15"
+        className="w-full rounded-lg py-1 text-center text-[10px] font-medium text-sky-300/90 transition hover:bg-sky-500/10 hover:text-sky-200"
       >
-        {topValueTotal > 0 ? `Tour ${topValueTotal} sets` : "Open full pulse"}
+        {topValueTotal > 0 ? `Browse ${topValueTotal} sets` : "Open pulse"}
       </button>
     </div>
   );

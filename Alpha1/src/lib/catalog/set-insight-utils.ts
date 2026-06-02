@@ -1,7 +1,10 @@
 import type { CatalogCardSummary } from "@/lib/catalog/catalog-types";
 import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
-import { bestCatalogUsd } from "@/lib/market/catalog-price-utils";
+import {
+  resolveCatalogMomentum,
+  resolvedCatalogMomentumPct,
+} from "@/lib/market/catalog-momentum";
 import { primaryTcgPlayerFromSnapshot } from "@/lib/market/catalog-raw-fmv";
 import { resolveCatalogRawFmv } from "@/lib/market/catalog-raw-fmv";
 import type { TcgCardSetEmbed, TcgCardSummary } from "@/lib/pokedex/tcg-api-types";
@@ -69,8 +72,10 @@ function isTcgInsightCard(card: SetInsightCardSource): card is TcgCardSummary {
   return "tcgplayer" in card || "cardmarket" in card;
 }
 
-function pricesForInsightCard(card: SetInsightCardSource): CatalogPriceSnapshot {
+/** DB `prices`, hydrated `catalogPrices`, then live TCG API embed — order matters after PokeTrace sync. */
+export function pricesForInsightCard(card: SetInsightCardSource): CatalogPriceSnapshot {
   if ("prices" in card && card.prices) return card.prices;
+  if ("catalogPrices" in card && card.catalogPrices) return card.catalogPrices;
   if (isTcgInsightCard(card)) return priceSnapshotFromTcgCard(card);
   return parseCatalogPriceSnapshot(null);
 }
@@ -83,6 +88,10 @@ export type SetInsightCardRow = {
   imageUrl: string | null;
   priceUsd: number | null;
   momentumPct: number | null;
+  momentumLabel: string | null;
+  momentumDeltaUsd: number | null;
+  momentumRegion: "us" | "eu" | null;
+  priceLabel: string | null;
 };
 
 export type SetInsightRollup = {
@@ -101,14 +110,9 @@ function bestTcgUsd(prices: CatalogPriceSnapshot): number | null {
   return best;
 }
 
-/** Momentum: PokeTrace medians first, then Cardmarket trend vs 7d, then WS overlay. */
+/** @see resolveCatalogMomentum — US 7d vs 30d first, EU Cardmarket fallback. */
 export function catalogMomentumPct(prices: CatalogPriceSnapshot): number | null {
-  if (prices.pokeTrace?.momentumPct != null) {
-    return prices.pokeTrace.momentumPct;
-  }
-  const cm = prices.cardMarket;
-  if (!cm?.trendPrice || !cm.avg7 || cm.avg7 <= 0) return null;
-  return Math.round(((cm.trendPrice - cm.avg7) / cm.avg7) * 1000) / 10;
+  return resolvedCatalogMomentumPct(prices);
 }
 
 export function cardInsightRow(
@@ -127,6 +131,7 @@ export function cardInsightRow(
     rarity,
     identity: { name: card.name, number, set: card.set?.name ?? null },
   });
+  const momentum = resolveCatalogMomentum(prices);
   return {
     catalogId: card.id,
     name: card.name,
@@ -134,7 +139,11 @@ export function cardInsightRow(
     rarity,
     imageUrl: card.images?.small ?? card.images?.large ?? null,
     priceUsd: fmv.usd ?? bestTcgUsd(prices),
-    momentumPct: catalogMomentumPct(prices),
+    priceLabel: fmv.sourceLabel,
+    momentumPct: momentum.pct,
+    momentumLabel: momentum.pct != null ? momentum.label : null,
+    momentumDeltaUsd: momentum.deltaUsd,
+    momentumRegion: momentum.region,
   };
 }
 
@@ -256,6 +265,8 @@ export function topValueCards(
     .slice(0, limit);
 }
 
+const SET_INSIGHT_STRONG_MOMENTUM_PCT = 3;
+
 export function topMomentumCards(
   cards: SetInsightCardSource[],
   limit = 4,
@@ -265,11 +276,14 @@ export function topMomentumCards(
     .map((c) => cardInsightRow(c, evidenceByCatalogId?.get(c.id)))
     .filter((r) => r.momentumPct != null && r.momentumPct !== 0);
 
-  const strong = rows
-    .filter((r) => Math.abs(r.momentumPct!) >= 3)
-    .sort((a, b) => Math.abs(b.momentumPct ?? 0) - Math.abs(a.momentumPct ?? 0));
+  const byStrength = (a: SetInsightCardRow, b: SetInsightCardRow) =>
+    Math.abs(b.momentumPct ?? 0) - Math.abs(a.momentumPct ?? 0);
 
-  const pool = strong.length > 0 ? strong : rows.sort((a, b) => Math.abs(b.momentumPct ?? 0) - Math.abs(a.momentumPct ?? 0));
+  const strong = rows
+    .filter((r) => Math.abs(r.momentumPct!) >= SET_INSIGHT_STRONG_MOMENTUM_PCT)
+    .sort(byStrength);
+
+  const pool = strong.length > 0 ? strong : [...rows].sort(byStrength);
   return pool.slice(0, limit);
 }
 

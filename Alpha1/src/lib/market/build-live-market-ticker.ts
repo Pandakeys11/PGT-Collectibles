@@ -253,7 +253,7 @@ async function insightsForSet(set: CatalogSetSummary): Promise<SetInsights> {
     scored.push({
       row,
       price: bestCatalogUsd(prices),
-      momentum: resolvedCatalogMomentumPct(row.prices_json),
+      momentum: resolvedCatalogMomentumPct(prices),
     });
   }
 

@@ -1,16 +1,21 @@
-import { catalogMomentumPct } from "@/lib/catalog/set-insight-utils";
+import {
+  resolveCatalogMomentum,
+  resolvedCatalogMomentumPct as resolvePct,
+} from "@/lib/market/catalog-momentum";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
-import { getPokeTraceRealtimeUpdate } from "@/lib/market/poketrace/realtime-store";
+import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
 
-/** PokeTrace WS overlay → cached pokeTrace meta → Cardmarket fallback. */
-export function resolvedCatalogMomentumPct(
+export { resolveCatalogMomentum, resolvedCatalogMomentumPct } from "@/lib/market/catalog-momentum";
+
+/** @deprecated Import from `@/lib/market/catalog-momentum` */
+export function resolvedCatalogMomentumFromJson(
   pricesJson: Record<string, unknown> | null | undefined,
 ): number | null {
-  const prices = parseCatalogPriceSnapshot(pricesJson);
-  const pokeId = prices.pokeTrace?.cardId;
-  if (pokeId) {
-    const live = getPokeTraceRealtimeUpdate(pokeId);
-    if (live?.trendPct != null) return live.trendPct;
-  }
-  return catalogMomentumPct(prices);
+  return resolvePct(parseCatalogPriceSnapshot(pricesJson));
+}
+
+export function resolvedCatalogMomentumFromSnapshot(
+  prices: CatalogPriceSnapshot,
+): number | null {
+  return resolveCatalogMomentum(prices).pct;
 }

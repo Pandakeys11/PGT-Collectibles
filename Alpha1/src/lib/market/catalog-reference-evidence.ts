@@ -100,6 +100,8 @@ export function parseCatalogPriceSnapshot(
               ? Number((pt as Record<string, unknown>).historyPoints)
               : 0,
           lastSpotUsd: asNumber((pt as Record<string, unknown>).lastSpotUsd),
+          median7dUsd: asNumber((pt as Record<string, unknown>).median7dUsd),
+          median30dUsd: asNumber((pt as Record<string, unknown>).median30dUsd),
         }
       : null;
 

@@ -56,6 +56,8 @@ export type PokeTraceCatalogMeta = {
   anomalyFlag: boolean;
   historyPoints: number;
   lastSpotUsd: number | null;
+  median7dUsd: number | null;
+  median30dUsd: number | null;
 };
 
 export type CatalogPriceSnapshot = {

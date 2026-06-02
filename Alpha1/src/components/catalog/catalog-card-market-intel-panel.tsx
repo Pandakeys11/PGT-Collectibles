@@ -7,9 +7,23 @@ import { Button } from "@/components/ui/button";
 import { MarketSourceLogo } from "@/components/market/market-source-logo";
 import { normalizeMarketSource } from "@/lib/market/sources";
 import { marketPokemonHref } from "@/lib/app-routes";
-import { resolveCatalogGradedGuide } from "@/lib/market/catalog-graded-guide";
-import { formatCatalogFmvUsd } from "@/lib/market/catalog-raw-fmv";
-import type { FairValueBasis } from "@/lib/market/fair-value";
+import { MarketLaneCompGrid } from "@/components/market/market-lane-comp-grid";
+import { buildCatalogLaneCompSummaries } from "@/lib/market/catalog-knowledge-lane-summary";
+import {
+  resolveCatalogGradedGuide,
+  resolvePriceChartingGradedTiers,
+} from "@/lib/market/catalog-graded-guide";
+import {
+  fetchCatalogMarketIntel,
+  writeCachedCatalogIntel,
+} from "@/lib/market/catalog-intel-client";
+import { resolveEvidenceGradeBucket } from "@/lib/market/catalog-raw-fmv";
+import {
+  formatFmvBasis,
+  formatFmvUsd,
+  knowledgeFromRawFmvSeed,
+  type CatalogRawFmvSeed,
+} from "@/lib/market/fmv-display";
 import {
   gradeBucketLabel,
   type GradeBucket,
@@ -21,7 +35,27 @@ import {
   type PokemonMarketKnowledge,
 } from "@/lib/market/pokemon-market-knowledge-shared";
 import type { CatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
+import type { MarketEvidence } from "@/lib/scan/schemas";
 import { cn } from "@/lib/cn";
+
+type IntelCompRow = CatalogMarketIntel["comps"][number];
+
+function intelCompToEvidence(row: IntelCompRow): MarketEvidence {
+  return {
+    kind: row.kind as MarketEvidence["kind"],
+    title: row.title,
+    priceUsd: row.priceUsd,
+    observedAt: row.observedAt,
+    url: row.url,
+    source: row.source,
+    slab: row.slab,
+    gradeBucket: (row.gradeBucket as MarketEvidence["gradeBucket"] | null) ?? undefined,
+  };
+}
+
+function compLaneLabel(row: IntelCompRow): string {
+  return gradeBucketLabel(resolveEvidenceGradeBucket(intelCompToEvidence(row)));
+}
 
 const GRADED_LADDER_BUCKETS: GradeBucket[] = [
   "psa9",
@@ -30,21 +64,8 @@ const GRADED_LADDER_BUCKETS: GradeBucket[] = [
   "cgcPristine10",
 ];
 
-const FMV_BASIS_PHRASE: Partial<Record<FairValueBasis, string>> = {
-  sold_median: "recent sold median",
-  active_median: "active listing median",
-  reference_median: "price guide median",
-  sticker_anchor: "sticker price",
-  tcg_catalog: "TCGPlayer market",
-};
-
 function fmtUsd(n: number | null | undefined): string {
-  return formatCatalogFmvUsd(n);
-}
-
-function formatFmvBasis(basis: FairValueBasis | null): string {
-  if (!basis) return "insufficient comps";
-  return FMV_BASIS_PHRASE[basis] ?? basis.replace(/_/g, " ");
+  return formatFmvUsd(n);
 }
 
 function labelTcgVariant(key: string): string {
@@ -96,6 +117,7 @@ function RawFmvBand({
   refreshing,
   needsLive,
   catalogId,
+  hydrating = false,
 }: {
   knowledge: PokemonMarketKnowledge;
   isSheet: boolean;
@@ -103,9 +125,11 @@ function RawFmvBand({
   refreshing: boolean;
   needsLive: boolean;
   catalogId: string;
+  /** Full intel still loading — Raw FMV from catalog prices is already shown. */
+  hydrating?: boolean;
 }) {
-  const headline = knowledge.rawFmvUsd ?? knowledge.fairValueUsd;
-  const basis = knowledge.rawFmvBasis ?? knowledge.fairValueBasis;
+  const headline = knowledge.rawFmvUsd;
+  const basis = knowledge.rawFmvBasis;
 
   return (
     <div className="sc-catalog-fmv-band rounded-xl border border-accent/30 bg-gradient-to-r from-accent/[0.12] via-panel-raised/50 to-panel-raised/30">
@@ -124,8 +148,15 @@ function RawFmvBand({
           </p>
           <p className="mt-0.5 text-[10px] text-muted">
             {formatFmvBasis(basis)} · {knowledge.rawFmvSourceLabel}
+            {hydrating ? (
+              <span className="text-faint"> · loading comps…</span>
+            ) : null}
           </p>
-          {(knowledge.tcgPlayerUsd != null || knowledge.priceChartingUsd != null) && (
+          {(knowledge.tcgPlayerUsd != null ||
+            knowledge.priceChartingUsd != null ||
+            knowledge.referencePrices.priceChartingPsa10Usd != null ||
+            knowledge.referencePrices.priceChartingPsa9Usd != null ||
+            knowledge.referencePrices.priceChartingPsa8Usd != null) && (
             <p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-faint">
               {knowledge.tcgPlayerUsd != null ? (
                 <span className="inline-flex items-center gap-1">
@@ -134,9 +165,27 @@ function RawFmvBand({
                 </span>
               ) : null}
               {knowledge.priceChartingUsd != null ? (
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1" title="PriceCharting loose">
                   <MarketSourceLogo label="PriceCharting" hideLaneChips />
-                  {fmtUsd(knowledge.priceChartingUsd)}
+                  Loose {fmtUsd(knowledge.priceChartingUsd)}
+                </span>
+              ) : null}
+              {knowledge.referencePrices.priceChartingPsa10Usd != null ? (
+                <span className="inline-flex items-center gap-1" title="PriceCharting PSA 10 guide">
+                  <MarketSourceLogo label="PriceCharting" hideLaneChips />
+                  PSA 10 {fmtUsd(knowledge.referencePrices.priceChartingPsa10Usd)}
+                </span>
+              ) : null}
+              {knowledge.referencePrices.priceChartingPsa9Usd != null ? (
+                <span className="inline-flex items-center gap-1" title="PriceCharting PSA 9 guide">
+                  <MarketSourceLogo label="PriceCharting" hideLaneChips />
+                  PSA 9 {fmtUsd(knowledge.referencePrices.priceChartingPsa9Usd)}
+                </span>
+              ) : null}
+              {knowledge.referencePrices.priceChartingPsa8Usd != null ? (
+                <span className="inline-flex items-center gap-1" title="PriceCharting PSA 8 guide">
+                  <MarketSourceLogo label="PriceCharting" hideLaneChips />
+                  PSA 8 {fmtUsd(knowledge.referencePrices.priceChartingPsa8Usd)}
                 </span>
               ) : null}
             </p>
@@ -186,30 +235,40 @@ export function CatalogCardMarketIntelPanel({
   catalogId,
   variant = "sheet",
   autoRefreshWhenThin = true,
+  initialRawFmv,
   className,
 }: {
   catalogId: string;
   variant?: "sheet" | "full";
   autoRefreshWhenThin?: boolean;
+  /** Instant Raw FMV from grid / catalog row while intel hydrates. */
+  initialRawFmv?: CatalogRawFmvSeed | null;
   className?: string;
 }) {
   const isSheet = variant === "sheet";
-  const [knowledge, setKnowledge] = useState<PokemonMarketKnowledge | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [knowledge, setKnowledge] = useState<PokemonMarketKnowledge | null>(() => {
+    const id = catalogId.trim();
+    if (!id || !initialRawFmv) return null;
+    return knowledgeFromRawFmvSeed(id, initialRawFmv);
+  });
+  const [loadingFull, setLoadingFull] = useState(() => !initialRawFmv?.rawFmvUsd);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autoRefreshAttempted = useRef(false);
 
-  const loadIntel = useCallback(async () => {
+  useEffect(() => {
     const id = catalogId.trim();
-    if (!id) return null;
-    const res = await fetch(`/api/market/intel?catalogId=${encodeURIComponent(id)}`);
-    const body = (await res.json()) as PokemonMarketKnowledge & { ready?: boolean; error?: string };
-    if (!res.ok || !body.ready) {
-      throw new Error(body.error ?? `Market intel failed (${res.status})`);
+    if (!id) return;
+    if (initialRawFmv) {
+      setKnowledge(knowledgeFromRawFmvSeed(id, initialRawFmv));
+      setLoadingFull(true);
+      setError(null);
+    } else {
+      setKnowledge(null);
+      setLoadingFull(true);
     }
-    return body;
-  }, [catalogId]);
+    autoRefreshAttempted.current = false;
+  }, [catalogId, initialRawFmv]);
 
   const refreshLive = useCallback(
     async (force = false) => {
@@ -227,6 +286,7 @@ export function CatalogCardMarketIntelPanel({
         if (!res.ok || !body.ready) {
           throw new Error(body.error ?? "Refresh failed");
         }
+        writeCachedCatalogIntel(id, body, false);
         setKnowledge(body);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Refresh failed");
@@ -238,47 +298,69 @@ export function CatalogCardMarketIntelPanel({
   );
 
   useEffect(() => {
+    const id = catalogId.trim();
+    if (!id) return;
+
+    const controller = new AbortController();
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    void loadIntel()
-      .then((data) => {
-        if (!cancelled && data) setKnowledge(data);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load market intel");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+
+    void (async () => {
+      setError(null);
+      try {
+        // Fetch in parallel so the UI can paint with persisted comps quickly,
+        // while full intel replaces it as soon as ready.
+        const litePromise = fetchCatalogMarketIntel(id, {
+          lite: true,
+          signal: controller.signal,
+        })
+          .then((lite) => {
+            if (!cancelled) setKnowledge(lite);
+          })
+          .catch(() => {
+            // Keep whatever we already have (seed or partial) if lite fails.
+          });
+
+        const full = await fetchCatalogMarketIntel(id, {
+          lite: false,
+          signal: controller.signal,
+        });
+        if (!cancelled) setKnowledge(full);
+        await litePromise;
+      } catch (e: unknown) {
+        if (cancelled || (e instanceof DOMException && e.name === "AbortError")) return;
+        // If full fails but seed exists, we still want to keep rendering.
+        setError((prev) => prev ?? (e instanceof Error ? e.message : "Failed to load market intel"));
+      } finally {
+        if (!cancelled) setLoadingFull(false);
+      }
+    })();
+
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [loadIntel]);
+  }, [catalogId, initialRawFmv]);
 
   useEffect(() => {
-    if (!autoRefreshWhenThin || !knowledge || autoRefreshAttempted.current) return;
+    if (!autoRefreshWhenThin || !knowledge || loadingFull || autoRefreshAttempted.current) {
+      return;
+    }
     const thin =
       !knowledge.institutionalMemory || knowledge.dataDepth.persistedComps < 6;
     if (!thin) return;
     autoRefreshAttempted.current = true;
-    void refreshLive(false);
-  }, [autoRefreshWhenThin, knowledge, refreshLive]);
-
-  const gradedLadderRows = useMemo(() => {
-    if (!knowledge) return [];
-    const byBucket = new Map(knowledge.intelligence.buckets.map((b) => [b.bucket, b]));
-    return GRADED_LADDER_BUCKETS.map((bucket) => byBucket.get(bucket)).filter(
-      (row): row is GradeBucketSummary =>
-        Boolean(row && row.soldCount + row.activeCount + row.referenceCount > 0),
-    );
-  }, [knowledge]);
+    const timer = window.setTimeout(() => void refreshLive(false), 800);
+    return () => window.clearTimeout(timer);
+  }, [autoRefreshWhenThin, knowledge, loadingFull, refreshLive]);
 
   const gradedGuide = useMemo(
     () => resolveCatalogGradedGuide(knowledge?.referencePrices, knowledge?.intel),
     [knowledge?.referencePrices, knowledge?.intel],
+  );
+
+  const priceChartingGradedTiers = useMemo(
+    () => resolvePriceChartingGradedTiers(knowledge?.referencePrices),
+    [knowledge?.referencePrices],
   );
 
   const identityFilteredComps = useMemo(() => {
@@ -299,13 +381,71 @@ export function CatalogCardMarketIntelPanel({
       observedAt: c.observedAt,
       url: c.url,
       source: c.source,
-      slab: c.gradeBucket,
+      slab: c.slab,
+      gradeBucket: (c.gradeBucket as MarketEvidence["gradeBucket"] | null) ?? undefined,
     }));
     const matched = filterMarketEvidenceForCardIdentity(evidence, extracted);
     const matchedTitles = new Set(matched.map((m) => m.title));
     const filtered = comps.filter((c) => matchedTitles.has(c.title));
     return filtered.length ? filtered : comps;
   }, [knowledge]);
+
+  const laneCompSummaries = useMemo(() => {
+    const seen = new Set<string>();
+    const evidence: MarketEvidence[] = [];
+    const push = (row: MarketEvidence) => {
+      const key = `${row.kind}|${row.title}|${row.priceUsd ?? ""}|${row.observedAt ?? ""}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      evidence.push(row);
+    };
+    for (const c of identityFilteredComps) push(intelCompToEvidence(c));
+    for (const row of knowledge?.marketEvidence ?? []) push(row);
+    return buildCatalogLaneCompSummaries(evidence);
+  }, [identityFilteredComps, knowledge?.marketEvidence]);
+
+  const gradedLadderRows = useMemo(() => {
+    const fromLanes: GradeBucketSummary[] = laneCompSummaries
+      .filter((row) => row.bucket !== "raw")
+      .map((row) => {
+        const sold =
+          row.soldDisplay === "—"
+            ? null
+            : Number(row.soldDisplay.replace(/[^0-9.]/g, "")) || null;
+        const active =
+          row.listedDisplay === "—"
+            ? null
+            : Number(row.listedDisplay.replace(/[^0-9.]/g, "")) || null;
+        return {
+          bucket: row.bucket,
+          label: row.label,
+          soldCount: row.soldCount,
+          activeCount: row.activeCount,
+          referenceCount: 0,
+          medianSoldUsd: sold,
+          medianActiveUsd: active,
+          latestSoldUsd: sold,
+          latestSoldAt: null,
+          lowSoldUsd: null,
+          highSoldUsd: null,
+          sources: [],
+        };
+      })
+      .filter((row) => GRADED_LADDER_BUCKETS.includes(row.bucket as GradeBucket));
+
+    if (fromLanes.length > 0) {
+      return GRADED_LADDER_BUCKETS.map((bucket) =>
+        fromLanes.find((r) => r.bucket === bucket),
+      ).filter((row): row is GradeBucketSummary => Boolean(row));
+    }
+
+    if (!knowledge) return [];
+    const byBucket = new Map(knowledge.intelligence.buckets.map((b) => [b.bucket, b]));
+    return GRADED_LADDER_BUCKETS.map((bucket) => byBucket.get(bucket)).filter(
+      (row): row is GradeBucketSummary =>
+        Boolean(row && row.soldCount + row.activeCount + row.referenceCount > 0),
+    );
+  }, [knowledge, laneCompSummaries]);
 
   const priceChartingSoldComps = useMemo(() => {
     return sortCompsForDisplay(
@@ -314,14 +454,21 @@ export function CatalogCardMarketIntelPanel({
     );
   }, [identityFilteredComps, isSheet]);
 
-  const otherComps = useMemo(() => {
-    return sortCompsForDisplay(
-      identityFilteredComps.filter((c) => !isPriceChartingSoldRow(c.source, c.kind)),
-      isSheet ? 5 : 8,
-    );
+  const { rawMarketComps, gradedMarketComps } = useMemo(() => {
+    const raw: IntelCompRow[] = [];
+    const graded: IntelCompRow[] = [];
+    for (const row of identityFilteredComps) {
+      if (isPriceChartingSoldRow(row.source, row.kind)) continue;
+      const bucket = resolveEvidenceGradeBucket(intelCompToEvidence(row));
+      if (bucket === "raw") raw.push(row);
+      else graded.push(row);
+    }
+    return {
+      rawMarketComps: sortCompsForDisplay(raw, isSheet ? 8 : 12),
+      gradedMarketComps: sortCompsForDisplay(graded, isSheet ? 10 : 14),
+    };
   }, [identityFilteredComps, isSheet]);
 
-  const population = knowledge?.intel?.population ?? [];
   const certifications = knowledge?.intel?.certifications ?? [];
 
   const referencePrices = knowledge?.referencePrices;
@@ -329,7 +476,7 @@ export function CatalogCardMarketIntelPanel({
     knowledge != null &&
     (!knowledge.institutionalMemory || knowledge.dataDepth.persistedComps < 6);
 
-  if (loading && !knowledge) {
+  if (!knowledge && loadingFull) {
     return (
       <div className={cn("flex items-center gap-2 py-2 text-xs text-muted", className)}>
         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -342,7 +489,20 @@ export function CatalogCardMarketIntelPanel({
     return (
       <div className={cn("space-y-2 py-2", className)}>
         <p className="text-xs text-danger">{error}</p>
-        <Button type="button" size="sm" variant="secondary" onClick={() => void loadIntel()}>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            setLoadingFull(true);
+            void fetchCatalogMarketIntel(catalogId.trim())
+              .then(setKnowledge)
+              .catch((e: unknown) =>
+                setError(e instanceof Error ? e.message : "Failed to load market intel"),
+              )
+              .finally(() => setLoadingFull(false));
+          }}
+        >
           Retry
         </Button>
       </div>
@@ -367,8 +527,11 @@ export function CatalogCardMarketIntelPanel({
         catalogId={catalogId}
         refreshing={refreshing}
         needsLive={needsLive}
+        hydrating={loadingFull}
         onRefresh={() => void refreshLive(needsLive)}
       />
+
+      <MarketLaneCompGrid lanes={laneCompSummaries} />
 
       {referencePrices && referencePrices.tcgPlayerPrices.length > 0 ? (
         <div className="rounded-lg border border-border-subtle/70 bg-panel-raised/25 p-2">
@@ -403,7 +566,7 @@ export function CatalogCardMarketIntelPanel({
       {gradedLadderRows.length > 0 ? (
         <div>
           <p className="mb-1 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">
-            Graded FMV
+            Graded FMV · sold / listed comps
           </p>
           <div className="sc-catalog-grade-ladder flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden">
             {gradedLadderRows.slice(0, isSheet ? 3 : 5).map((row) => (
@@ -417,6 +580,37 @@ export function CatalogCardMarketIntelPanel({
                 <p className="font-mono text-sm leading-tight text-primary">
                   {fmtUsd(row.medianSoldUsd ?? row.medianActiveUsd)}
                 </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {priceChartingGradedTiers.length > 0 ? (
+        <div>
+          <p className="mb-1 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-200/85">
+            PriceCharting graded (PSA 8–10)
+          </p>
+          <p className="mb-1.5 px-0.5 text-[9px] leading-snug text-muted">
+            Cached grade guides from PriceCharting — PSA 10, grade 9 (CIB), and grade 8 (NM).
+          </p>
+          <div className="flex gap-1 overflow-x-auto pb-0.5 sm:grid sm:grid-cols-3">
+            {priceChartingGradedTiers.map((tier) => (
+              <div
+                key={tier.label}
+                className="min-w-[4.25rem] shrink-0 rounded-lg border border-amber-500/25 bg-amber-500/[0.08] px-2 py-1.5 text-center"
+              >
+                <p className="text-[8px] font-semibold uppercase tracking-wide text-amber-200/90">
+                  {tier.label}
+                </p>
+                <p className="font-mono text-sm leading-tight text-primary">{fmtUsd(tier.usd)}</p>
+                <div className="mt-0.5 flex justify-center">
+                  <MarketSourceLogo
+                    label="PriceCharting"
+                    sourceId="pricecharting"
+                    variant="compact"
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -499,13 +693,13 @@ export function CatalogCardMarketIntelPanel({
         </div>
       ) : null}
 
-      {otherComps.length > 0 ? (
+      {rawMarketComps.length > 0 ? (
         <div className="sc-catalog-comps-list">
-          <p className="mb-1 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">
-            {priceChartingSoldComps.length > 0 ? "Other market comps" : "Recent comps"}
+          <p className="mb-1 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-200/80">
+            Raw market comps
           </p>
-          <ul className="divide-y divide-border-subtle/50 rounded-lg border border-border-subtle/70 bg-panel-raised/20">
-            {otherComps.map((row) => (
+          <ul className="divide-y divide-border-subtle/50 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04]">
+            {rawMarketComps.map((row) => (
               <li key={row.id} className="flex items-start justify-between gap-2 px-2 py-1.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1">
@@ -524,11 +718,9 @@ export function CatalogCardMarketIntelPanel({
                         variant="compact"
                       />
                     ) : null}
-                    {row.gradeBucket ? (
-                      <span className="text-[8px] text-faint">
-                        {gradeBucketLabel(row.gradeBucket as GradeBucket)}
-                      </span>
-                    ) : null}
+                    <span className="text-[8px] font-medium text-emerald-200/90">
+                      {compLaneLabel(row)}
+                    </span>
                   </div>
                   <p className="mt-0.5 line-clamp-1 text-[10px] leading-tight text-primary">
                     {row.title}
@@ -553,33 +745,68 @@ export function CatalogCardMarketIntelPanel({
             ))}
           </ul>
         </div>
-      ) : priceChartingSoldComps.length === 0 ? (
-        <p className="text-[10px] text-muted">No comps yet — tap refresh on Raw FMV.</p>
       ) : null}
 
-      {population.length > 0 ? (
-        <div className="rounded-lg border border-border-subtle/70 bg-panel-raised/20 p-2">
-          <p className="text-[9px] font-semibold uppercase tracking-wide text-faint">Population</p>
-          <ul className="mt-1 space-y-1">
-            {population.slice(0, isSheet ? 4 : 8).map((row, i) => (
-              <li
-                key={`${row.grader}-${row.grade}-${i}`}
-                className="flex justify-between gap-2 text-[10px]"
-              >
-                <span className="text-primary">
-                  {row.grader}
-                  {row.grade ? ` ${row.grade}` : ""}
-                </span>
-                <span className="font-mono text-accent">
-                  {row.populationCount != null
-                    ? row.populationCount.toLocaleString()
-                    : "—"}
-                </span>
+      {gradedMarketComps.length > 0 ? (
+        <div className="sc-catalog-comps-list">
+          <p className="mb-1 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-200/80">
+            Graded market comps
+          </p>
+          <ul className="divide-y divide-border-subtle/50 rounded-lg border border-violet-500/20 bg-violet-500/[0.04]">
+            {gradedMarketComps.map((row) => (
+              <li key={row.id} className="flex items-start justify-between gap-2 px-2 py-1.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span
+                      className={cn(
+                        "rounded px-1 py-px text-[7px] font-bold uppercase",
+                        kindBadge(row.kind),
+                      )}
+                    >
+                      {row.kind}
+                    </span>
+                    {row.source ? (
+                      <MarketSourceLogo
+                        label={row.source}
+                        sourceId={normalizeMarketSource(row.source)}
+                        variant="compact"
+                      />
+                    ) : null}
+                    <span className="text-[8px] font-medium text-violet-200/90">
+                      {compLaneLabel(row)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 line-clamp-1 text-[10px] leading-tight text-primary">
+                    {row.title}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-mono text-[11px] font-medium text-accent">
+                    {fmtUsd(row.priceUsd)}
+                  </p>
+                  {row.url ? (
+                    <a
+                      href={row.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[8px] text-accent underline-offset-2 hover:underline"
+                    >
+                      View
+                    </a>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
         </div>
+      ) : rawMarketComps.length === 0 && priceChartingSoldComps.length === 0 ? (
+        <p className="text-[10px] text-muted">No comps yet — tap refresh on Raw FMV.</p>
       ) : null}
+
+      <div className="rounded-lg border border-border-subtle/70 bg-panel-raised/20 p-2">
+        <p className="text-[9px] font-semibold uppercase tracking-wide text-faint">Population</p>
+        <p className="mt-1 text-[10px] text-muted">Coming soon</p>
+      </div>
 
       {certifications.length > 0 ? (
         <div className="rounded-lg border border-border-subtle/70 bg-panel-raised/20 p-2">

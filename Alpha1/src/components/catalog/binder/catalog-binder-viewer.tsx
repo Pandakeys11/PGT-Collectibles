@@ -64,7 +64,14 @@ export function CatalogBinderViewer<T>({
     setSpreadIndex(0);
     setPageIndex(0);
     setTurnDir(null);
-  }, [cards, setName]);
+  }, [setName]);
+
+  useEffect(() => {
+    const maxSpread = Math.max(0, spreadTotal - 1);
+    if (spreadIndex > maxSpread) setSpreadIndex(maxSpread);
+    const maxPage = Math.max(0, pageTotal - 1);
+    if (pageIndex > maxPage) setPageIndex(maxPage);
+  }, [spreadTotal, pageTotal, spreadIndex, pageIndex]);
 
   useEffect(() => {
     return () => {
@@ -216,7 +223,7 @@ export function CatalogBinderViewer<T>({
           else goNext();
         }}
       >
-        {loading ? (
+        {loading && cards.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-sm text-muted">
             <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
             Loading binder pages…

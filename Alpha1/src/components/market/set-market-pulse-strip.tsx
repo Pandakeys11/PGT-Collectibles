@@ -4,7 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
 import { topMomentumCards, type SetInsightCardSource } from "@/lib/catalog/set-insight-utils";
 import type { SetInsightPriceCard } from "@/lib/catalog/set-insight-payload";
-import type { WeeklyMoverCard, WeeklyMoversPayload } from "@/lib/market/build-weekly-movers";
+import { momentumSourceShort } from "@/lib/market/catalog-momentum";
+import {
+  SET_INSIGHT_MOVER_SEED_LIMIT,
+  SET_MOVER_COLUMN_SIZE,
+} from "@/lib/catalog/set-insight-limits";
+import { weeklyMoversPayloadFromInsight } from "@/lib/market/set-insight-movers";
+import {
+  moversSignalSubtitle,
+  type WeeklyMoverCard,
+  type WeeklyMoversPayload,
+} from "@/lib/market/weekly-movers-types";
+import {
+  MarketMoversFootnote,
+  MarketMoversSectionHeader,
+} from "@/components/market/market-movers-explainer";
 import { MarketCardThumb } from "@/components/ui/market-card-thumb";
 import { cn } from "@/lib/cn";
 
@@ -13,62 +27,31 @@ function fmtUsd(n: number | null | undefined): string {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
-function payloadFromInsightMomentum(
-  setName: string,
-  rows: SetInsightPriceCard[],
-): WeeklyMoversPayload | null {
-  const mapped: WeeklyMoverCard[] = rows
-    .filter((r) => r.momentumPct != null && r.momentumPct !== 0 && r.catalogId)
-    .map((r) => ({
-      catalogId: r.catalogId!,
-      name: r.name,
-      setName,
-      setCode: null,
-      cardNumber: r.number ?? null,
-      rarity: r.rarity ?? null,
-      imageUrl: r.imageUrl ?? null,
-      priceUsd: r.priceUsd ?? null,
-      momentumPct: r.momentumPct ?? 0,
-      deltaUsd: null,
-    }));
-  if (!mapped.length) return null;
-  const increases = mapped.filter((r) => r.momentumPct > 0).slice(0, 6);
-  const decreases = mapped.filter((r) => r.momentumPct < 0).slice(0, 6);
-  if (!increases.length && !decreases.length) return null;
-  return {
-    ready: true,
-    refreshedAt: new Date().toISOString(),
-    increases,
-    decreases,
-  };
+function hasMoverRows(payload: WeeklyMoversPayload | null): boolean {
+  return Boolean(payload?.ready && (payload.increases.length > 0 || payload.decreases.length > 0));
 }
 
 function clientPayloadFromCards(
   setName: string,
   cards: SetInsightCardSource[],
+  columnSize: number,
 ): WeeklyMoversPayload | null {
-  const rows: WeeklyMoverCard[] = topMomentumCards(cards, 12).map((r) => ({
-    catalogId: r.catalogId,
-    name: r.name,
-    setName,
-    setCode: null,
-    cardNumber: r.number,
-    rarity: r.rarity,
-    imageUrl: r.imageUrl,
-    priceUsd: r.priceUsd,
-    momentumPct: r.momentumPct ?? 0,
-    deltaUsd: null,
-  }));
-  if (rows.length === 0) return null;
-  const increases = rows.filter((r) => r.momentumPct > 0).slice(0, 6);
-  const decreases = rows.filter((r) => r.momentumPct < 0).slice(0, 6);
-  if (increases.length === 0 && decreases.length === 0) return null;
-  return {
-    ready: true,
-    refreshedAt: new Date().toISOString(),
-    increases,
-    decreases,
-  };
+  const seeds: SetInsightPriceCard[] = topMomentumCards(cards, SET_INSIGHT_MOVER_SEED_LIMIT).map(
+    (r) => ({
+      catalogId: r.catalogId,
+      name: r.name,
+      number: r.number,
+      rarity: r.rarity,
+      imageUrl: r.imageUrl,
+      priceUsd: r.priceUsd,
+      priceLabel: r.priceLabel,
+      momentumPct: r.momentumPct,
+      momentumLabel: r.momentumLabel,
+      momentumDeltaUsd: r.momentumDeltaUsd,
+      momentumRegion: r.momentumRegion,
+    }),
+  );
+  return weeklyMoversPayloadFromInsight(setName, seeds, columnSize);
 }
 
 function MoverRow({
@@ -80,6 +63,7 @@ function MoverRow({
   up: boolean;
   onSelect?: (catalogId: string) => void;
 }) {
+  const region = row.momentumRegion ?? momentumSourceShort(row.momentumLabel);
   const inner = (
     <>
       <div className="h-9 w-7 shrink-0 overflow-hidden rounded bg-black/35 ring-1 ring-white/10">
@@ -90,15 +74,29 @@ function MoverRow({
         <p className="text-[8px] text-muted">
           {row.cardNumber ? `#${row.cardNumber}` : "—"}
           {row.rarity ? ` · ${row.rarity}` : ""}
+          {region ? (
+            <span
+              className={cn(
+                "ml-1 rounded px-1 py-px font-semibold uppercase tracking-wide",
+                region === "US"
+                  ? "bg-emerald-500/15 text-emerald-200/90"
+                  : "bg-violet-500/15 text-violet-200/90",
+              )}
+            >
+              {region}
+            </span>
+          ) : null}
         </p>
       </div>
       <div className="shrink-0 text-right">
         <p className="font-mono text-[10px] text-amber-200/90">{fmtUsd(row.priceUsd)}</p>
+        <p className="text-[7px] text-muted">{row.priceLabel ?? "TCGPlayer"}</p>
         <p
           className={cn(
             "inline-flex items-center gap-0.5 font-mono text-[9px] font-semibold",
             up ? "text-emerald-300" : "text-rose-300",
           )}
+          title={row.momentumLabel ?? "7d vs 30d median change"}
         >
           {up ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
           {row.momentumPct > 0 ? "+" : ""}
@@ -133,6 +131,7 @@ export function SetMarketPulseStrip({
   embeddedInRail = false,
   flow = false,
   seedMomentum,
+  moverColumnSize = SET_MOVER_COLUMN_SIZE,
   className,
 }: {
   setId: string;
@@ -147,36 +146,40 @@ export function SetMarketPulseStrip({
   flow?: boolean;
   /** Set-insight momentum rows when /api/market/set-movers has no Cardmarket signal yet. */
   seedMomentum?: SetInsightPriceCard[];
+  /** Max rows per trending up / down column (default 5 in binder, 8 in full rail). */
+  moverColumnSize?: number;
   className?: string;
 }) {
   const [payload, setPayload] = useState<WeeklyMoversPayload | null>(null);
   const [loading, setLoading] = useState(false);
 
   const seedPayload = useMemo(
-    () => (seedMomentum?.length ? payloadFromInsightMomentum(setName, seedMomentum) : null),
-    [seedMomentum, setName],
+    () =>
+      seedMomentum?.length
+        ? weeklyMoversPayloadFromInsight(setName, seedMomentum, moverColumnSize)
+        : null,
+    [seedMomentum, setName, moverColumnSize],
   );
 
   const preview = useMemo(() => {
     if (seedPayload) return seedPayload;
-    return cards?.length ? clientPayloadFromCards(setName, cards) : null;
-  }, [cards, setName, seedPayload]);
+    return cards?.length ? clientPayloadFromCards(setName, cards, moverColumnSize) : null;
+  }, [cards, setName, seedPayload, moverColumnSize]);
 
   useEffect(() => {
     setPayload(null);
   }, [setId]);
 
   useEffect(() => {
+    if (seedPayload) {
+      setPayload((prev) => (hasMoverRows(prev) ? prev : seedPayload));
+      return;
+    }
     if (!cards?.length) return;
-    const instant = clientPayloadFromCards(setName, cards);
+    const instant = clientPayloadFromCards(setName, cards, moverColumnSize);
     if (!instant) return;
-    setPayload((prev) => {
-      if (prev?.ready && (prev.increases.length > 0 || prev.decreases.length > 0)) {
-        return prev;
-      }
-      return instant;
-    });
-  }, [cards, setName]);
+    setPayload((prev) => (hasMoverRows(prev) ? prev : instant));
+  }, [cards, setName, moverColumnSize, seedPayload]);
 
   useEffect(() => {
     if (!setId.trim()) {
@@ -194,20 +197,24 @@ export function SetMarketPulseStrip({
         const body = (await res.json()) as WeeklyMoversPayload;
         if (!cancelled) {
           setPayload((prev) => {
-            if (body.ready) return body;
-            const local =
-              seedPayload ??
-              (cards?.length ? clientPayloadFromCards(setName, cards) : null);
-            return local ?? prev;
+            if (hasMoverRows(body)) return body;
+            if (hasMoverRows(seedPayload)) return seedPayload!;
+            const local = cards?.length
+              ? clientPayloadFromCards(setName, cards, moverColumnSize)
+              : null;
+            if (hasMoverRows(local)) return local!;
+            return hasMoverRows(prev) ? prev : body.ready ? body : prev;
           });
         }
       } catch {
         if (!cancelled) {
           setPayload((prev) => {
-            const local =
-              seedPayload ??
-              (cards?.length ? clientPayloadFromCards(setName, cards) : null);
-            return local ?? prev;
+            if (hasMoverRows(seedPayload)) return seedPayload!;
+            const local = cards?.length
+              ? clientPayloadFromCards(setName, cards, moverColumnSize)
+              : null;
+            if (hasMoverRows(local)) return local!;
+            return prev;
           });
         }
       } finally {
@@ -218,9 +225,10 @@ export function SetMarketPulseStrip({
     return () => {
       cancelled = true;
     };
-  }, [setId, setName, cards, seedPayload]);
+  }, [setId, setName, cards, seedPayload, moverColumnSize]);
 
   const display = payload ?? preview;
+  const signalSubtitle = moversSignalSubtitle(display?.signalKind);
   const showLoading = loading && !display?.ready;
 
   if (!setId.trim()) return null;
@@ -249,8 +257,8 @@ export function SetMarketPulseStrip({
           className,
         )}
       >
-        No 7-day movers flagged yet — Cardmarket trend data may be sparse for this set; check back after
-        catalog sync.
+        No cards moved ±3% vs their 30-day median in this set yet. With PokeTrace configured you get US
+        TCGPlayer/eBay trends; otherwise EU Cardmarket averages are used when available.
       </div>
     );
   }
@@ -304,10 +312,22 @@ export function SetMarketPulseStrip({
     </div>
   );
 
+  const footnote = (
+    <MarketMoversFootnote
+      className={embeddedInRail || flow ? "mt-2 px-1" : "border-t border-sky-500/10 px-2.5 py-2"}
+      usCount={display.momentumUsCount}
+      euCount={display.momentumEuCount}
+    />
+  );
+
   if (embeddedInRail || flow) {
     return (
       <div className={cn("sc-set-market-pulse", className)} aria-label={`${setName} 7-day movers`}>
+        {signalSubtitle ? (
+          <p className="mb-1.5 px-0.5 text-[8px] leading-snug text-muted/90">{signalSubtitle}</p>
+        ) : null}
         {grid}
+        {footnote}
       </div>
     );
   }
@@ -318,14 +338,11 @@ export function SetMarketPulseStrip({
       aria-label={`${setName} 7-day market movers`}
     >
       <header className="border-b border-sky-500/15 px-2.5 py-2">
-        <p className="text-[9px] font-semibold uppercase tracking-wide text-sky-200/90">
-          7-day market movers
-        </p>
-        <p className="truncate text-[8px] text-muted">
-          {setName} · Cardmarket trend vs 7-day avg
-        </p>
+        <MarketMoversSectionHeader subtitle={signalSubtitle} />
+        <p className="mt-0.5 truncate text-[8px] text-muted/80">{setName}</p>
       </header>
       {grid}
+      {footnote}
     </section>
   );
 }

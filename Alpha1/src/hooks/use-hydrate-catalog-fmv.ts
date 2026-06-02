@@ -87,7 +87,7 @@ export function useHydrateCatalogFmv(
     }, 120);
 
     return () => window.clearTimeout(timer);
-  }, [cardsKey, setId, enabled, cards]);
+  }, [cardsKey, setId, enabled]);
 
   return useMemo(
     () => cards.map((c) => mergeCard(c, patches[c.id])),

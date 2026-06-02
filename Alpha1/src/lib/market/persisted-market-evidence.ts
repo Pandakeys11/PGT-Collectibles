@@ -6,6 +6,7 @@ import {
 } from "@/lib/market/catalog-reference-evidence";
 import type { CatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
 import { readCatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
+import { resolveEvidenceGradeBucket } from "@/lib/market/catalog-raw-fmv";
 import type { MarketEvidence } from "@/lib/scan/schemas";
 
 function compKind(raw: string): MarketEvidence["kind"] {
@@ -15,15 +16,23 @@ function compKind(raw: string): MarketEvidence["kind"] {
 
 /** Turn Postgres comp rows into enrich-compatible evidence (newest first). */
 export function intelCompsToMarketEvidence(intel: CatalogMarketIntel): MarketEvidence[] {
-  return intel.comps.map((row) => ({
-    kind: compKind(row.kind),
-    title: row.title,
-    priceUsd: row.priceUsd,
-    observedAt: row.observedAt,
-    url: row.url,
-    source: row.source,
-    slab: row.slab,
-  }));
+  return intel.comps.map((row) => {
+    const partial: MarketEvidence = {
+      kind: compKind(row.kind),
+      title: row.title,
+      priceUsd: row.priceUsd,
+      observedAt: row.observedAt,
+      url: row.url,
+      source: row.source,
+      slab: row.slab,
+      gradeBucket:
+        (row.gradeBucket as MarketEvidence["gradeBucket"] | null | undefined) ?? undefined,
+    };
+    return {
+      ...partial,
+      gradeBucket: resolveEvidenceGradeBucket(partial),
+    };
+  });
 }
 
 export async function loadPersistedMarketEvidence(

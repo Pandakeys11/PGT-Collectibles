@@ -1,4 +1,5 @@
 import { syncSetCatalogPricesFromTcgApi } from "@/lib/catalog/catalog-set-price-sync";
+import { hydrateSetUsMomentum } from "@/lib/market/hydrate-catalog-momentum";
 import { loadSetMarketEvidenceMap } from "@/lib/catalog/set-insight-comps";
 import { listCardsFromDb } from "@/lib/catalog/db-catalog-browse";
 import type { CatalogSetInsightPayload, SetInsightPriceCard } from "@/lib/catalog/set-insight-payload";
@@ -13,7 +14,6 @@ import {
 } from "@/lib/catalog/set-insight-ai";
 import {
   groqRawToCards,
-  groqRawToMomentum,
   groqRawToPromos,
   groqRawToSealed,
 } from "@/lib/catalog/set-insight-groq";
@@ -68,8 +68,12 @@ function attachCatalogIds(
       ...row,
       catalogId: hit.id,
       imageUrl: insight.imageUrl,
-      priceUsd: row.priceUsd ?? insight.priceUsd,
-      momentumPct: row.momentumPct ?? insight.momentumPct,
+      priceUsd: insight.priceUsd ?? row.priceUsd,
+      priceLabel: insight.priceLabel ?? row.priceLabel,
+      momentumPct: insight.momentumPct ?? row.momentumPct,
+      momentumLabel: insight.momentumLabel ?? row.momentumLabel,
+      momentumDeltaUsd: insight.momentumDeltaUsd ?? row.momentumDeltaUsd,
+      momentumRegion: insight.momentumRegion ?? row.momentumRegion,
     };
   });
 }
@@ -92,17 +96,20 @@ function catalogRowsToInsight(
       rarity: r.rarity,
       imageUrl: r.imageUrl,
       priceUsd: r.priceUsd,
-      priceLabel: cardInsightPriceLabel(card, ev),
+      priceLabel: r.priceLabel ?? cardInsightPriceLabel(card, ev),
       momentumPct: r.momentumPct,
+      momentumLabel: r.momentumLabel,
+      momentumDeltaUsd: r.momentumDeltaUsd,
+      momentumRegion: r.momentumRegion,
     };
   };
 
   return {
-    topValue: topValueCards(cards, 8, evidenceByCatalogId).map((r) => {
+    topValue: topValueCards(cards, SET_INSIGHT_TOP_VALUE_POOL, evidenceByCatalogId).map((r) => {
       const card = cards.find((c) => c.id === r.catalogId);
       return card ? mapRow(card) : { ...r, priceLabel: "TCGPlayer market" };
     }),
-    momentum: topMomentumCards(cards, 6, evidenceByCatalogId).map((r) => {
+    momentum: topMomentumCards(cards, SET_INSIGHT_MOVER_SEED_LIMIT, evidenceByCatalogId).map((r) => {
       const card = cards.find((c) => c.id === r.catalogId);
       return card ? mapRow(card) : { ...r, priceLabel: "TCGPlayer market" };
     }),
@@ -111,6 +118,74 @@ function catalogRowsToInsight(
       return card ? mapRow(card) : { ...r, priceLabel: "TCGPlayer market" };
     }),
   };
+}
+
+import {
+  SET_INSIGHT_MOVER_SEED_LIMIT,
+  SET_INSIGHT_TOP_VALUE_LIMIT,
+  SET_INSIGHT_TOP_VALUE_POOL,
+} from "@/lib/catalog/set-insight-limits";
+
+function topValueRowKey(row: SetInsightPriceCard): string {
+  return row.catalogId?.trim() || normalizeName(row.name);
+}
+
+function isGroqFreshPriceLabel(label: string | null | undefined): boolean {
+  if (!label?.trim()) return false;
+  return /sold|active|reference|tcgplayer/i.test(label);
+}
+
+function findGroqTopValueMatch(
+  row: SetInsightPriceCard,
+  groq: SetInsightPriceCard[],
+): SetInsightPriceCard | undefined {
+  const id = row.catalogId?.trim();
+  if (id) {
+    const byId = groq.find((g) => g.catalogId === id);
+    if (byId) return byId;
+  }
+  const nameKey = normalizeName(row.name);
+  return groq.find((g) => normalizeName(g.name) === nameKey);
+}
+
+/**
+ * Catalog-ranked top value first; Groq only refreshes prices on matched set cards (no random inserts).
+ */
+function mergeTopValueCards(
+  catalog: SetInsightPriceCard[],
+  groq: SetInsightPriceCard[],
+): SetInsightPriceCard[] {
+  const merged: SetInsightPriceCard[] = catalog
+    .filter((row) => row.priceUsd != null)
+    .map((row) => {
+      const hint = findGroqTopValueMatch(row, groq);
+      if (!hint?.priceUsd) return row;
+      const groqUsd = hint.priceUsd;
+      const catalogUsd = row.priceUsd ?? 0;
+      const sane =
+        groqUsd >= catalogUsd * 0.65 && groqUsd <= catalogUsd * 1.75;
+      const preferGroq = isGroqFreshPriceLabel(hint.priceLabel) && sane;
+      if (!preferGroq) return row;
+      return {
+        ...row,
+        priceUsd: groqUsd,
+        priceLabel: hint.priceLabel ?? row.priceLabel,
+        note: hint.note ?? row.note,
+      };
+    });
+
+  const seen = new Set(merged.map(topValueRowKey));
+  for (const row of groq) {
+    if (!row.catalogId || row.priceUsd == null) continue;
+    const key = topValueRowKey(row);
+    if (seen.has(key)) continue;
+    merged.push(row);
+    seen.add(key);
+  }
+
+  return merged
+    .sort((a, b) => (b.priceUsd ?? 0) - (a.priceUsd ?? 0))
+    .slice(0, SET_INSIGHT_TOP_VALUE_LIMIT);
 }
 
 function mergeCardLists(
@@ -126,7 +201,7 @@ function mergeCardLists(
     seen.add(normalizeName(row.name));
     out.push(row);
   }
-  return out.slice(0, 10);
+  return out.slice(0, SET_INSIGHT_TOP_VALUE_LIMIT);
 }
 
 /** Full-set cards + live TCG price enrichment (set insight, market movers). */
@@ -204,6 +279,10 @@ export async function buildCatalogSetInsight(
     }
   }
 
+  if (process.env.CATALOG_MOMENTUM_HYDRATE !== "0") {
+    cards = await hydrateSetUsMomentum(cards);
+  }
+
   evidenceByCatalogId = await loadSetMarketEvidenceMap(cards.map((c) => c.id));
   insightRollup = rollupSetInsightCards(cards, evidenceByCatalogId);
   const tcgRollup =
@@ -278,12 +357,12 @@ export async function buildCatalogSetInsight(
       chaseNotes = groq.raw.chaseNotes?.trim() ?? chaseNotes;
 
       const groqTop = attachCatalogIds(groqRawToCards(groq.raw.topValueCards), cards);
-      const groqMom = attachCatalogIds(groqRawToMomentum(groq.raw.momentumCards), cards);
       const groqPromo = attachCatalogIds(groqRawToPromos(groq.raw.promoCards), cards);
       const groqSealed = groqRawToSealed(groq.raw.sealedProducts);
 
-      topValue = mergeCardLists(catalogInsight.topValue, groqTop);
-      momentum = mergeCardLists(catalogInsight.momentum, groqMom);
+      topValue = mergeTopValueCards(catalogInsight.topValue, groqTop);
+      // Movers: catalog 7d/30d math only (accurate %); Groq does not override momentum.
+      momentum = catalogInsight.momentum;
       promos = mergeCardLists(catalogInsight.promos, groqPromo);
 
       if (groqSealed.length) {

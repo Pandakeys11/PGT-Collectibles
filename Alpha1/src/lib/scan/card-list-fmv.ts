@@ -1,5 +1,6 @@
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import { deriveFairValueResult, type FairValueBasis } from "@/lib/market/fair-value";
+import { assessFmvReadiness } from "@/lib/scan/fmv-readiness";
 import { inferCardTargetGradeBucket } from "@/lib/market/market-intelligence";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 import {
@@ -16,6 +17,9 @@ export type CardListFmv = {
   fmvBasis: FairValueBasis | null;
   fmvDisplay: string;
   fmvSubline: string | null;
+  /** Headline FMV withheld until catalog + print identity are confirmed. */
+  fmvHeld: boolean;
+  fmvHoldMessage: string | null;
   /** Price read from a sticker or handwritten tag on the slab/photo. */
   stickerUsd: number | null;
   stickerDisplay: string;
@@ -165,7 +169,10 @@ function buildSubline(
  * the same grade-aware sold-median logic as market research.
  */
 export function resolveCardListFmv(specimen: ScanSpecimen): CardListFmv {
-  const { fmvUsd, fmvBasis } = resolveMarketFmvUsd(specimen);
+  const readiness = assessFmvReadiness(specimen);
+  const resolved = resolveMarketFmvUsd(specimen);
+  const fmvUsd = readiness.ready ? resolved.fmvUsd : null;
+  const fmvBasis = readiness.ready ? resolved.fmvBasis : null;
   const stickerUsd = getAskingUsd(specimen);
   const soldComps = matchingSoldComps(specimen);
   const latest = soldComps[0] ?? null;
@@ -178,11 +185,17 @@ export function resolveCardListFmv(specimen: ScanSpecimen): CardListFmv {
   const hasSticker =
     stickerUsd != null && Number.isFinite(stickerUsd) && stickerUsd >= 1;
 
+  const subline = readiness.ready
+    ? buildSubline(fmvBasis, soldComps, latest)
+    : readiness.message;
+
   return {
     fmvUsd,
     fmvBasis,
+    fmvHeld: !readiness.ready,
+    fmvHoldMessage: readiness.ready ? null : readiness.message,
     fmvDisplay: formatUsd(fmvUsd),
-    fmvSubline: buildSubline(fmvBasis, soldComps, latest),
+    fmvSubline: subline,
     stickerUsd: hasSticker ? Math.round(stickerUsd) : null,
     stickerDisplay: formatUsd(hasSticker ? stickerUsd : null),
     hasSticker,

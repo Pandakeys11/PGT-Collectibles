@@ -16,7 +16,7 @@ export function stopProjectNextProcesses(projectRoot) {
     "Get-CimInstance Win32_Process",
     "| Where-Object {",
     `$_.CommandLine -and $_.CommandLine -like '*${escaped}*'`,
-    "-and ($_.CommandLine -match 'next dev' -or $_.CommandLine -match 'next\\\\build' -or $_.CommandLine -match 'node_modules\\\\next')",
+    "-and ($_.CommandLine -match 'next dev' -or $_.CommandLine -match 'npm run dev' -or $_.CommandLine -match 'next\\\\build' -or $_.CommandLine -match 'dev-clean' -or $_.CommandLine -match 'dev-port' -or $_.CommandLine -match 'node_modules\\\\next\\\\dist\\\\bin\\\\next')",
     "}",
     "| ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
   ].join(" ");

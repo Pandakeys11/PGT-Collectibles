@@ -1,3 +1,4 @@
+import { cardMarketUsdFromSnapshot } from "@/lib/market/cardmarket-eur";
 import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
 import { bestCatalogUsd } from "@/lib/market/catalog-price-utils";
@@ -8,12 +9,25 @@ import {
   getCardNumberEvidence,
 } from "@/lib/market/market-evidence-identity";
 import {
+  evidenceHaystack,
   matchesBgsBlackLabel,
   matchesCgcPristine10,
   matchesPsa10,
   matchesPsa9,
 } from "@/lib/market/grade-match";
+import { inferEvidenceGradeBucket, type GradeBucket } from "@/lib/market/market-intelligence";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
+
+// PriceCharting uses "Gem Mint", "Pristine", etc. for *ungraded* condition bands.
+// We only want to exclude true slabbed/graded-company comps.
+const RAW_PRICECHARTING_TITLE =
+  /loose|ungraded|raw|nm\b|near\s*mint|non[-\s]?graded|unslabbed|gem\s*mint|pristine/i;
+
+// Graded = PSA/BGS/CGC/SGC/TAG (company + grade tier) OR BGS Black Label.
+const GRADED_TITLE_HINT =
+  /\b(psa|bgs|cgc|sgc|tag|ace|beckett)\s*(?:10|9\.5|9|8|7)\b|\bblack\s*label\b/i;
+
+const RAW_TITLE_HINT = /\b(raw|ungraded|unslabbed|near\s*mint(?!\s*\d))\b/i;
 
 export type CatalogRawFmvBasis =
   | "tcg_player"
@@ -40,8 +54,42 @@ function isUsd(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n) && n >= 0.5;
 }
 
+/** True when a comp row is graded/slab — must not feed Raw FMV. */
+export function isGradedMarketEvidence(item: MarketEvidence): boolean {
+  if (matchesPsa10(item) || matchesPsa9(item) || matchesBgsBlackLabel(item) || matchesCgcPristine10(item)) {
+    return true;
+  }
+  const h = evidenceHaystack(item);
+  if (GRADED_TITLE_HINT.test(h)) return true;
+  if (/\btag\b/.test(h) && /\b10\b/.test(h) && !RAW_TITLE_HINT.test(h)) return true;
+  if (/pricecharting/i.test(item.source ?? "") && !RAW_PRICECHARTING_TITLE.test(h)) {
+    return true;
+  }
+  if (item.gradeBucket != null && item.gradeBucket !== "raw" && item.gradeBucket !== "unknown") {
+    return true;
+  }
+  return false;
+}
+
+/** Resolve display lane for a comp row (title beats stale persisted `raw` buckets). */
+export function resolveEvidenceGradeBucket(item: MarketEvidence): GradeBucket {
+  if (isGradedMarketEvidence(item)) {
+    return inferEvidenceGradeBucket({ ...item, gradeBucket: undefined });
+  }
+  if (item.gradeBucket === "raw" || RAW_TITLE_HINT.test(evidenceHaystack(item))) {
+    return "raw";
+  }
+  const inferred = inferEvidenceGradeBucket(item);
+  return inferred === "unknown" ? "raw" : inferred;
+}
+
+function isEbayEvidence(item: MarketEvidence): boolean {
+  const blob = `${item.source ?? ""} ${item.url ?? ""}`.toLowerCase();
+  return blob.includes("ebay");
+}
+
 function excludeGraded(item: MarketEvidence): boolean {
-  return !matchesPsa10(item) && !matchesPsa9(item) && !matchesBgsBlackLabel(item) && !matchesCgcPristine10(item);
+  return !isGradedMarketEvidence(item);
 }
 
 function toExtractedCard(identity?: CatalogRawFmvIdentity | null): ExtractedCard | null {
@@ -55,7 +103,8 @@ function toExtractedCard(identity?: CatalogRawFmvIdentity | null): ExtractedCard
   };
 }
 
-function filterRawEvidence(
+/** Sold/active/reference rows eligible for ungraded FMV (identity + grade filtered). */
+export function filterMarketEvidenceForRawLane(
   evidence: MarketEvidence[],
   identity?: CatalogRawFmvIdentity | null,
 ): MarketEvidence[] {
@@ -63,6 +112,13 @@ function filterRawEvidence(
   const card = toExtractedCard(identity);
   if (!card) return raw;
   return filterMarketEvidenceForCardIdentity(raw, card);
+}
+
+function filterRawEvidence(
+  evidence: MarketEvidence[],
+  identity?: CatalogRawFmvIdentity | null,
+): MarketEvidence[] {
+  return filterMarketEvidenceForRawLane(evidence, identity);
 }
 
 function evidenceMatchesCardNumber(
@@ -91,9 +147,10 @@ export function primaryTcgPlayerFromSnapshot(
     mid: isUsd(r.mid) ? r.mid : null,
   }));
 
-  const maxMarket = (pool: Row[]): number | null => {
+  const medianMarket = (pool: Row[]): number | null => {
     const m = pool.map((e) => e.market).filter((n): n is number => n != null);
-    return m.length ? Math.max(...m) : null;
+    const med = median(m);
+    return med != null ? Math.round(med) : null;
   };
 
   let pool = entries;
@@ -107,11 +164,12 @@ export function primaryTcgPlayerFromSnapshot(
     if (premium.length) pool = premium;
   }
 
-  let out = maxMarket(pool);
-  if (out == null) out = maxMarket(entries);
+  let out = medianMarket(pool);
+  if (out == null) out = medianMarket(entries);
   if (out == null) {
     const mids = entries.map((e) => e.mid).filter((n): n is number => n != null);
-    out = mids.length ? Math.max(...mids) : null;
+    const med = median(mids);
+    out = med != null ? Math.round(med) : null;
   }
   return out;
 }
@@ -123,16 +181,11 @@ export function priceChartingUsdFromSnapshot(
   return isUsd(n) ? Math.round(n) : null;
 }
 
-/** Cardmarket trend / avg when TCGPlayer has no US market row. */
+/** Cardmarket trend / avg (EUR→USD) when TCGPlayer has no US market row. */
 export function primaryCardMarketFromSnapshot(
   prices: CatalogPriceSnapshot | null | undefined,
 ): number | null {
-  const cm = prices?.cardMarket;
-  if (!cm) return null;
-  for (const n of [cm.trendPrice, cm.averageSellPrice, cm.avg30, cm.avg7, cm.lowPrice]) {
-    if (isUsd(n)) return Math.round(n);
-  }
-  return null;
+  return cardMarketUsdFromSnapshot(prices?.cardMarket);
 }
 
 export function priceChartingUsdFromEvidence(evidence: MarketEvidence[]): number | null {
@@ -140,14 +193,10 @@ export function priceChartingUsdFromEvidence(evidence: MarketEvidence[]): number
     (e) =>
       e.source === "PriceCharting" &&
       typeof e.priceUsd === "number" &&
-      /loose|ungraded|raw|nm|near mint/i.test(e.title),
+      !isGradedMarketEvidence(e) &&
+      RAW_PRICECHARTING_TITLE.test(e.title),
   );
-  if (!rows.length) {
-    const any = evidence.find(
-      (e) => e.source === "PriceCharting" && typeof e.priceUsd === "number",
-    );
-    return any?.priceUsd != null ? Math.round(any.priceUsd) : null;
-  }
+  if (!rows.length) return null;
   const med = median(rows.map((r) => r.priceUsd as number));
   return med != null ? Math.round(med) : null;
 }
@@ -187,6 +236,33 @@ function medianSoldRaw(
   return med != null && prices.length >= minCount ? Math.round(med) : null;
 }
 
+/** eBay-only raw sold + active average (ungraded lane). */
+function ebayRawFmvUsd(
+  rawLaneEvidence: MarketEvidence[],
+  cardNumber?: string | null,
+): { usd: number; basis: CatalogRawFmvBasis; sourceLabel: string } | null {
+  const ebay = rawLaneEvidence.filter(isEbayEvidence);
+  if (!ebay.length) return null;
+
+  const soldUsd = medianSoldRaw(ebay, cardNumber);
+  const activeUsd = medianActiveRaw(ebay, cardNumber);
+
+  if (soldUsd != null && activeUsd != null) {
+    return {
+      usd: Math.round((soldUsd + activeUsd) / 2),
+      basis: "sold_median",
+      sourceLabel: "eBay raw sold · listed avg",
+    };
+  }
+  if (soldUsd != null) {
+    return { usd: soldUsd, basis: "sold_median", sourceLabel: "eBay raw sold" };
+  }
+  if (activeUsd != null) {
+    return { usd: activeUsd, basis: "active_median", sourceLabel: "eBay raw listed" };
+  }
+  return null;
+}
+
 /** Reject PriceCharting when identity-matched listings disagree sharply (wrong SKU). */
 function priceChartingTrusted(
   pcUsd: number,
@@ -203,7 +279,7 @@ function priceChartingTrusted(
 
 /**
  * Headline RAW FMV for master catalog display.
- * TCGPlayer (catalog) → identity-matched listings → PriceCharting (validated) → sold comps.
+ * TCGPlayer → eBay raw sold + listed average → Cardmarket → PriceCharting loose only.
  */
 export function resolveCatalogRawFmv(args: {
   prices?: CatalogPriceSnapshot | null;
@@ -219,13 +295,21 @@ export function resolveCatalogRawFmv(args: {
     catalogFinish: args.catalogFinish,
     rarity: args.rarity,
   });
-  const activeUsd = medianActiveRaw(filtered, cardNumber);
-  const soldUsd = medianSoldRaw(filtered, cardNumber);
+  const ebayRaw = ebayRawFmvUsd(filtered, cardNumber);
   let priceChartingUsd =
     priceChartingUsdFromSnapshot(args.prices) ?? priceChartingUsdFromEvidence(filtered);
+  const ebaySoldUsd = ebayRaw?.basis === "sold_median" ? ebayRaw.usd : null;
+  const ebayActiveUsd = ebayRaw?.basis === "active_median" ? ebayRaw.usd : null;
   if (
     priceChartingUsd != null &&
-    !priceChartingTrusted(priceChartingUsd, activeUsd, soldUsd)
+    !priceChartingTrusted(priceChartingUsd, ebayActiveUsd, ebaySoldUsd)
+  ) {
+    priceChartingUsd = null;
+  }
+  if (
+    priceChartingUsd != null &&
+    tcgPlayerUsd != null &&
+    priceChartingUsd > tcgPlayerUsd * 2.25
   ) {
     priceChartingUsd = null;
   }
@@ -241,6 +325,16 @@ export function resolveCatalogRawFmv(args: {
     };
   }
 
+  if (ebayRaw != null) {
+    return {
+      usd: ebayRaw.usd,
+      basis: ebayRaw.basis,
+      tcgPlayerUsd: null,
+      priceChartingUsd,
+      sourceLabel: ebayRaw.sourceLabel,
+    };
+  }
+
   const cardMarketUsd = primaryCardMarketFromSnapshot(args.prices);
   if (cardMarketUsd != null) {
     return {
@@ -249,26 +343,6 @@ export function resolveCatalogRawFmv(args: {
       tcgPlayerUsd: null,
       priceChartingUsd,
       sourceLabel: priceChartingUsd != null ? "Cardmarket · PriceCharting" : "Cardmarket",
-    };
-  }
-
-  if (activeUsd != null) {
-    return {
-      usd: activeUsd,
-      basis: "active_median",
-      tcgPlayerUsd: null,
-      priceChartingUsd,
-      sourceLabel: "Matched listings",
-    };
-  }
-
-  if (soldUsd != null) {
-    return {
-      usd: soldUsd,
-      basis: "sold_median",
-      tcgPlayerUsd: null,
-      priceChartingUsd: null,
-      sourceLabel: "Matched sold",
     };
   }
 

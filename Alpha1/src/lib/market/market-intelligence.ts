@@ -102,9 +102,9 @@ export function inferEvidenceGradeBucket(item: MarketEvidence): GradeBucket {
   if (/bgs|beckett/.test(h) && /\b10(?:\.0)?\b/.test(h)) return "bgs10";
   if (/psa/.test(h) && /\b10\b|gem\s*mint/.test(h)) return "psa10";
   if (/psa/.test(h) && /\b9\b|mint\s*9/.test(h)) return "psa9";
-  if (/raw|ungraded/.test(h)) return "raw";
+  if (/raw|ungraded|near\s*mint\s*ungraded/i.test(h)) return "raw";
   if (/psa|bgs|beckett|cgc|tag|sgc|ace|degree|mana/.test(h)) return "gradedOther";
-  return "raw";
+  return "unknown";
 }
 
 export function inferCardTargetGradeBucket(card: ExtractedCard): GradeBucket {

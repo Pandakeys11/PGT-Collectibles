@@ -5,6 +5,7 @@ import { productIdFromMetadata } from "@/lib/billing/stripe";
 import { getStripe } from "@/lib/billing/stripe";
 import { isBillingConfigured } from "@/lib/billing/pricing";
 
+export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 async function fulfillSession(session: Stripe.Checkout.Session) {

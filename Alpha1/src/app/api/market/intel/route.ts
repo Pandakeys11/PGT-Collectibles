@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildPokemonMarketKnowledge } from "@/lib/market/pokemon-market-knowledge";
+import {
+  buildPokemonMarketKnowledge,
+  buildPokemonMarketKnowledgeLite,
+} from "@/lib/market/pokemon-market-knowledge";
 import { readCatalogMarketIntel } from "@/lib/pgt-registry/pgt-market-intel-persist";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +20,7 @@ export async function GET(req: NextRequest) {
   }
 
   const view = req.nextUrl.searchParams.get("view")?.trim() || "knowledge";
+  const lite = req.nextUrl.searchParams.get("lite") === "1";
   const limitRaw = req.nextUrl.searchParams.get("limit");
   const compLimit = limitRaw ? Number(limitRaw) : 48;
 
@@ -36,9 +40,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ...intel, ready: true });
   }
 
-  const knowledge = await buildPokemonMarketKnowledge(catalogId, {
-    compLimit: Number.isFinite(compLimit) ? compLimit : 48,
-  });
+  const knowledge = lite
+    ? await buildPokemonMarketKnowledgeLite(catalogId)
+    : await buildPokemonMarketKnowledge(catalogId, {
+        compLimit: Number.isFinite(compLimit) ? compLimit : 48,
+      });
 
   if (!knowledge) {
     return NextResponse.json({

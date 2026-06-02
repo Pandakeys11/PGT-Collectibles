@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
 import { marketPokemonHref } from "@/lib/app-routes";
-import type { WeeklyMoverCard, WeeklyMoversPayload } from "@/lib/market/build-weekly-movers";
+import {
+  MarketMoversFootnote,
+  MarketMoversSectionHeader,
+} from "@/components/market/market-movers-explainer";
+import type { WeeklyMoverCard, WeeklyMoversPayload } from "@/lib/market/weekly-movers-types";
 import { MarketCardThumb } from "@/components/ui/market-card-thumb";
 import { cn } from "@/lib/cn";
 
@@ -90,10 +94,7 @@ export function WeeklyMoversStrip({
       aria-label="Weekly price movers"
     >
       <header className="border-b border-white/8 px-2.5 py-2">
-        <p className="text-[9px] font-semibold uppercase tracking-wide text-sky-200/90">
-          7-day market movers
-        </p>
-        <p className="text-[8px] text-muted">Cardmarket trend vs 7-day avg · catalog-wide</p>
+        <MarketMoversSectionHeader />
       </header>
       <div
         className={cn(
@@ -130,6 +131,11 @@ export function WeeklyMoversStrip({
           )}
         </div>
       </div>
+      <MarketMoversFootnote
+        className="border-t border-white/8 px-2.5 py-2"
+        usCount={payload.momentumUsCount}
+        euCount={payload.momentumEuCount}
+      />
     </section>
   );
 }

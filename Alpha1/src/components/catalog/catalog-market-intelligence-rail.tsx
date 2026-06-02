@@ -2,6 +2,8 @@
 
 import { TrendingUp } from "lucide-react";
 import { SetMarketPulseStrip } from "@/components/market/set-market-pulse-strip";
+import { MarketMoversSectionHeader } from "@/components/market/market-movers-explainer";
+import { SET_MOVER_RAIL_COLUMN_SIZE } from "@/lib/catalog/set-insight-limits";
 import type { SetInsightCardSource } from "@/lib/catalog/set-insight-utils";
 import { cn } from "@/lib/cn";
 
@@ -41,16 +43,13 @@ export function CatalogMarketIntelligenceRail({
           </div>
         </div>
         <p className="mt-1.5 text-[9px] leading-snug text-muted">
-          7-day trend vs trailing avg · updates when you change sets
+          Price movers for the active set · refreshes when you change sets
         </p>
       </header>
 
       <div className="sc-catalog-market-intelligence-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 scanner-chat-scrollbar">
         <section className="mb-2 border-b border-sky-500/10 pb-2">
-          <p className="text-[9px] font-semibold uppercase tracking-wide text-sky-200/90">
-            7-day market movers
-          </p>
-          <p className="text-[8px] text-muted">Cardmarket trend vs 7-day avg</p>
+          <MarketMoversSectionHeader />
         </section>
         <SetMarketPulseStrip
           key={setId}
@@ -58,6 +57,7 @@ export function CatalogMarketIntelligenceRail({
           setName={setName}
           cards={cards}
           onSelectCard={onSelectCard}
+          moverColumnSize={SET_MOVER_RAIL_COLUMN_SIZE}
           compact
           embeddedInRail
         />
