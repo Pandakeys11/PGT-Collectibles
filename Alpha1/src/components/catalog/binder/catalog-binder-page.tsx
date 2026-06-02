@@ -30,6 +30,12 @@ export function CatalogBinderPage({
       )}
       aria-label={label}
     >
+      <div className="sc-binder-rings" aria-hidden>
+        <span className="sc-binder-rings__hole" />
+        <span className="sc-binder-rings__hole" />
+        <span className="sc-binder-rings__hole" />
+      </div>
+      <div className="sc-binder-page__curl" aria-hidden />
       <div className="sc-binder-page__header">
         <span>{label}</span>
         {rangeLabel ? <span className="tabular-nums opacity-80">{rangeLabel}</span> : null}

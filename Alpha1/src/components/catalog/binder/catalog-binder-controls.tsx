@@ -2,6 +2,8 @@
 
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CatalogBinderThemePicker } from "@/components/catalog/binder/catalog-binder-theme-picker";
+import type { BinderThemeId } from "@/lib/catalog/binder-theme";
 import { cn } from "@/lib/cn";
 
 export function CatalogBinderControls({
@@ -13,6 +15,8 @@ export function CatalogBinderControls({
   expanded,
   onToggleExpand,
   mobilePage = false,
+  binderTheme,
+  onBinderThemeChange,
   className,
 }: {
   navLabel: string;
@@ -24,13 +28,18 @@ export function CatalogBinderControls({
   onToggleExpand: () => void;
   /** Single-page mobile binder (one 3×5 page visible). */
   mobilePage?: boolean;
+  binderTheme: BinderThemeId;
+  onBinderThemeChange: (theme: BinderThemeId) => void;
   className?: string;
 }) {
   return (
     <div className={cn("sc-binder-toolbar", className)}>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-        {mobilePage ? `Binder page · ${navLabel}` : `3×5 binder · ${navLabel}`}
-      </p>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          {mobilePage ? `Binder page · ${navLabel}` : `3×5 binder · ${navLabel}`}
+        </p>
+        <CatalogBinderThemePicker theme={binderTheme} onThemeChange={onBinderThemeChange} />
+      </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <Button
           type="button"

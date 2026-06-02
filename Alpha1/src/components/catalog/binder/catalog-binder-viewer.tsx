@@ -8,6 +8,8 @@ import { CatalogBinderControls } from "@/components/catalog/binder/catalog-binde
 import { CatalogBinderPage } from "@/components/catalog/binder/catalog-binder-page";
 import { CatalogBinderSlot } from "@/components/catalog/binder/catalog-binder-slot";
 import { useViewportMobile } from "@/hooks/use-viewport-mobile";
+import { useBinderTheme } from "@/hooks/use-binder-theme";
+import { binderThemeClass } from "@/lib/catalog/binder-theme";
 import {
   binderPageCount,
   binderPageLabel,
@@ -43,11 +45,14 @@ export function CatalogBinderViewer<T>({
   className?: string;
 }) {
   const mobile = useViewportMobile();
+  const { theme: binderTheme, setTheme: setBinderTheme } = useBinderTheme();
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [turnDir, setTurnDir] = useState<"prev" | "next" | null>(null);
   const touchStartX = useRef<number | null>(null);
+  const turnTimerRef = useRef<number | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -58,7 +63,20 @@ export function CatalogBinderViewer<T>({
   useEffect(() => {
     setSpreadIndex(0);
     setPageIndex(0);
+    setTurnDir(null);
   }, [cards, setName]);
+
+  useEffect(() => {
+    return () => {
+      if (turnTimerRef.current != null) window.clearTimeout(turnTimerRef.current);
+    };
+  }, []);
+
+  const pulseTurn = useCallback((dir: "prev" | "next") => {
+    setTurnDir(dir);
+    if (turnTimerRef.current != null) window.clearTimeout(turnTimerRef.current);
+    turnTimerRef.current = window.setTimeout(() => setTurnDir(null), 520);
+  }, []);
 
   const spread = useMemo(
     () => sliceBinderSpread(padded, spreadIndex),
@@ -74,14 +92,28 @@ export function CatalogBinderViewer<T>({
     : binderSpreadLabel(spreadIndex, spreadTotal);
 
   const goPrev = useCallback(() => {
-    if (mobile) setPageIndex((p) => Math.max(0, p - 1));
-    else setSpreadIndex((p) => Math.max(0, p - 1));
-  }, [mobile]);
+    if (mobile) {
+      if (pageIndex <= 0) return;
+      pulseTurn("prev");
+      setPageIndex((p) => Math.max(0, p - 1));
+    } else {
+      if (spreadIndex <= 0) return;
+      pulseTurn("prev");
+      setSpreadIndex((p) => Math.max(0, p - 1));
+    }
+  }, [mobile, pageIndex, spreadIndex, pulseTurn]);
 
   const goNext = useCallback(() => {
-    if (mobile) setPageIndex((p) => Math.min(pageTotal - 1, p + 1));
-    else setSpreadIndex((p) => Math.min(spreadTotal - 1, p + 1));
-  }, [mobile, pageTotal, spreadTotal]);
+    if (mobile) {
+      if (pageIndex >= pageTotal - 1) return;
+      pulseTurn("next");
+      setPageIndex((p) => Math.min(pageTotal - 1, p + 1));
+    } else {
+      if (spreadIndex >= spreadTotal - 1) return;
+      pulseTurn("next");
+      setSpreadIndex((p) => Math.min(spreadTotal - 1, p + 1));
+    }
+  }, [mobile, pageIndex, pageTotal, spreadIndex, spreadTotal, pulseTurn]);
 
   useEffect(() => {
     if (!expanded) return;
@@ -126,6 +158,7 @@ export function CatalogBinderViewer<T>({
     <div
       className={cn(
         "sc-binder-root sc-binder-root--embedded",
+        binderThemeClass(binderTheme),
         mobile && !expanded && "sc-binder-root--mobile-page sc-binder-root--mobile-scroll",
         expanded && "sc-binder-root--expanded",
         className,
@@ -155,6 +188,8 @@ export function CatalogBinderViewer<T>({
           nextDisabled={nextDisabled}
           expanded={expanded}
           mobilePage={mobile && !expanded}
+          binderTheme={binderTheme}
+          onBinderThemeChange={setBinderTheme}
           onToggleExpand={() => setExpanded((v) => !v)}
           className={expanded ? "shrink-0 px-4 pt-2" : undefined}
         />
@@ -191,31 +226,55 @@ export function CatalogBinderViewer<T>({
         ) : cards.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted">No cards in this view.</p>
         ) : mobile ? (
-          <div className="sc-binder-book sc-binder-book--mobile">
-            <CatalogBinderPage
-              side="single"
-              className="sc-binder-page--single"
-              compactHeader={embedded}
-              label={setName ?? "Binder page"}
-              rangeLabel={navLabel}
+          <div className="sc-binder-cover">
+            <div
+              className={cn(
+                "sc-binder-book sc-binder-book--mobile",
+                turnDir === "next" && "sc-binder-book--turn-next",
+                turnDir === "prev" && "sc-binder-book--turn-prev",
+              )}
+              key={`mobile-page-${pageIndex}`}
             >
-              {renderSlots(mobilePage, pageIndex * 15)}
-            </CatalogBinderPage>
+              <CatalogBinderPage
+                side="single"
+                className="sc-binder-page--single"
+                compactHeader={embedded}
+                label={setName ?? "Binder page"}
+                rangeLabel={navLabel}
+              >
+                {renderSlots(mobilePage, pageIndex * 15)}
+              </CatalogBinderPage>
+            </div>
           </div>
         ) : (
-          <div className="sc-binder-book">
-            <CatalogBinderPage
-              side="left"
-              compactHeader={embedded}
-              label="Left page"
-              rangeLabel={navLabel}
+          <div className="sc-binder-cover">
+            <div
+              className={cn(
+                "sc-binder-book",
+                turnDir === "next" && "sc-binder-book--turn-next",
+                turnDir === "prev" && "sc-binder-book--turn-prev",
+              )}
+              key={`spread-${spreadIndex}`}
             >
-              {renderSlots(spread.left, spreadIndex * 30)}
-            </CatalogBinderPage>
-            <div className="sc-binder-spine" aria-hidden />
-            <CatalogBinderPage side="right" compactHeader={embedded} label="Right page">
-              {renderSlots(spread.right, spreadIndex * 30 + 15)}
-            </CatalogBinderPage>
+              <CatalogBinderPage
+                side="left"
+                compactHeader={embedded}
+                label="Left page"
+                rangeLabel={navLabel}
+              >
+                {renderSlots(spread.left, spreadIndex * 30)}
+              </CatalogBinderPage>
+              <div className="sc-binder-spine" aria-hidden>
+                <div className="sc-binder-spine__rings">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+              <CatalogBinderPage side="right" compactHeader={embedded} label="Right page">
+                {renderSlots(spread.right, spreadIndex * 30 + 15)}
+              </CatalogBinderPage>
+            </div>
           </div>
         )}
       </div>

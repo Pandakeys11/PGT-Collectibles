@@ -21,15 +21,150 @@
 .sc-binder-root {
   --binder-page-bg: #f0efeb;
   --binder-page-texture: #e6e4de;
+  --binder-page-gradient-top: #faf9f6;
+  --binder-page-header: rgb(80 78 72 / 0.85);
   --binder-pocket-gap: 0px;
   --binder-pocket-seam: #b8b5ad;
   --binder-page-pad: 2px;
-  --binder-spine-w: clamp(4px, 0.4vw, 8px);
+  --binder-spine-w: clamp(10px, 1.1vw, 16px);
   --binder-card-radius: 1px;
   --binder-zip-h: 3px;
+  --binder-zip-top: #f8f7f4;
+  --binder-zip-bottom: #dddcd6;
   --binder-fmv-strip-h: 1.4rem;
+  --binder-sleeve-top: rgb(252 252 250);
+  --binder-sleeve-mid: rgb(242 241 237);
+  --binder-sleeve-bottom: rgb(234 233 228);
+  --binder-sleeve-empty-a: rgb(245 244 240);
+  --binder-sleeve-empty-b: rgb(238 236 230);
+  --binder-placeholder-bg: #fff;
+  --binder-placeholder-title: #1a1a1a;
+  --binder-placeholder-gen: rgb(90 88 82 / 0.9);
+  --binder-cover-bg: linear-gradient(145deg, #eceae4 0%, #d8d5cc 48%, #cbc7bd 100%);
+  --binder-cover-border: rgb(255 255 255 / 0.22);
+  --binder-cover-shadow:
+    0 28px 56px -24px rgb(0 0 0 / 0.65),
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -2px 8px rgb(0 0 0 / 0.12);
+  --binder-spine-bg: linear-gradient(
+    90deg,
+    #0c0d10 0%,
+    #2a2c32 35%,
+    #4a4d56 50%,
+    #2a2c32 65%,
+    #0c0d10 100%
+  );
+  --binder-ring-face: #8a8d96;
+  --binder-ring-hole: rgb(0 0 0 / 0.55);
+  --binder-stage-surface: linear-gradient(180deg, rgb(12 14 18 / 0.55) 0%, rgb(6 8 11 / 0.85) 100%);
+  --binder-page-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.65), inset 0 -8px 16px rgb(0 0 0 / 0.04),
+    0 2px 0 rgb(255 255 255 / 0.2);
+  --binder-grid-inset: inset 0 0 0 1px rgb(255 255 255 / 0.35);
   position: relative;
   width: 100%;
+}
+
+/* Binder page color themes */
+.sc-binder-theme--black {
+  --binder-page-bg: #1e1e22;
+  --binder-page-texture: #141418;
+  --binder-page-gradient-top: #2a2a30;
+  --binder-page-header: rgb(168 170 178 / 0.88);
+  --binder-pocket-seam: #3a3a42;
+  --binder-zip-top: #2e2e34;
+  --binder-zip-bottom: #1a1a1e;
+  --binder-sleeve-top: rgb(44 44 50);
+  --binder-sleeve-mid: rgb(34 34 40);
+  --binder-sleeve-bottom: rgb(28 28 34);
+  --binder-sleeve-empty-a: rgb(36 36 42);
+  --binder-sleeve-empty-b: rgb(28 28 34);
+  --binder-placeholder-bg: #24242a;
+  --binder-placeholder-title: #ececf0;
+  --binder-placeholder-gen: rgb(160 162 170 / 0.9);
+  --binder-cover-bg: linear-gradient(145deg, #3a3a42 0%, #222228 50%, #121216 100%);
+  --binder-cover-border: rgb(255 255 255 / 0.08);
+  --binder-cover-shadow:
+    0 28px 56px -24px rgb(0 0 0 / 0.85),
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    inset 0 -2px 10px rgb(0 0 0 / 0.45);
+  --binder-spine-bg: linear-gradient(
+    90deg,
+    #08080a 0%,
+    #1a1a20 35%,
+    #3a3a44 50%,
+    #1a1a20 65%,
+    #08080a 100%
+  );
+  --binder-ring-face: #5c5c66;
+  --binder-page-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06), inset 0 -8px 16px rgb(0 0 0 / 0.35),
+    0 2px 0 rgb(255 255 255 / 0.04);
+  --binder-grid-inset: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+.sc-binder-theme--red {
+  --binder-page-bg: #f0e0e0;
+  --binder-page-texture: #e6cfcf;
+  --binder-page-gradient-top: #faf0f0;
+  --binder-page-header: rgb(120 56 56 / 0.88);
+  --binder-pocket-seam: #c89898;
+  --binder-zip-top: #f5e8e8;
+  --binder-zip-bottom: #d4b0b0;
+  --binder-sleeve-top: rgb(252 244 244);
+  --binder-sleeve-mid: rgb(244 228 228);
+  --binder-sleeve-bottom: rgb(234 214 214);
+  --binder-sleeve-empty-a: rgb(248 236 236);
+  --binder-sleeve-empty-b: rgb(238 220 220);
+  --binder-placeholder-bg: #fff8f8;
+  --binder-placeholder-title: #4a2020;
+  --binder-placeholder-gen: rgb(120 64 64 / 0.9);
+  --binder-cover-bg: linear-gradient(145deg, #c43c48 0%, #9b2330 45%, #6e1520 100%);
+  --binder-cover-border: rgb(255 255 255 / 0.18);
+  --binder-cover-shadow:
+    0 28px 56px -24px rgb(80 10 20 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    inset 0 -2px 8px rgb(0 0 0 / 0.25);
+  --binder-spine-bg: linear-gradient(
+    90deg,
+    #4a0a12 0%,
+    #7a1824 35%,
+    #a82838 50%,
+    #7a1824 65%,
+    #4a0a12 100%
+  );
+  --binder-ring-face: #d4a0a0;
+}
+
+.sc-binder-theme--blue {
+  --binder-page-bg: #dce8f4;
+  --binder-page-texture: #cddaeb;
+  --binder-page-gradient-top: #ecf4fc;
+  --binder-page-header: rgb(48 72 112 / 0.88);
+  --binder-pocket-seam: #8aa8c8;
+  --binder-zip-top: #e8f2fa;
+  --binder-zip-bottom: #b8cce0;
+  --binder-sleeve-top: rgb(244 248 252);
+  --binder-sleeve-mid: rgb(228 238 248);
+  --binder-sleeve-bottom: rgb(214 228 242);
+  --binder-sleeve-empty-a: rgb(236 244 252);
+  --binder-sleeve-empty-b: rgb(220 232 246);
+  --binder-placeholder-bg: #f4f9ff;
+  --binder-placeholder-title: #1a3050;
+  --binder-placeholder-gen: rgb(64 96 136 / 0.9);
+  --binder-cover-bg: linear-gradient(145deg, #2a6cb8 0%, #1e4a8a 48%, #123060 100%);
+  --binder-cover-border: rgb(255 255 255 / 0.18);
+  --binder-cover-shadow:
+    0 28px 56px -24px rgb(10 30 80 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    inset 0 -2px 8px rgb(0 0 0 / 0.22);
+  --binder-spine-bg: linear-gradient(
+    90deg,
+    #0a2040 0%,
+    #1a4080 35%,
+    #2a58a8 50%,
+    #1a4080 65%,
+    #0a2040 100%
+  );
+  --binder-ring-face: #98b8d8;
 }
 
 .sc-binder-root--embedded,
@@ -165,12 +300,47 @@
   width: 100%;
   flex: 1 1 0%;
   flex-direction: column;
-  padding: 2px 1px;
+  padding: clamp(4px, 0.6vw, 8px) clamp(2px, 0.4vw, 6px);
   border-radius: 0.65rem;
-  background: linear-gradient(180deg, rgb(12 14 18 / 0.55) 0%, rgb(6 8 11 / 0.85) 100%);
+  background: var(--binder-stage-surface);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.06),
     0 24px 48px -20px rgb(0 0 0 / 0.75);
+}
+
+.sc-binder-cover {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  flex: 1 1 0%;
+  flex-direction: column;
+  padding: clamp(5px, 0.75vw, 10px);
+  border-radius: clamp(8px, 1.2vw, 14px);
+  background: var(--binder-cover-bg);
+  border: 1px solid var(--binder-cover-border);
+  box-shadow: var(--binder-cover-shadow);
+}
+
+.sc-binder-cover::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: clamp(3px, 0.5vw, 6px);
+  border-radius: inherit;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  opacity: 0.65;
+}
+
+@media (min-width: 1024px) {
+  .sc-binder-cover {
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .sc-binder-stage:hover .sc-binder-cover {
+    transform: translateY(-1px);
+  }
 }
 
 .sc-binder-stage--embedded {
@@ -193,6 +363,17 @@
   margin-inline: 0;
   perspective: 1400px;
   filter: drop-shadow(0 18px 36px rgb(0 0 0 / 0.45));
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sc-binder-book--turn-next .sc-binder-page--right,
+.sc-binder-book--turn-next.sc-binder-book--mobile .sc-binder-page--single {
+  animation: sc-binder-page-turn-next 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sc-binder-book--turn-prev .sc-binder-page--left,
+.sc-binder-book--turn-prev.sc-binder-book--mobile .sc-binder-page--single {
+  animation: sc-binder-page-turn-prev 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .sc-binder-root--embedded .sc-binder-book,
@@ -209,20 +390,36 @@
 }
 
 .sc-binder-spine {
+  position: relative;
   min-height: 0;
   align-self: stretch;
-  background: linear-gradient(
-    90deg,
-    #0c0d10 0%,
-    #2a2c32 35%,
-    #4a4d56 50%,
-    #2a2c32 65%,
-    #0c0d10 100%
-  );
+  background: var(--binder-spine-bg);
   border-radius: 2px;
   box-shadow:
     inset 2px 0 6px rgb(0 0 0 / 0.65),
     inset -2px 0 6px rgb(0 0 0 / 0.65);
+}
+
+.sc-binder-spine__rings {
+  position: absolute;
+  inset: 8% 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+  pointer-events: none;
+}
+
+.sc-binder-spine__rings span {
+  display: block;
+  width: calc(var(--binder-spine-w) - 2px);
+  height: calc(var(--binder-spine-w) - 2px);
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, var(--binder-ring-face) 0%, #2a2c32 55%, #0a0a0c 100%);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.25);
 }
 
 .sc-binder-page--compact {
@@ -251,16 +448,65 @@
   background-image:
     radial-gradient(circle at 1px 1px, rgb(0 0 0 / 0.045) 1px, transparent 0),
     radial-gradient(circle at 50% 120%, rgb(255 255 255 / 0.35) 0%, transparent 55%),
-    linear-gradient(165deg, #faf9f6 0%, var(--binder-page-bg) 40%, var(--binder-page-texture) 100%);
+    linear-gradient(165deg, var(--binder-page-gradient-top) 0%, var(--binder-page-bg) 40%, var(--binder-page-texture) 100%);
   background-size:
     5px 5px,
     100% 100%,
     100% 100%;
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 0.65),
-    inset 0 -8px 16px rgb(0 0 0 / 0.04),
-    0 2px 0 rgb(255 255 255 / 0.2);
+  box-shadow: var(--binder-page-shadow);
   animation: sc-binder-page-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sc-binder-rings {
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  pointer-events: none;
+}
+
+.sc-binder-page--left .sc-binder-rings {
+  right: clamp(1px, 0.25vw, 3px);
+}
+
+.sc-binder-page--right .sc-binder-rings,
+.sc-binder-page--single .sc-binder-rings {
+  left: clamp(1px, 0.25vw, 3px);
+}
+
+.sc-binder-rings__hole {
+  display: block;
+  width: clamp(5px, 0.65vw, 8px);
+  height: clamp(5px, 0.65vw, 8px);
+  border-radius: 999px;
+  background: var(--binder-ring-hole);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.8),
+    0 0 0 1px rgb(255 255 255 / 0.08);
+}
+
+.sc-binder-page__curl {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  bottom: calc(var(--binder-zip-h) + var(--binder-page-pad));
+  z-index: 4;
+  width: clamp(8px, 1.2vw, 16px);
+  opacity: 0.55;
+}
+
+.sc-binder-page--left .sc-binder-page__curl {
+  right: 0;
+  background: linear-gradient(90deg, transparent 0%, rgb(0 0 0 / 0.12) 100%);
+}
+
+.sc-binder-page--right .sc-binder-page__curl,
+.sc-binder-page--single .sc-binder-page__curl {
+  left: 0;
+  background: linear-gradient(270deg, transparent 0%, rgb(0 0 0 / 0.12) 100%);
 }
 
 .sc-binder-root--embedded .sc-binder-page__header {
@@ -292,7 +538,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgb(80 78 72 / 0.85);
+  color: var(--binder-page-header);
 }
 
 .sc-binder-page__body {
@@ -314,7 +560,7 @@
   gap: var(--binder-pocket-gap);
   background: var(--binder-pocket-seam);
   border: 1px solid var(--binder-pocket-seam);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.35);
+  box-shadow: var(--binder-grid-inset);
 }
 
 .sc-binder-slot {
@@ -335,7 +581,12 @@
   min-height: 0;
   overflow: hidden;
   border-radius: 0;
-  background: linear-gradient(180deg, rgb(252 252 250) 0%, rgb(242 241 237) 48%, rgb(234 233 228) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--binder-sleeve-top) 0%,
+    var(--binder-sleeve-mid) 48%,
+    var(--binder-sleeve-bottom) 100%
+  );
   box-shadow:
     inset 0 0 0 1px rgb(255 255 255 / 0.75),
     inset 0 2px 5px rgb(0 0 0 / 0.07),
@@ -374,12 +625,16 @@
 .sc-binder-slot--empty .sc-binder-slot__sleeve {
   background: repeating-linear-gradient(
     -12deg,
-    rgb(245 244 240) 0,
-    rgb(245 244 240) 4px,
-    rgb(238 236 230) 4px,
-    rgb(238 236 230) 8px
+    var(--binder-sleeve-empty-a) 0,
+    var(--binder-sleeve-empty-a) 4px,
+    var(--binder-sleeve-empty-b) 4px,
+    var(--binder-sleeve-empty-b) 8px
   );
   opacity: 0.65;
+}
+
+.sc-binder-slot__sleeve:hover {
+  filter: brightness(1.03);
 }
 
 .sc-binder-card-btn {
@@ -492,7 +747,7 @@
   gap: 0.1rem;
   padding: 0.15rem;
   text-align: center;
-  background: #fff;
+  background: var(--binder-placeholder-bg);
 }
 
 .sc-binder-placeholder__sprite {
@@ -511,7 +766,7 @@
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: 0.02em;
-  color: #1a1a1a;
+  color: var(--binder-placeholder-title);
 }
 
 .sc-binder-placeholder__gen {
@@ -520,7 +775,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgb(90 88 82 / 0.9);
+  color: var(--binder-placeholder-gen);
 }
 
 .sc-binder-zip {
@@ -532,13 +787,43 @@
   height: var(--binder-zip-h);
   flex-shrink: 0;
   border-radius: 0 0 clamp(6px, 1vw, 10px) clamp(6px, 1vw, 10px);
-  background: linear-gradient(180deg, #f8f7f4 0%, #dddcd6 100%);
+  background: linear-gradient(180deg, var(--binder-zip-top) 0%, var(--binder-zip-bottom) 100%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.8);
   pointer-events: none;
 }
 
 .sc-binder-root--expanded .sc-binder-zip {
   display: none;
+}
+
+@keyframes sc-binder-page-turn-next {
+  0% {
+    transform: rotateY(0deg);
+    box-shadow: var(--binder-page-shadow);
+  }
+  45% {
+    transform: rotateY(-14deg);
+    filter: brightness(0.96);
+  }
+  100% {
+    transform: rotateY(0deg);
+    box-shadow: var(--binder-page-shadow);
+  }
+}
+
+@keyframes sc-binder-page-turn-prev {
+  0% {
+    transform: rotateY(0deg);
+    box-shadow: var(--binder-page-shadow);
+  }
+  45% {
+    transform: rotateY(14deg);
+    filter: brightness(0.96);
+  }
+  100% {
+    transform: rotateY(0deg);
+    box-shadow: var(--binder-page-shadow);
+  }
 }
 
 @keyframes sc-binder-page-in {
@@ -731,8 +1016,17 @@
 @media (prefers-reduced-motion: reduce) {
   .sc-binder-page,
   .sc-binder-slot__sleeve::before,
-  .sc-binder-card-art__holo {
+  .sc-binder-card-art__holo,
+  .sc-binder-book--turn-next .sc-binder-page--right,
+  .sc-binder-book--turn-next.sc-binder-book--mobile .sc-binder-page--single,
+  .sc-binder-book--turn-prev .sc-binder-page--left,
+  .sc-binder-book--turn-prev.sc-binder-book--mobile .sc-binder-page--single {
     animation: none !important;
+  }
+
+  .sc-binder-cover,
+  .sc-binder-stage:hover .sc-binder-cover {
+    transform: none !important;
   }
 
   .sc-binder-card-btn:hover {
