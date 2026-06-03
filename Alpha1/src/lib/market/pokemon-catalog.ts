@@ -757,7 +757,7 @@ function resolveCatalogIdentityStatus(
 
   if (
     detectVintagePrintCatalogCollision(
-      card ?? { set: undefined, number: undefined, printStamps: undefined, details: undefined },
+      card ?? { name: "", set: undefined, number: undefined, printStamps: undefined, details: undefined },
       {
         catalogId: top.catalogId,
         score: top.score,

@@ -174,6 +174,7 @@ const SOURCE_DOMAIN_PATTERN: Record<MarketSourceId, RegExp> = {
   pricecharting: /pricecharting\.com/i,
   cardmarket: /cardmarket\.com/i,
   tcgplayer: /tcgplayer\.com/i,
+  oneThirtyPoint: /130point\.com/i,
 };
 
 function evidenceFromSnippet(

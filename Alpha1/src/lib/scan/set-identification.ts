@@ -359,7 +359,7 @@ export function applyWizardsTitleAndFractionHeuristics(
   extras?: Pick<ExtractedCard, "year" | "printStamps">,
 ): { set?: string; number?: string; details?: string; clearSet?: boolean; year?: string } {
   const baseSetOcr = correctBaseSetVersusBaseSet2FractionOcr({
-    name,
+    name: name ?? "",
     set,
     number,
     year: extras?.year,

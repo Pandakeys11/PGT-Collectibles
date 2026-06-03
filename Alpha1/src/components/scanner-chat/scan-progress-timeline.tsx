@@ -10,6 +10,7 @@ import {
   preloadScanPipelineSprites,
 } from "@/components/scanner-chat/scan-pipeline-evolution-arena";
 import { cn } from "@/lib/cn";
+import type { SystemChatMessage } from "@/lib/scanner-chat/types";
 
 export function ScanProgressTimeline({
   steps,

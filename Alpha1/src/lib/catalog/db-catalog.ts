@@ -413,7 +413,7 @@ async function rowsToMatch(
         exactName &&
         exactSet &&
         conflicts.includes("number") &&
-        collectorNumeratorsAllowOcrCorrection(card.number, cardNumber)
+        collectorNumeratorsAllowOcrCorrection(card.number ?? undefined, cardNumber ?? undefined)
       ) {
         score += 30;
         reasons.push("number_ocr_corrected");

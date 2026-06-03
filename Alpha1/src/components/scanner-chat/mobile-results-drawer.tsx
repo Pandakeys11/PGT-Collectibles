@@ -378,7 +378,11 @@ export function MobileResultsDrawer({
                   historyRefreshKey={historyRefreshKey}
                   compsSectionRef={compsSectionRef}
                   isPro={isPro}
-                  onOpenMasterCatalog={onOpenMasterCatalog}
+                  onOpenMasterCatalog={
+                    onOpenMasterCatalog && selectedSpecimenId
+                      ? () => onOpenMasterCatalog(selectedSpecimenId)
+                      : undefined
+                  }
                   onIdleAction={onIdleAction}
                   digitalScanAsset={digitalScanAsset}
                   onDownloadDigitalScan={onDownloadDigitalScan}
