@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, PanelRightOpen } from "lucide-react";
+import { Menu, PanelRightOpen, TrendingUp } from "lucide-react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/branding/brand-logo";
@@ -12,14 +12,19 @@ import { cn } from "@/lib/cn";
 export function ScannerHeader({
   onMenuClick,
   onResultsClick,
+  onMarketIntelClick,
   showResultsToggle,
+  showMarketIntelToggle = true,
   resultsCount,
   quota,
   className,
 }: {
   onMenuClick: () => void;
   onResultsClick: () => void;
+  /** Opens idle daily desk when no scan; same as results when a session exists. */
+  onMarketIntelClick?: () => void;
   showResultsToggle: boolean;
+  showMarketIntelToggle?: boolean;
   resultsCount?: number;
   quota?: AccountQuota | null;
   className?: string;
@@ -57,7 +62,7 @@ export function ScannerHeader({
               type="button"
               onClick={onResultsClick}
               className="sc-mobile-header__icon-btn sc-mobile-header__results relative"
-              aria-label="View scan results"
+              aria-label="View scan results and market intelligence"
             >
               <PanelRightOpen className="h-5 w-5" />
               {resultsCount != null && resultsCount > 0 ? (
@@ -65,6 +70,15 @@ export function ScannerHeader({
                   {resultsCount > 99 ? "99+" : resultsCount}
                 </span>
               ) : null}
+            </button>
+          ) : showMarketIntelToggle && onMarketIntelClick ? (
+            <button
+              type="button"
+              onClick={onMarketIntelClick}
+              className="sc-mobile-header__icon-btn sc-mobile-header__intel"
+              aria-label="Open market intelligence desk"
+            >
+              <TrendingUp className="h-5 w-5" />
             </button>
           ) : null}
           <Show when="signed-in">

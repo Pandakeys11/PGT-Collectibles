@@ -21,7 +21,7 @@ export function MarketSourceAds({
   const listed = sources.filter((s) => s.lane === "active");
 
   return (
-    <section className={cn("min-w-0 w-full space-y-3", className)}>
+    <section className={cn("min-w-0 w-full space-y-3 sc-market-source-ads", className)}>
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
           Shop & research
@@ -77,7 +77,7 @@ function SourceAdCard({
       target="_blank"
       rel="noreferrer"
       className={cn(
-        "group block shrink-0 overflow-hidden rounded-xl border transition hover:ring-1 hover:ring-white/20",
+        "group block shrink-0 overflow-hidden rounded-xl border transition hover:ring-1 hover:ring-white/20 touch-manipulation active:scale-[0.98]",
         "min-w-0 w-full",
         isEbay
           ? "border-rose-500/25 bg-gradient-to-br from-[#e53238]/20 via-rose-950/40 to-slate-950/90"

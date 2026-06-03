@@ -277,7 +277,7 @@ export function ScanIntelligencePanel({
                 />
               </div>
             </motion.div>
-          ) : (
+          ) : summary || !onIdleAction ? (
             <motion.div
               key="empty"
               initial={{ opacity: 0 }}
@@ -288,7 +288,7 @@ export function ScanIntelligencePanel({
                 Click a card in the feed for FMV, graded comps, listings, and sold history.
               </p>
             </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
 
         {!isDrawer && cards.length > 1 ? (

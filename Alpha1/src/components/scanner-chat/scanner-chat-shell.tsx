@@ -21,6 +21,7 @@ import { ChatMessageList } from "./chat-message";
 import { EmptyScannerState } from "./empty-scanner-state";
 import { LiquidScanQuickActions } from "./liquid-scan-quick-actions";
 import { MobileResultsDrawer } from "./mobile-results-drawer";
+import { MobileMarketIntelFab } from "./mobile-market-intel-fab";
 import { MobileResultsFab } from "./mobile-results-fab";
 import type { MarketIntelIdleAction } from "./market-intelligence-idle-showcase";
 import { ScanIntelligencePanel } from "./scan-intelligence-panel";
@@ -39,6 +40,7 @@ export function ScannerChatShell() {
   const chat = useScannerChat();
   const { navCollapsed, intelCollapsed, toggleNav, toggleIntel } = useLiquidScanRailLayout();
   const [liveCameraOpen, setLiveCameraOpen] = useState(false);
+  const [mobileIntelOpen, setMobileIntelOpen] = useState(false);
   const companion = useCompanion();
   const { quota, isPro } = useScanQuota();
   const feedRef = useRef<HTMLDivElement>(null);
@@ -196,6 +198,8 @@ export function ScannerChatShell() {
 
   const handleIntelIdleAction = useCallback(
     (action: MarketIntelIdleAction) => {
+      setMobileIntelOpen(false);
+      chat.setResultsDrawerOpen(false);
       switch (action) {
         case "live-market":
           chat.openLiveMarketOutput();
@@ -266,6 +270,13 @@ export function ScannerChatShell() {
       <ScannerHeader
         onMenuClick={() => chat.setSidebarOpen(true)}
         onResultsClick={() => chat.setResultsDrawerOpen(true)}
+        onMarketIntelClick={() => {
+          if (chat.summary && chat.specimens.length > 0) {
+            chat.setResultsDrawerOpen(true);
+          } else {
+            setMobileIntelOpen(true);
+          }
+        }}
         showResultsToggle={chat.specimens.length > 0}
         resultsCount={chat.specimens.length}
         quota={quota}
@@ -368,10 +379,14 @@ export function ScannerChatShell() {
             </div>
             </div>
             <MobileResultsFab
-              visible={!!chat.summary && !chat.resultsDrawerOpen && !chat.catalogPanelOpen}
+              visible={!!chat.summary && !chat.resultsDrawerOpen && !chat.catalogPanelOpen && !mobileIntelOpen}
               cardCount={chat.specimens.length}
               scanning={chat.isScanning || chat.isEnriching}
               onOpen={() => chat.setResultsDrawerOpen(true)}
+            />
+            <MobileMarketIntelFab
+              visible={!chat.summary && !mobileIntelOpen && !chat.resultsDrawerOpen && !chat.catalogPanelOpen}
+              onOpen={() => setMobileIntelOpen(true)}
             />
             {chat.catalogPanelMounted ? (
               <MasterCatalogSessionPanel
@@ -540,9 +555,16 @@ export function ScannerChatShell() {
         }}
       />
       <MobileResultsDrawer
-        open={chat.resultsDrawerOpen && !!chat.summary && chat.specimens.length > 0}
+        open={
+          (chat.resultsDrawerOpen && !!chat.summary && chat.specimens.length > 0) ||
+          mobileIntelOpen
+        }
+        intelOnly={mobileIntelOpen && !(chat.summary && chat.specimens.length > 0)}
         {...intelligenceCropProps}
-        onClose={() => chat.setResultsDrawerOpen(false)}
+        onClose={() => {
+          chat.setResultsDrawerOpen(false);
+          setMobileIntelOpen(false);
+        }}
         summary={chat.summary}
         cards={chat.cards}
         specimens={chat.specimens}

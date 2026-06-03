@@ -126,6 +126,7 @@ export function MobileResultsDrawer({
   open,
   onClose,
   summary,
+  intelOnly = false,
   cards,
   specimens = [],
   cardHandlers,
@@ -190,10 +191,13 @@ export function MobileResultsDrawer({
   onIdleAction?: (action: MarketIntelIdleAction) => void;
   digitalScanAsset?: import("@/lib/digital-scan/types").DigitalScanAsset | null;
   onDownloadDigitalScan?: () => void;
+  /** Idle daily desk — no scan session required. */
+  intelOnly?: boolean;
 }) {
   const reviewCount = cards.filter((c) => c.status === "review").length;
   const [drawerTab, setDrawerTab] = useState<"detail" | "sheet">("detail");
   const [expanded, setExpanded] = useState(false);
+  const sessionMode = Boolean(summary && !intelOnly);
 
   useEffect(() => {
     if (open) {
@@ -213,7 +217,7 @@ export function MobileResultsDrawer({
 
   return (
     <AnimatePresence>
-      {open && summary ? (
+      {open && (sessionMode || intelOnly) ? (
         <>
           <motion.div
             initial={{ opacity: 0 }}
@@ -226,9 +230,10 @@ export function MobileResultsDrawer({
           <motion.div
             role="dialog"
             aria-modal="true"
-            aria-label="Scan results"
+            aria-label={intelOnly ? "Market intelligence desk" : "Scan results"}
             data-expanded={expanded ? "true" : "false"}
             data-drawer-tab={drawerTab}
+            data-intel-only={intelOnly ? "true" : "false"}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
@@ -246,9 +251,15 @@ export function MobileResultsDrawer({
               <div className="min-w-0">
                 <h2 className="text-sm font-semibold text-primary">Market intelligence</h2>
                 <p className="mt-0.5 text-[10px] leading-snug text-muted">
-                  {summary.totalDetected} cards · ${summary.estimatedTotal.toLocaleString()} session
-                  FMV
-                  {summary.needsReview > 0 ? ` · ${summary.needsReview} need review` : ""}
+                  {intelOnly ? (
+                    <>Daily TCG desk · live pulse · platform shortcuts</>
+                  ) : summary ? (
+                    <>
+                      {summary.totalDetected} cards · ${summary.estimatedTotal.toLocaleString()}{" "}
+                      session FMV
+                      {summary.needsReview > 0 ? ` · ${summary.needsReview} need review` : ""}
+                    </>
+                  ) : null}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -281,42 +292,44 @@ export function MobileResultsDrawer({
               </div>
             </div>
 
-            <div className="flex shrink-0 gap-1 border-b border-white/6 px-3 py-2">
-              <button
-                type="button"
-                onClick={() => setDrawerTab("detail")}
-                className={cn(
-                  "min-h-9 flex-1 rounded-lg text-xs font-medium transition touch-manipulation",
-                  drawerTab === "detail"
-                    ? "bg-success/15 text-primary ring-1 ring-success/30"
-                    : "text-muted hover:bg-white/5",
-                )}
-              >
-                Card detail
-              </button>
-              <button
-                type="button"
-                onClick={() => setDrawerTab("sheet")}
-                className={cn(
-                  "min-h-9 flex-1 rounded-lg text-xs font-medium transition touch-manipulation",
-                  drawerTab === "sheet"
-                    ? "bg-success/15 text-primary ring-1 ring-success/30"
-                    : "text-muted hover:bg-white/5",
-                )}
-              >
-                Scan sheet ({cards.length})
-              </button>
-            </div>
+            {sessionMode ? (
+              <div className="flex shrink-0 gap-1 border-b border-white/6 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => setDrawerTab("detail")}
+                  className={cn(
+                    "min-h-9 flex-1 rounded-lg text-xs font-medium transition touch-manipulation",
+                    drawerTab === "detail"
+                      ? "bg-success/15 text-primary ring-1 ring-success/30"
+                      : "text-muted hover:bg-white/5",
+                  )}
+                >
+                  Card detail
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDrawerTab("sheet")}
+                  className={cn(
+                    "min-h-9 flex-1 rounded-lg text-xs font-medium transition touch-manipulation",
+                    drawerTab === "sheet"
+                      ? "bg-success/15 text-primary ring-1 ring-success/30"
+                      : "text-muted hover:bg-white/5",
+                  )}
+                >
+                  Scan sheet ({cards.length})
+                </button>
+              </div>
+            ) : null}
 
             <div
               className={cn(
                 "sc-mobile-drawer-body min-h-0 flex-1",
-                drawerTab === "sheet"
+                sessionMode && drawerTab === "sheet"
                   ? "flex flex-col overflow-hidden"
-                  : "overflow-y-auto overflow-x-hidden scanner-chat-scrollbar",
+                  : "overflow-y-auto overflow-x-hidden scanner-chat-scrollbar overscroll-contain",
               )}
             >
-              {drawerTab === "detail" && cards.length > 0 ? (
+              {sessionMode && drawerTab === "detail" && cards.length > 0 ? (
                 <div className="border-b border-white/6 px-3 py-3">
                   <ExtractedCardsCarousel
                     cards={cards}
@@ -338,7 +351,7 @@ export function MobileResultsDrawer({
                   />
                 </div>
               ) : null}
-              {drawerTab === "sheet" && specimens.length > 0 ? (
+              {sessionMode && drawerTab === "sheet" && specimens.length > 0 ? (
                 <div className="flex min-h-0 flex-1 flex-col p-3 pt-2">
                   <ScanResultsSheet
                     specimens={specimens}
@@ -350,7 +363,7 @@ export function MobileResultsDrawer({
                     }}
                   />
                 </div>
-              ) : drawerTab === "detail" ? (
+              ) : sessionMode && drawerTab === "detail" ? (
                 <ScanIntelligencePanel
                   layoutMode="drawer"
                   summary={summary}
@@ -388,10 +401,30 @@ export function MobileResultsDrawer({
                   onDownloadDigitalScan={onDownloadDigitalScan}
                   className="sc-mobile-drawer-intel min-h-0 border-0 bg-transparent shadow-none"
                 />
+              ) : intelOnly ? (
+                <ScanIntelligencePanel
+                  layoutMode="drawer"
+                  summary={null}
+                  cards={[]}
+                  selectedSpecimen={null}
+                  selectedSpecimenId={null}
+                  enrichingSpecimenId={null}
+                  onSelectSpecimen={() => {}}
+                  onConfirmCandidate={() => {}}
+                  onRejectCandidate={() => {}}
+                  onExport={() => {}}
+                  onNewScan={() => {}}
+                  onReviewUncertain={() => {}}
+                  onSaveCollection={() => {}}
+                  saveStatus={null}
+                  onIdleAction={onIdleAction}
+                  className="sc-mobile-drawer-intel sc-mobile-drawer-intel--idle min-h-0 border-0 bg-transparent shadow-none"
+                />
               ) : null}
             </div>
 
-            <MobileDrawerFooter
+            {sessionMode ? (
+              <MobileDrawerFooter
               summary={summary}
               reviewCount={reviewCount}
               saving={saving}
@@ -403,6 +436,17 @@ export function MobileResultsDrawer({
               onExport={onExport}
               onNewScan={onNewScan}
             />
+            ) : (
+              <div className="shrink-0 border-t border-white/8 bg-panel/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex w-full min-h-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-xs font-medium text-slate-300 touch-manipulation active:scale-[0.99]"
+                >
+                  Close desk
+                </button>
+              </div>
+            )}
           </motion.div>
         </>
       ) : null}
