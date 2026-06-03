@@ -12,6 +12,7 @@ All times below are **US Eastern Standard Time (EST, UTC−5)**. Vercel cron exp
 | **03:30** | 08:30 | `/api/jobs/market-ingest` | Market ingest (chunk 4) |
 | **03:50** | 08:50 | `/api/jobs/market-ingest` | Market ingest (chunk 5) |
 | **06:10** | 11:10 | `/api/jobs/nightly-final` | **Catalog sync + full nightly report** |
+| **06:20** | 11:20 | `/api/jobs/market-daily-brief` | **Idle daily TCG desk** (web brief + PGT anchors) |
 
 `vercel.json` cron expressions:
 
@@ -22,7 +23,16 @@ All times below are **US Eastern Standard Time (EST, UTC−5)**. Vercel cron exp
 30 8 * * *   market-ingest
 50 8 * * *   market-ingest
 10 11 * * *  nightly-final
+20 11 * * *  market-daily-brief
 ```
+
+## Daily TCG desk (06:20 EST)
+
+`/api/jobs/market-daily-brief` runs **after** nightly-final so FMV and catalog anchors are fresh.
+
+- Edition date rolls at **`MARKET_DAILY_BRIEF_REFRESH_HOUR_UTC`** (default **11 UTC / 06:00 EST**). Before that hour, users still see yesterday's desk.
+- Client auto-refetches when `nextRefreshAt` passes.
+- Local: `npm run market:daily-brief`
 
 ## Final run (06:10 EST)
 

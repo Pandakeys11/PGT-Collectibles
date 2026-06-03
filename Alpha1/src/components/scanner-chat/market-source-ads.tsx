@@ -8,9 +8,12 @@ import { cn } from "@/lib/cn";
 export function MarketSourceAds({
   sources,
   className,
+  variant = "card",
 }: {
   sources: MarketSourceBrand[];
   className?: string;
+  /** card = per-scan specimen; idle = market intelligence welcome rail */
+  variant?: "card" | "idle";
 }) {
   if (sources.length === 0) return null;
 
@@ -24,7 +27,9 @@ export function MarketSourceAds({
           Shop & research
         </p>
         <p className="text-[10px] text-slate-500">
-          Ad-style shortcuts to live listings and sold searches for this card
+          {variant === "idle"
+            ? "Ad-style shortcuts to live listings and sold comps across Pokémon TCG"
+            : "Ad-style shortcuts to live listings and sold searches for this card"}
         </p>
       </div>
 

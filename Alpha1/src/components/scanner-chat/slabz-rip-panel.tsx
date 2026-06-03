@@ -15,6 +15,7 @@ import {
   SlabzWalletCard,
 } from "@/components/scanner-chat/slabz/slabz-panel-chrome";
 import { useSlabzPartner } from "@/components/scanner-chat/slabz-partner-provider";
+import { SlabzRipDemoBanner } from "@/components/scanner-chat/slabz-rip-demo-banner";
 import { formatSlabzUsd, slabzRarityClass, slabzRarityLabel } from "@/lib/slabz/display";
 import { normalizeSlabzPack } from "@/lib/slabz/pack-art";
 import type { SlabzPack, SlabzRipRecord } from "@/lib/slabz/types";
@@ -386,6 +387,8 @@ export function SlabzRipPanel({
 
       <div className="sc-slabz-rip-panel__scroll min-h-0 flex-1 overflow-y-auto scanner-chat-scrollbar">
         <div className="sc-slabz-rip-panel__inner p-3 sm:p-4 md:p-5">
+          <SlabzRipDemoBanner className="mb-3" />
+
           {!slabz.configured ? (
             <div className="sc-slabz-alert sc-slabz-alert--warn">
               <p className="font-semibold text-amber-200">Slabz partner API not configured</p>

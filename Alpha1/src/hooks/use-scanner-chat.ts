@@ -33,6 +33,7 @@ import { getCardDisplayTitle } from "@/lib/scan/card-display";
 import { SYSTEM_SCAN_STEPS } from "@/lib/scanner-chat/mock-data";
 import type { CatalogCandidate, ExtractedCard } from "@/lib/scan/schemas";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import { SLABZ_RIP_DEMO_MODE, SLABZ_RIP_PARTNERSHIP } from "@/lib/partners/slabz-rip-preview";
 import type { SlabzPack, SlabzRipRecord } from "@/lib/slabz/types";
 import type {
   AssistantChatMessage,
@@ -1023,7 +1024,7 @@ export function useScannerChat() {
     pushChatOutput(
       "companion",
       "Open companion",
-      "Your PGT companion is synced to your account. Feed, train, battle, and claim tasks while you scan and research cards.",
+      "Your **PGT Partner Card** — hatch, feed, train, and complete quests while you scan. Same TCG card layout as the evolution pipeline.",
     );
   }, [pushChatOutput]);
 
@@ -1075,7 +1076,9 @@ export function useScannerChat() {
     pushChatOutput(
       "slabz-rip",
       "Open Slabz pack rip",
-      "Rip **graded mystery packs** powered by [Slabz](https://slabz.com) — connect Phantom on **Devnet**, pay with **USDC-DEV**, and reveal slab NFTs without leaving Liquid Scan. History syncs to your Clerk account.",
+      SLABZ_RIP_DEMO_MODE
+        ? `**${SLABZ_RIP_PARTNERSHIP.collaboration}** — **Demo mode**: test graded pack rips below (devnet · USDC-DEV). **${SLABZ_RIP_PARTNERSHIP.liveLabel}** — production ripz and vault sync will follow at launch.`
+        : "Rip **graded mystery packs** powered by [Slabz](https://slabz.com) — connect Phantom on **Devnet**, pay with **USDC-DEV**, and reveal slab NFTs without leaving Liquid Scan. History syncs to your Clerk account.",
     );
   }, [pushChatOutput]);
 
@@ -1323,7 +1326,8 @@ export function useScannerChat() {
       if (
         lower.includes("slabz") ||
         lower.includes("pack rip") ||
-        lower.includes("mystery pack")
+        lower.includes("mystery pack") ||
+        lower.includes("ripz")
       ) {
         openSlabzRipOutput();
         return;

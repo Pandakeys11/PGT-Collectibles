@@ -17,8 +17,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { LiveMarketTickerPill } from "@/components/scanner-chat/live-market-ticker-pill";
+import { MarketDailyBriefPanel } from "@/components/scanner-chat/market-daily-brief-panel";
+import { MarketIdleSourceHub } from "@/components/scanner-chat/market-idle-source-hub";
 import { useLiveMarketTicker } from "@/hooks/use-live-market-ticker";
+import { useMarketDailyBrief } from "@/hooks/use-market-daily-brief";
 import { ONE_THIRTY_POINT_CARDS_BASE } from "@/lib/market/one-thirty-point-urls";
+import { SLABZ_RIP_DEMO_MODE, SLABZ_RIP_PARTNERSHIP } from "@/lib/partners/slabz-rip-preview";
 import { cn } from "@/lib/cn";
 
 export type MarketIntelIdleAction =
@@ -40,6 +44,8 @@ type SpotlightDef = {
   bg: string;
   icon: LucideIcon;
   externalUrl?: string;
+  comingSoon?: boolean;
+  demoMode?: boolean;
 };
 
 const SPOTLIGHTS: SpotlightDef[] = [
@@ -63,12 +69,13 @@ const SPOTLIGHTS: SpotlightDef[] = [
   },
   {
     id: "slabz-rip",
-    title: "Slabz pack rip",
-    subtitle: "Rip partner packs, reveal slabs, and open pulls in Liquid Scan.",
-    cta: "Open Slabz",
+    title: "Slabz Pack Ripz",
+    subtitle: `${SLABZ_RIP_PARTNERSHIP.collaboration} — ${SLABZ_RIP_DEMO_MODE ? "Demo open for testing. " : ""}${SLABZ_RIP_PARTNERSHIP.tagline}`,
+    cta: SLABZ_RIP_DEMO_MODE ? "Try demo" : "Open Slabz",
     border: "border-cyan-400/35",
     bg: "from-cyan-500/20 via-cyan-950/40 to-transparent",
     icon: Gift,
+    demoMode: SLABZ_RIP_DEMO_MODE,
   },
   {
     id: "arcade",
@@ -106,10 +113,18 @@ const QUICK_TILES: Array<{
   icon: LucideIcon;
   accent: string;
   externalUrl?: string;
+  comingSoon?: boolean;
+  demoMode?: boolean;
 }> = [
   { id: "live-market", label: "Live pulse", icon: Radio, accent: "text-sky-300" },
   { id: "ebay-ending", label: "eBay ending", icon: Gavel, accent: "text-rose-300" },
-  { id: "slabz-rip", label: "Slabz rip", icon: Gift, accent: "text-cyan-300" },
+  {
+    id: "slabz-rip",
+    label: SLABZ_RIP_DEMO_MODE ? "Slabz (demo)" : "Slabz rip",
+    icon: Gift,
+    accent: "text-cyan-300",
+    demoMode: SLABZ_RIP_DEMO_MODE,
+  },
   { id: "catalog", label: "Catalog", icon: BookOpen, accent: "text-amber-300" },
   { id: "calculator", label: "Calculator", icon: Calculator, accent: "text-emerald-300" },
   { id: "companion", label: "Companion", icon: Sparkles, accent: "text-violet-300" },
@@ -212,6 +227,8 @@ export function MarketIntelligenceIdleShowcase({
   const rotatePool = SPOTLIGHTS;
   const [spotIdx, setSpotIdx] = useState(0);
   const compact = variant === "compact";
+  const { data: dailyBrief } = useMarketDailyBrief();
+  const hotSetName = dailyBrief?.hotSetNames?.[0] ?? null;
   const spot = rotatePool[spotIdx] ?? rotatePool[0];
   const SpotIcon = spot?.icon ?? TrendingUp;
 
@@ -240,6 +257,10 @@ export function MarketIntelligenceIdleShowcase({
         </div>
       ) : null}
 
+      <MarketDailyBriefPanel compact={compact} />
+
+      <MarketIdleSourceHub hotSetName={hotSetName} />
+
       <IntelLiveTickerStrip onOpen={() => onAction("live-market")} />
 
       {spot ? (
@@ -257,11 +278,17 @@ export function MarketIntelligenceIdleShowcase({
                 "sc-intel-idle-banner group flex w-full flex-col rounded-xl border bg-gradient-to-br p-3 text-left transition hover:brightness-110",
                 spot.border,
                 spot.bg,
+                spot.comingSoon && "sc-intel-idle-banner--soon opacity-75 saturate-[0.45] hover:brightness-100",
               )}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/30 ring-1 ring-white/10">
+                  <span
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/30 ring-1 ring-white/10",
+                      spot.comingSoon && "grayscale",
+                    )}
+                  >
                     <SpotIcon className="h-4 w-4 text-slate-100" aria-hidden />
                   </span>
                   <div className="min-w-0">
@@ -273,14 +300,29 @@ export function MarketIntelligenceIdleShowcase({
                     ) : null}
                   </div>
                 </div>
-                {spot.externalUrl ? (
+                {spot.demoMode ? (
+                  <span className="shrink-0 rounded-full border border-amber-500/35 bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-200/90">
+                    Demo
+                  </span>
+                ) : spot.comingSoon ? (
+                  <span className="shrink-0 rounded-full border border-slate-500/35 bg-slate-800/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-400">
+                    Soon
+                  </span>
+                ) : spot.externalUrl ? (
                   <ExternalLink
                     className="h-3.5 w-3.5 shrink-0 text-slate-500 group-hover:text-slate-300"
                     aria-hidden
                   />
                 ) : null}
               </div>
-              <span className="mt-2.5 inline-flex w-fit items-center rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/90 ring-1 ring-white/10">
+              <span
+                className={cn(
+                  "mt-2.5 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-white/10",
+                  spot.comingSoon
+                    ? "bg-slate-700/40 text-slate-400"
+                    : "bg-white/10 text-emerald-200/90",
+                )}
+              >
                 {spot.cta}
               </span>
               <div
@@ -316,8 +358,12 @@ export function MarketIntelligenceIdleShowcase({
             const Icon = tile.icon;
             const external = Boolean(tile.externalUrl);
             const shared = cn(
-              "flex min-w-0 flex-col items-center gap-1 rounded-xl border border-white/8 bg-white/[0.03] px-1.5 py-2 text-center transition",
-              "hover:border-white/15 hover:bg-white/[0.06] active:scale-[0.98]",
+              "flex min-w-0 flex-col items-center gap-1 rounded-xl border px-1.5 py-2 text-center transition",
+              tile.comingSoon
+                ? "sc-intel-idle-tile--soon border-white/6 bg-white/[0.02] opacity-70 saturate-[0.5] hover:opacity-85"
+                : tile.demoMode
+                  ? "border-cyan-400/15 bg-cyan-500/[0.04] hover:border-cyan-400/25 hover:bg-cyan-500/[0.08] active:scale-[0.98]"
+                  : "border-white/8 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.06] active:scale-[0.98]",
             );
             if (external && tile.externalUrl) {
               return (

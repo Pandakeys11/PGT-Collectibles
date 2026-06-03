@@ -308,6 +308,105 @@
   animation: sc-pulse 1.6s ease-in-out infinite;
 }
 
+.sc-companion-tcg-card {
+  max-width: 20rem;
+}
+
+.sc-companion-tcg-card__art img {
+  filter: drop-shadow(0 6px 16px rgb(0 0 0 / 0.55));
+}
+
+.sc-companion-tcg-action:focus-visible {
+  outline: 2px solid rgb(232 121 249 / 0.45);
+  outline-offset: 1px;
+}
+
+.sc-companion-embed-panel.sc-chat-output-panel--stacked {
+  min-height: 0;
+  max-height: none;
+  background: linear-gradient(180deg, rgb(15 10 28 / 0.35) 0%, transparent 100%);
+}
+
+.sc-companion-tcg-shell {
+  width: 100%;
+}
+
+.sc-companion-tcg-shell--battle {
+  padding-top: 0.15rem;
+  padding-bottom: 0.35rem;
+}
+
+.sc-companion-battle-arena__frame {
+  max-width: 22rem;
+  margin-inline: auto;
+}
+
+.sc-companion-battle-arena__field {
+  background: linear-gradient(
+    180deg,
+    rgb(18 24 38 / 0.95) 0%,
+    rgb(8 12 20 / 0.98) 55%,
+    rgb(6 8 14) 100%
+  );
+}
+
+.sc-companion-battle-card {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.06),
+    inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+
+.sc-companion-battle-card--enemy {
+  transform-origin: top center;
+}
+
+.sc-companion-battle-card--rocket {
+  box-shadow:
+    0 0 0 1px rgb(244 63 94 / 0.35),
+    0 0 18px rgb(244 63 94 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.sc-companion-battle-rocket-banner {
+  animation: sc-companion-rocket-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes sc-companion-rocket-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(244 63 94 / 0.15);
+  }
+  50% {
+    box-shadow: 0 0 14px 2px rgb(244 63 94 / 0.22);
+  }
+}
+
+.sc-companion-battle-log {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.sc-companion-battle-move:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.12);
+}
+
+.sc-companion-battle-move:focus-visible {
+  outline: 2px solid rgb(244 114 182 / 0.5);
+  outline-offset: 1px;
+}
+
+.sc-companion-battle-card__art img {
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.55));
+}
+
+@media (min-width: 1024px) {
+  .scanner-chat-root .sc-assistant-wide-embed .sc-companion-embed-panel.sc-chat-output-panel--stacked {
+    max-width: min(100%, 28rem);
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
 /* Liquid Scan — evolution pipeline TCG card + holo text */
 .sc-scan-pipeline-panel {
   padding: 0.25rem 0;
@@ -1419,6 +1518,24 @@
 .sc-live-market-embed-panel.sc-chat-output-panel--stacked .sc-live-market-panel__scroll,
 .sc-ebay-ending-embed-panel.sc-chat-output-panel--stacked .sc-ebay-ending-panel__scroll {
   max-height: min(28rem, 52vh);
+}
+
+.sc-slabz-rip-panel--coming-soon {
+  --slabz-cyan: 100 116 139;
+  --slabz-fuchsia: 100 116 139;
+}
+
+.sc-slabz-rip-panel--coming-soon .sc-slabz-rip-panel__header-mesh {
+  opacity: 0.25;
+  filter: grayscale(0.85);
+}
+
+.sc-intel-idle-banner--soon {
+  cursor: pointer;
+}
+
+.sc-intel-idle-tile--soon {
+  cursor: pointer;
 }
 
 /* ── Slabz partner rip: full responsive showcase ── */

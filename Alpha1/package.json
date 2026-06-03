@@ -53,6 +53,7 @@
     "db:apply:localized-artwork": "node scripts/apply-sql-file.mjs supabase/migrations/202605280002_tcg_catalog_localized_artwork.sql",
     "db:push": "node scripts/push-supabase-migrations.mjs",
     "db:probe": "node scripts/probe-db-connection.mjs",
+    "companion:reset-rerolls": "node scripts/reset-companion-starter-rerolls.mjs --apply",
     "db:build-pending": "node scripts/build-pending-sql.mjs",
     "catalog:sync": "node scripts/catalog-sync.mjs",
     "catalog:sync:magic": "node scripts/catalog-sync.mjs --franchise=magic",
@@ -102,7 +103,8 @@
     "market:ingest": "node scripts/run-market-ingest.mjs",
     "market:ingest:set": "node scripts/run-market-ingest-set.mjs",
     "platform:nightly": "node scripts/run-nightly-platform.mjs",
-    "platform:nightly:final": "node scripts/run-nightly-final.mjs"
+    "platform:nightly:final": "node scripts/run-nightly-final.mjs",
+    "market:daily-brief": "node scripts/run-market-daily-brief.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.3.5",

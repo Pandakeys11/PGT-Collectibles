@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatSlabzTokenAmount, shortSolanaAddress } from "@/lib/slabz/display";
 import { SLABZ_BRAND_LOGO_URL } from "@/lib/slabz/pack-art";
+import { SLABZ_RIP_DEMO_MODE, SLABZ_RIP_PARTNERSHIP } from "@/lib/partners/slabz-rip-preview";
 import { LIQUID_SCAN_PATH } from "@/lib/app-routes";
 import { cn } from "@/lib/cn";
 
@@ -38,11 +39,19 @@ export function SlabzPanelHeader({
             <img src={SLABZ_BRAND_LOGO_URL} alt="Slabz" className="h-6 w-auto sm:h-7" />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-50 sm:text-xs">
-              Slabz mystery packs
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-50 sm:text-xs">
+                Slabz mystery packs
+              </p>
+              {SLABZ_RIP_DEMO_MODE ? (
+                <span className="rounded-full border border-amber-500/35 bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-200/90">
+                  {SLABZ_RIP_PARTNERSHIP.demoLabel}
+                </span>
+              ) : null}
+            </div>
             <p className="mt-0.5 text-[10px] text-slate-400 sm:text-[11px]">
               Graded slab rips · {network === "devnet" ? "Devnet · USDC-DEV" : "Mainnet · USDC"}
+              {SLABZ_RIP_DEMO_MODE ? ` · ${SLABZ_RIP_PARTNERSHIP.demoShort}` : ""}
             </p>
             <p className="mt-1 hidden text-[10px] text-slate-500 sm:block">
               Connect Phantom, rip packs, reveal vaulted PSA slabs — synced to your PGT account.

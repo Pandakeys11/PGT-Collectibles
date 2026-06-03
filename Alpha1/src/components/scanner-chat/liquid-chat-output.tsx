@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Calculator, Sparkles, X } from "lucide-react";
+import { BookOpen, Calculator, X } from "lucide-react";
 import { EbayEndingSoonPanel } from "@/components/scanner-chat/ebay-ending-soon-panel";
 import { SlabzRipPanel } from "@/components/scanner-chat/slabz-rip-panel";
 import { PgtArcadePartnerPanel } from "@/components/scanner-chat/pgt-arcade-partner-panel";
@@ -150,30 +150,12 @@ export function LiquidChatOutputPanel({
     return (
       <div
         className={cn(
-          "sc-chat-output-panel sc-chat-output-panel--stacked flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-violet-500/20 sc-glass-raised",
+          "sc-companion-embed-panel sc-assistant-wide-embed sc-chat-output-panel sc-chat-output-panel--stacked flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-violet-500/25 sc-glass-raised",
           className,
         )}
       >
-        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/8 bg-white/[0.02] px-3 py-2">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-violet-300" aria-hidden />
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-200/90">
-              PGT Companion
-            </p>
-          </div>
-          {onDismiss ? (
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5"
-              aria-label="Close companion"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          ) : null}
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-2.5 sm:p-3 scanner-chat-scrollbar">
-          <CompanionPanel layout="mobile" {...companion} />
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-4 sm:py-4 scanner-chat-scrollbar">
+          <CompanionPanel layout="tcg" onDismiss={onDismiss} {...companion} />
         </div>
       </div>
     );

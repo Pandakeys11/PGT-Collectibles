@@ -30,6 +30,7 @@ import { SidebarMarketPulse } from "@/components/scanner-chat/sidebar-market-pul
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { BrandLogo } from "@/components/branding/brand-logo";
+import { SLABZ_RIP_DEMO_MODE } from "@/lib/partners/slabz-rip-preview";
 import type { ScanHistoryItem } from "@/lib/scanner-chat/types";
 import { cn } from "@/lib/cn";
 
@@ -55,13 +56,20 @@ type NavItem = {
   label: string;
   icon: typeof Plus;
   href?: string;
+  comingSoon?: boolean;
+  demoMode?: boolean;
 };
 
 const NAV_TOOLS: NavItem[] = [
   { id: "calculator", label: "Deal calculator", icon: Calculator },
   { id: "catalog", label: "Master catalog", icon: BookOpen },
   { id: "ebay-ending", label: "eBay ending soon", icon: Gavel },
-  { id: "slabz-rip", label: "Slabz pack rip", icon: Gift },
+  {
+    id: "slabz-rip",
+    label: "Slabz pack rip",
+    icon: Gift,
+    demoMode: SLABZ_RIP_DEMO_MODE,
+  },
   { id: "pgt-arcade", label: "PGT Arcade", icon: Gamepad2 },
   { id: "companion", label: "Companion", icon: Sparkles },
 ];
@@ -102,7 +110,11 @@ function NavRow({
     "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition",
     disabled
       ? "cursor-not-allowed text-slate-600 opacity-50"
-      : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+      : item.comingSoon
+        ? "text-slate-500 opacity-75 saturate-[0.55] hover:bg-white/[0.03] hover:text-slate-400"
+        : item.demoMode
+          ? "text-slate-400 hover:bg-cyan-500/[0.06] hover:text-cyan-100"
+          : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
   );
 
   if (item.href) {
@@ -124,8 +136,17 @@ function NavRow({
       }}
       className={className}
     >
-      <Icon className="h-4 w-4 shrink-0 opacity-80" />
-      {item.label}
+      <Icon className={cn("h-4 w-4 shrink-0 opacity-80", item.comingSoon && "grayscale")} />
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {item.comingSoon ? (
+        <span className="shrink-0 rounded border border-slate-600/40 bg-slate-800/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">
+          Soon
+        </span>
+      ) : item.demoMode ? (
+        <span className="shrink-0 rounded border border-amber-500/35 bg-amber-500/12 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-200/85">
+          Demo
+        </span>
+      ) : null}
     </button>
   );
 }
