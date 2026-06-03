@@ -32,8 +32,8 @@ function haystack(text: string): string {
 }
 
 /** Normalize vision/user text into a canonical print edition when possible. */
-export function resolvePrintEdition(card: Pick<ExtractedCard, "printStamps" | "details">): ResolvedPrintEdition | null {
-  const parts = [card.printStamps, card.details].filter(Boolean).join(" ");
+export function resolvePrintEdition(card: Pick<ExtractedCard, "printStamps" | "details" | "rarity">): ResolvedPrintEdition | null {
+  const parts = [card.printStamps, card.details, card.rarity].filter(Boolean).join(" ");
   const h = haystack(parts);
   if (!h.trim()) return null;
 
@@ -45,6 +45,20 @@ export function resolvePrintEdition(card: Pick<ExtractedCard, "printStamps" | "d
   }
   if (/\bunlimited\b|\bunl\.?\s*ed/.test(h)) {
     return { id: "unlimited", label: EDITION_LABELS.unlimited, source: card.printStamps ? "printStamps" : "details" };
+  }
+  if (
+    /\b(no|without|missing|flat)\s+(drop\s*)?shadow|\bshadowless\s+(art|frame|box)\b|\bflat\s+art\s+box\b|\bno\s+art\s+box\s+shadow\b/.test(
+      h,
+    )
+  ) {
+    return { id: "shadowless", label: EDITION_LABELS.shadowless, source: "details" };
+  }
+  if (
+    /\bdrop\s*shadow|\bshadowed\s+(art|frame|box)\b|\bart\s+box\s+shadow\b|\bdistinct\s+(dark\s+)?shadow\b/.test(
+      h,
+    )
+  ) {
+    return { id: "unlimited", label: EDITION_LABELS.unlimited, source: "details" };
   }
   if (/\breverse\s*holo|\brev\s*holo\b/.test(h)) {
     return { id: "reverse_holo", label: EDITION_LABELS.reverse_holo, source: card.printStamps ? "printStamps" : "details" };

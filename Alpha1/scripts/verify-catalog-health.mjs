@@ -130,6 +130,40 @@ async function main() {
     if (!reverse?.image_large_url) throw new Error("base6-3__reverse_holo image missing");
   });
 
+  ok &&= await check("pokemon compilation + evolutions sets", async () => {
+    const base4Unlimited = await pokemonVariantCount("base4", "unlimited");
+    const base4First = await pokemonVariantCount("base4", "first_edition");
+    const xy12Base = await pokemonSetBaseCount("xy12");
+    if (base4Unlimited !== 130) {
+      throw new Error(`Base Set 2 Unlimited has ${base4Unlimited}, expected 130`);
+    }
+    if (base4First !== 130) {
+      throw new Error(`Base Set 2 1st Edition has ${base4First}, expected 130`);
+    }
+    if (xy12Base !== 113) {
+      throw new Error(`Evolutions has ${xy12Base}, expected 113`);
+    }
+  });
+
+  ok &&= await check("base1 charizard print-run artwork", async () => {
+    const { data, error } = await supabase
+      .from("tcg_catalog_cards")
+      .select("catalog_id,image_large_url")
+      .eq("franchise", "pokemon")
+      .in("catalog_id", ["base1-4__shadowless", "base1-4__unlimited", "base1-4__first_edition"]);
+    if (error) throw new Error(error.message);
+    const byId = new Map((data ?? []).map((row) => [row.catalog_id, row.image_large_url]));
+    const shadowless = byId.get("base1-4__shadowless");
+    const unlimited = byId.get("base1-4__unlimited");
+    const first = byId.get("base1-4__first_edition");
+    if (!shadowless || !unlimited || !first) {
+      throw new Error("Missing Charizard variant rows");
+    }
+    if (shadowless === unlimited) {
+      throw new Error("Charizard shadowless and unlimited share the same image URL");
+    }
+  });
+
   ok &&= await check("pokemon set search matches plain DB terms", async () => {
     const { data, error } = await supabase
       .from("tcg_catalog_sets")

@@ -4,6 +4,7 @@ import {
   type CardMarketPriceFields,
 } from "@/lib/market/cardmarket-eur";
 import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
+import type { PgtUsTrendLane } from "@/lib/market/pgt-us-trends/types";
 import { getPokeTraceRealtimeUpdate } from "@/lib/market/poketrace/realtime-store";
 import type { PokeTracePriceSource } from "@/lib/market/poketrace/types";
 
@@ -19,17 +20,17 @@ export type CatalogMomentumResult = {
   window30dUsd: number | null;
 };
 
-export const CATALOG_MOMENTUM_TITLE = "7-day market movers";
+export const CATALOG_MOMENTUM_TITLE = "PGT US market trends";
 
 /** One-line subtitle under section headers. */
 export const CATALOG_MOMENTUM_SUBTITLE =
-  "Price change: 7-day vs 30-day median · list price from TCGPlayer (USD)";
+  "7-day vs 30-day median (USD) · PGT comps & TCG anchors · list from TCGPlayer";
 
 /** Footer / empty-state helper — plain language for collectors. */
 export const CATALOG_MOMENTUM_EXPLAINER =
-  "Percent shows how the recent 7-day median compares to the 30-day median. " +
-  "US data uses TCGPlayer and eBay (via PokeTrace when configured). " +
-  "Without PokeTrace, EU Cardmarket averages are used and labeled EU.";
+  "Percent is how the last 7-day median compares to the 30-day median. " +
+  "US trends use PGT sold comps and daily TCGPlayer ticks first; PokeTrace or JustTCG fill gaps when configured. " +
+  "EU uses Cardmarket 7d/30d from catalog or the Pokémon TCG API.";
 
 export function momentumSourceShort(label: string | null | undefined): string | null {
   if (!label?.trim()) return null;
@@ -99,6 +100,72 @@ function fromPokeTraceMeta(
   };
 }
 
+function pgtUsLaneLabel(lane: PgtUsTrendLane): string {
+  switch (lane) {
+    case "sold_comps":
+      return "PGT sold comps";
+    case "price_ticks":
+      return "PGT price history";
+    case "blended":
+      return "PGT blended";
+    case "tcg_anchor":
+      return "PGT TCG anchor";
+    default:
+      return "PGT US";
+  }
+}
+
+function fromPgtUsMeta(
+  meta: NonNullable<CatalogPriceSnapshot["pgtUs"]>,
+): CatalogMomentumResult | null {
+  if (meta.momentumPct == null) return null;
+  const w7 = meta.median7dUsd;
+  const w30 = meta.median30dUsd;
+  const sourceLabel = `US · ${pgtUsLaneLabel(meta.lane)} 7d vs 30d`;
+  if (w7 != null && w30 != null && w30 > 0) {
+    return resultFromWindows({
+      pct: meta.momentumPct,
+      region: "us",
+      sourceLabel,
+      window7dUsd: w7,
+      window30dUsd: w30,
+    });
+  }
+  return {
+    pct: meta.momentumPct,
+    region: "us",
+    label: sourceLabel,
+    deltaUsd: null,
+    window7dUsd: w7,
+    window30dUsd: w30,
+  };
+}
+
+function fromJustTcgMeta(
+  meta: NonNullable<CatalogPriceSnapshot["justTcg"]>,
+): CatalogMomentumResult | null {
+  if (meta.momentumPct == null) return null;
+  const w7 = meta.avgPrice7dUsd;
+  const w30 = meta.avgPrice30dUsd;
+  if (w7 != null && w30 != null && w30 > 0) {
+    return resultFromWindows({
+      pct: meta.momentumPct,
+      region: "us",
+      sourceLabel: "US · JustTCG 7d vs 30d",
+      window7dUsd: w7,
+      window30dUsd: w30,
+    });
+  }
+  return {
+    pct: meta.momentumPct,
+    region: "us",
+    label: "US · JustTCG 7d trend",
+    deltaUsd: null,
+    window7dUsd: w7,
+    window30dUsd: w30,
+  };
+}
+
 function fromCardmarketEu(cm: CardMarketPriceFields): CatalogMomentumResult | null {
   const pct = cardmarketMomentumPct7dVs30d(cm);
   if (pct == null || cm.avg7 == null || cm.avg30 == null) return null;
@@ -123,9 +190,15 @@ const EMPTY: CatalogMomentumResult = {
 };
 
 /**
- * Uniform catalog momentum: US 7d vs 30d (PokeTrace TCGPlayer/eBay) → EU Cardmarket 7d vs 30d fallback.
+ * Uniform catalog momentum: PGT US → PokeTrace US → JustTCG US → EU Cardmarket 7d vs 30d.
  */
 export function resolveCatalogMomentum(prices: CatalogPriceSnapshot): CatalogMomentumResult {
+  const pgt = prices.pgtUs;
+  if (pgt) {
+    const fromPgt = fromPgtUsMeta(pgt);
+    if (fromPgt) return fromPgt;
+  }
+
   const pokeId = prices.pokeTrace?.cardId?.trim();
   if (pokeId) {
     for (const source of ["tcgplayer", "ebay"] as const) {
@@ -147,6 +220,12 @@ export function resolveCatalogMomentum(prices: CatalogPriceSnapshot): CatalogMom
   if (meta) {
     const fromMeta = fromPokeTraceMeta(meta);
     if (fromMeta) return fromMeta;
+  }
+
+  const jt = prices.justTcg;
+  if (jt) {
+    const fromJt = fromJustTcgMeta(jt);
+    if (fromJt) return fromJt;
   }
 
   const cm = prices.cardMarket;

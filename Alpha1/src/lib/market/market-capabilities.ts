@@ -19,11 +19,14 @@ import {
   getEbayClientSecret,
   getEbayFindingAppId,
   isEbayBrowseConfigured,
+  isJustTcgConfigured,
   isPokeTraceConfigured,
   isPokeTraceWsEnabled,
 } from "@/lib/market/env-market";
+import { getPriceChartingReadiness } from "@/lib/market/pricecharting/readiness";
 import { isPriceChartingSoldScrapeEnabled } from "@/lib/market/pricecharting/config";
 import { getApifyEbaySoldBlockReason } from "@/lib/market/provider-health";
+import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export type MarketCapabilities = {
   /** Sold comps pipeline can run (Apify, Finding, or Bright Data HTML). */
@@ -40,12 +43,20 @@ export type MarketCapabilities = {
   ebayInsights: boolean;
   poketraceRest: boolean;
   poketraceWs: boolean;
+  justTcg: boolean;
+  /** PGT-owned US 7d/30d trends (comps + price ticks in Supabase). */
+  pgtUsTrends: boolean;
   geminiSearch: boolean;
   psaCertPage: boolean;
   gemrate: boolean;
   psaPublicApi: boolean;
   apifyPsa: boolean;
   priceChartingSoldScrape: boolean;
+  priceChartingApi: boolean;
+  /** Sold scrape + unlocker (completed auctions on product pages). */
+  priceChartingSoldReady: boolean;
+  priceChartingReady: boolean;
+  priceChartingGaps: string[];
   /** Human-readable gaps when credentials exist but paths are down. */
   ebaySoldGaps: string[];
 };
@@ -72,6 +83,8 @@ export function getMarketCapabilities(): MarketCapabilities {
     }
   }
 
+  const pc = getPriceChartingReadiness();
+
   return {
     ebaySoldReady,
     ebayBrowseReady: isEbayBrowseConfigured(),
@@ -84,12 +97,18 @@ export function getMarketCapabilities(): MarketCapabilities {
     ebayInsights: isEbayMarketplaceInsightsConfigured(),
     poketraceRest: isPokeTraceConfigured(),
     poketraceWs: isPokeTraceWsEnabled(),
+    justTcg: isJustTcgConfigured(),
+    pgtUsTrends: isSupabaseConfigured(),
     geminiSearch: isGeminiServiceEnabled(),
     psaCertPage: process.env.PSA_CERT_PAGE_SCRAPE !== "0",
     gemrate: Boolean(process.env.GEMRATE_API_KEY?.trim()),
     psaPublicApi: psaPublicApiConfigured(),
     apifyPsa: isApifyPsaPopConfigured(),
     priceChartingSoldScrape: isPriceChartingSoldScrapeEnabled(),
+    priceChartingApi: pc.apiReady,
+    priceChartingSoldReady: pc.soldScrapeReady,
+    priceChartingReady: pc.productionReady,
+    priceChartingGaps: pc.gaps,
     ebaySoldGaps: gaps,
   };
 }
@@ -106,10 +125,13 @@ export function marketCapabilitiesSummary(caps: MarketCapabilities): string {
   } else {
     parts.push("eBay sold not ready");
   }
+  if (caps.pgtUsTrends) parts.push("PGT US trends");
   if (caps.poketraceRest) parts.push("PokeTrace REST");
   if (caps.poketraceWs) parts.push("PokeTrace WS");
   if (caps.ebayInsights) parts.push("Insights (stub)");
-  if (caps.priceChartingSoldScrape) parts.push("PriceCharting sold scrape");
+  if (caps.priceChartingApi) parts.push("PriceCharting API");
+  if (caps.priceChartingSoldReady) parts.push("PriceCharting sold scrape");
+  else if (caps.priceChartingSoldScrape) parts.push("PriceCharting scrape (no unlocker)");
   if (caps.geminiSearch) parts.push("live search");
   if (caps.gemrate) parts.push("GemRate");
   if (caps.psaPublicApi) parts.push("PSA API");

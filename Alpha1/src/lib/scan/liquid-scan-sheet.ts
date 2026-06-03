@@ -1,5 +1,6 @@
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import { getCardDisplayTitle } from "@/lib/scan/card-display";
+import { formatCollectorId } from "@/lib/scanner-chat/format-card-identity";
 import {
   formatGradedSlabTag,
   hasReadableCertNumber,
@@ -163,7 +164,7 @@ export function specimensToLiquidScanSheetRows(
       name: getCardDisplayTitle(item.card),
       set: item.context.setName ?? item.card.set ?? "—",
       year: item.context.year ?? item.card.year ?? "—",
-      cardId: item.context.cardNumber ?? item.card.number ?? "—",
+      cardId: formatCollectorId(item.context.cardNumber ?? item.card.number),
       promo: displayPrintPromoForSpecimen(item),
       version: displayPrintVersionForSpecimen(item),
       grader,

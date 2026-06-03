@@ -1,4 +1,5 @@
 export type ScanMode =
+  | "auto"
   | "fast"
   | "deep"
   | "market"
@@ -35,6 +36,8 @@ export interface CardMatch {
   printVersion?: string;
   /** Promo-specific stamp when separated from printVersion. */
   printPromo?: string;
+  /** Master catalog row id when matched (e.g. base1-4__first_edition). */
+  catalogId?: string | null;
   condition?: string;
   graded?: { company: string; grade: string; cert?: string };
   confidence: number;
@@ -72,6 +75,10 @@ export interface CardMatch {
   verificationStatus?: string;
   catalogIdentityStatus?: string;
   fairValueUsd?: number | null;
+  /** Progressive pipeline — vision identity → catalog → market. */
+  pipelinePhase?: "identity" | "catalog" | "market" | "complete";
+  catalogPending?: boolean;
+  marketPending?: boolean;
 }
 
 export interface ScanSummary {
@@ -103,7 +110,9 @@ export type ChatOutputKind =
   | "calculator"
   | "live-market"
   | "ebay-ending"
-  | "pgt-youtube";
+  | "pgt-youtube"
+  | "pgt-arcade"
+  | "slabz-rip";
 
 export type ChatOutputPanel = {
   kind: ChatOutputKind;

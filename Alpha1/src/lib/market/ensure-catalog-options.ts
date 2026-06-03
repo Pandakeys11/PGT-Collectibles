@@ -1,9 +1,10 @@
-import { searchDbCatalog, searchDbCatalogBroad } from "@/lib/catalog/db-catalog";
+import { searchDbCatalog, searchDbCatalogBroad, supplementCatalogMatchSameNameVariants } from "@/lib/catalog/db-catalog";
 import { matchCatalogByArt } from "@/lib/catalog/art-match";
 import { mergeCatalogMatches } from "@/lib/market/catalog-candidate-merge";
 import { matchCatalogForEnrich } from "@/lib/market/catalog-router";
 import type { CatalogMatch } from "@/lib/market/pokemon-catalog";
 import { inferCardFranchise } from "@/lib/scan/franchise";
+import { applyCatalogIdentityHardening } from "@/lib/scan/print-finish-inference";
 import { toCatalogCounterpartCard } from "@/lib/scan/japanese-pokemon";
 import { isNonTcgPokemonCollectible } from "@/lib/scan/non-tcg-pokemon";
 import type { ExtractedCard } from "@/lib/scan/schemas";
@@ -61,7 +62,7 @@ export async function ensureCatalogMatchOptions(
   if (isNonTcgPokemonCollectible(card)) return null;
 
   const franchise = inferCardFranchise(card).id;
-  const catalogCard = toCatalogCounterpartCard(card);
+  const catalogCard = applyCatalogIdentityHardening(toCatalogCounterpartCard(card));
   let match = await searchDbCatalog(catalogCard, franchise);
 
   const hintCatalogId = options?.hintCatalogId?.trim();
@@ -106,6 +107,7 @@ export async function ensureCatalogMatchOptions(
         match = mergeCatalogMatches(match, artMatch);
       }
     }
+    match = await supplementCatalogMatchSameNameVariants(catalogCard, franchise, match);
     return match;
   }
 
@@ -128,5 +130,6 @@ export async function ensureCatalogMatchOptions(
     }
   }
 
+  match = await supplementCatalogMatchSameNameVariants(catalogCard, franchise, match);
   return match;
 }

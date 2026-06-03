@@ -2,37 +2,10 @@ import { getCardFromDb } from "@/lib/catalog/db-catalog-browse";
 import { upsertCatalogCards } from "@/lib/catalog/db-catalog";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
 import { isPokeTraceConfigured } from "@/lib/market/env-market";
+import { buildPokeTraceCatalogSnapshot } from "@/lib/market/poketrace/build-catalog-snapshot";
 import { collectPokeTraceMarketEvidence } from "@/lib/market/poketrace/collect";
-import { fetchPokeTracePriceHistory } from "@/lib/market/poketrace/history";
-import {
-  fetchPokeTraceCardById,
-  searchPokeTraceCards,
-  scoreCardMatch,
-} from "@/lib/market/poketrace/match";
-import { buildCatalogSnapshotFromPokeTrace } from "@/lib/market/poketrace/snapshot";
-import { marketForCard, pickPrimaryTierRow } from "@/lib/market/poketrace/tiers";
-import type { PokeTraceCard } from "@/lib/market/poketrace/types";
 import { catalogSummaryToExtractedCard } from "@/lib/market/pokemon-market-knowledge-shared";
-import type { CatalogCardSummary } from "@/lib/catalog/catalog-types";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
-
-async function resolvePokeTraceCard(
-  catalogCard: CatalogCardSummary,
-  extracted = catalogSummaryToExtractedCard(catalogCard),
-): Promise<PokeTraceCard | null> {
-  const stored = parseCatalogPriceSnapshot(catalogCard.prices ?? null).pokeTrace?.cardId ?? null;
-  if (stored) {
-    const byId = await fetchPokeTraceCardById(stored);
-    if (byId) return byId;
-  }
-
-  const candidates = await searchPokeTraceCards(extracted);
-  const ranked = candidates
-    .map((c) => ({ c, score: scoreCardMatch(c, extracted) }))
-    .sort((a, b) => b.score - a.score);
-  if (!ranked[0]?.c || (ranked[0]?.score ?? 0) < 4) return null;
-  return ranked[0].c;
-}
 
 /** Upsert catalog `prices_json` from PokeTrace (24/7 pipeline source). */
 export async function refreshPokeTraceCatalogPrices(catalogId: string): Promise<boolean> {
@@ -44,30 +17,12 @@ export async function refreshPokeTraceCatalogPrices(catalogId: string): Promise<
   const catalogCard = await getCardFromDb("pokemon", id);
   if (!catalogCard) return false;
 
-  const extracted = catalogSummaryToExtractedCard(catalogCard);
-  const pokeCard = await resolvePokeTraceCard(catalogCard, extracted);
-  if (!pokeCard) return false;
-
-  const primary = pickPrimaryTierRow(extracted, pokeCard);
-  let historyPoints = 0;
-  if (primary) {
-    const history = await fetchPokeTracePriceHistory(pokeCard.id, primary.tier, {
-      period: "90d",
-      limit: 14,
-    });
-    historyPoints = history.length;
-  }
-
-  const existing = parseCatalogPriceSnapshot(catalogCard.prices ?? null);
-  const { snapshot } = buildCatalogSnapshotFromPokeTrace(pokeCard, extracted, {
-    existing,
-    historyPoints,
-    market: marketForCard(extracted),
-  });
+  const snapshot = await buildPokeTraceCatalogSnapshot(id);
+  if (!snapshot?.pokeTrace?.cardId) return false;
 
   const rawJson = {
-    pokeTraceCardId: pokeCard.id,
-    pokeTraceSyncedAt: snapshot.pokeTrace?.syncedAt ?? new Date().toISOString(),
+    pokeTraceCardId: snapshot.pokeTrace.cardId,
+    pokeTraceSyncedAt: snapshot.pokeTrace.syncedAt ?? new Date().toISOString(),
   };
 
   await upsertCatalogCards([

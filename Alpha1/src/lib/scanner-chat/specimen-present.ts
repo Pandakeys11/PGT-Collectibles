@@ -11,8 +11,13 @@ import {
   displayPrintPromo,
   displayPrintVersion,
 } from "@/lib/scan/display-print-edition";
+import { catalogVariantLabelFromCatalogId } from "@/lib/scan/print-identity-ui";
 import { buildScanCompChips } from "@/lib/scan/scan-market-present";
 import { marketDataReady, summarizeSources } from "@/lib/scan/sheet-present";
+import {
+  resolveSpecimenPipelinePhase,
+  type ScanPresentContext,
+} from "@/lib/scan/specimen-pipeline-present";
 import type { CardMatch, MatchStatus, ScanSummary } from "./types";
 
 function matchStatus(specimen: ScanSpecimen): MatchStatus {
@@ -45,8 +50,13 @@ const GRADIENTS = [
   "from-emerald-500/35 via-teal-400/25 to-cyan-600/35",
 ] as const;
 
-export function specimenToCardMatch(specimen: ScanSpecimen, index: number): CardMatch {
+export function specimenToCardMatch(
+  specimen: ScanSpecimen,
+  index: number,
+  present?: ScanPresentContext,
+): CardMatch {
   const { card, context } = specimen;
+  const pipeline = resolveSpecimenPipelinePhase(specimen, present);
   const slabCard =
     context.lane === "graded" ? normalizeGradedSlabFields(card, "graded") : card;
   const gradedTag =
@@ -54,7 +64,11 @@ export function specimenToCardMatch(specimen: ScanSpecimen, index: number): Card
   const fmv = resolveCardListFmv(specimen);
   const scanMarketReady = marketDataReady(specimen);
   const compChips = scanMarketReady ? buildScanCompChips(specimen) : null;
-  const printVersion = displayPrintVersion(card, context.variantLabel);
+  const catalogVariant = catalogVariantLabelFromCatalogId(context.catalogId);
+  const printVersion =
+    displayPrintVersion(card, catalogVariant ?? context.variantLabel) ||
+    catalogVariant ||
+    "";
   const printPromo = displayPrintPromo(card, context.variantLabel);
   const sources = summarizeSources(specimen).map((s) => s.label);
   const fmvAmount = fmv.fmvUsd ?? 0;
@@ -81,6 +95,7 @@ export function specimenToCardMatch(specimen: ScanSpecimen, index: number): Card
     rarity: slabCard.rarity ?? "—",
     printVersion: printVersion || undefined,
     printPromo: printPromo || undefined,
+    catalogId: context.catalogId ?? null,
     condition: slabCard.details?.trim() || undefined,
     graded,
     confidence: confidencePercent(specimen),
@@ -112,6 +127,9 @@ export function specimenToCardMatch(specimen: ScanSpecimen, index: number): Card
     verificationStatus: context.verificationStatus,
     catalogIdentityStatus: context.catalogIdentityStatus,
     fairValueUsd: context.fairValueUsd,
+    pipelinePhase: pipeline.phase,
+    catalogPending: pipeline.catalogPending,
+    marketPending: pipeline.marketPending,
   };
 }
 
@@ -138,7 +156,7 @@ export function buildBatchScanAssistantText(
   summary: ScanSummary,
 ): string {
   if (specimens.length === 0) {
-    return "No cards were detected in this upload. Try a clearer photo, tighter framing, or switch the scan mode to All cards.";
+    return "No cards were detected in this upload. Try a clearer photo, tighter framing, or a flatter binder page.";
   }
 
   const verified = specimens.filter((s) => matchStatus(s) === "verified").length;

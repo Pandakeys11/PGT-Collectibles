@@ -71,6 +71,8 @@ export async function enrichExtractedCard(args: {
   timeoutMs?: number;
   artMatchImageBase64?: string;
   artMatchMimeType?: string;
+  /** Slabz partner metadata from `context.extraction` — enables art match + identity repair. */
+  extraction?: Record<string, unknown>;
 }): Promise<{
   card: ExtractedCard;
   context: ScanCardContext;
@@ -92,11 +94,15 @@ export async function enrichExtractedCard(args: {
 
     let response: Response;
     try {
-      const { skipRegistry, ...payload } = args;
+      const { skipRegistry, extraction, ...payload } = args;
       response = await fetch("/api/scan/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, skipRegistry: skipRegistry === true ? true : undefined }),
+        body: JSON.stringify({
+          ...payload,
+          skipRegistry: skipRegistry === true ? true : undefined,
+          extraction: extraction && Object.keys(extraction).length > 0 ? extraction : undefined,
+        }),
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {

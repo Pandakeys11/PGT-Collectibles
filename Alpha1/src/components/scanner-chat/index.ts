@@ -9,6 +9,8 @@ export { AIStreamingScanMessage } from "./ai-streaming-scan-message";
 export { ScanProgressTimeline } from "./scan-progress-timeline";
 export { CardMatchResult } from "./card-match-result";
 export { ExtractedCardsCarousel } from "./extracted-cards-carousel";
+export { LiquidScanQuickActions, LIQUID_SCAN_PROMPT_CHIPS } from "./liquid-scan-quick-actions";
+export { CardIdentityMeta } from "./card-identity-meta";
 export { ScanResultsSheet } from "./scan-results-sheet";
 export { ScanResultsViewToggle } from "./scan-results-view-toggle";
 export { ScanSummaryPanel, ScanSummaryInline } from "./scan-summary-panel";

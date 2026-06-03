@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   CircleHelp,
   ExternalLink,
+  Loader2,
   Plus,
   Tag,
   ThumbsDown,
@@ -16,9 +17,9 @@ import { CatalogCardThumb } from "@/components/scan-panels/catalog-card-thumb";
 import type { CardMatch } from "@/lib/scanner-chat/types";
 import { buildEbayHubForCard } from "@/lib/market/sources";
 import { isJapanesePokemonCard } from "@/lib/scan/japanese-pokemon";
-import { printEditionBlocker } from "@/lib/scan/print-edition";
 import { FmvHeadlineBlock } from "@/components/market/fmv-headline-block";
 import { buildFmvHeadlineFromCardMatch } from "@/lib/market/fmv-display";
+import { CardIdentityMeta } from "./card-identity-meta";
 import { cn } from "@/lib/cn";
 
 function statusMeta(status: CardMatch["status"]) {
@@ -86,10 +87,6 @@ export function CardMatchResult({
   const japaneseName = card.extractedCard?.japaneseName ?? card.extractedCard?.printedName;
   const counterpartSet = card.extractedCard?.setNameEnglish;
   const marketConfidence = card.extractedCard?.pricingConfidence;
-  const needsPrintRunConfirm =
-    card.extractedCard &&
-    !card.printVersion &&
-    printEditionBlocker(card.extractedCard, card.graded ? "graded" : "raw") != null;
 
   return (
     <motion.div
@@ -113,6 +110,7 @@ export function CardMatchResult({
               specimenId={card.specimenId}
               card={card.extractedCard}
               catalogImageUrl={card.catalogImageUrl}
+              previewUrl={card.previewUrl}
               className="h-full w-full"
             />
           ) : (
@@ -121,19 +119,8 @@ export function CardMatchResult({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <h4 className="text-[13px] font-semibold text-slate-100 sm:text-sm">{card.name}</h4>
-              <p className="text-[11px] text-slate-500 sm:text-xs">
-                {card.setName} · {card.setNumber} · {card.year}
-              </p>
-              {card.printVersion || card.printPromo ? (
-                <p className="mt-1 text-[11px] font-medium leading-snug text-violet-200/95 sm:text-xs">
-                  {card.printVersion}
-                  {card.printPromo && card.printPromo !== card.printVersion
-                    ? ` · ${card.printPromo}`
-                    : ""}
-                </p>
-              ) : null}
+            <div className="min-w-0 flex-1">
+              <CardIdentityMeta card={card} variant="list" />
               {japaneseCard ? (
                 <p className="mt-1 text-[11px] leading-snug text-slate-400 sm:text-xs">
                   {japaneseName ? `Japanese: ${japaneseName}` : "Japanese-language card"}
@@ -144,12 +131,24 @@ export function CardMatchResult({
             <span
               className={cn(
                 "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                status.className,
-                status.glow,
+                card.catalogPending
+                  ? "border-sky-400/30 bg-sky-500/10 text-sky-200"
+                  : card.marketPending
+                    ? "border-amber-400/30 bg-amber-500/10 text-amber-200"
+                    : status.className,
+                !card.catalogPending && !card.marketPending ? status.glow : "",
               )}
             >
-              <StatusIcon className="h-3 w-3" />
-              {status.label}
+              {card.catalogPending || card.marketPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+              ) : (
+                <StatusIcon className="h-3 w-3" />
+              )}
+              {card.catalogPending
+                ? "Matching catalog"
+                : card.marketPending
+                  ? "Loading market"
+                  : status.label}
             </span>
           </div>
           <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
@@ -188,20 +187,6 @@ export function CardMatchResult({
               </span>
             ) : null}
             <span className="rounded-md bg-white/5 px-1.5 py-0.5">{card.rarity}</span>
-            {card.printVersion ? (
-              <span className="rounded-md border border-violet-500/25 bg-violet-500/12 px-1.5 py-0.5 text-violet-200/95">
-                {card.printVersion}
-              </span>
-            ) : needsPrintRunConfirm ? (
-              <span className="rounded-md border border-amber-500/30 bg-amber-500/12 px-1.5 py-0.5 text-amber-100">
-                Confirm print run
-              </span>
-            ) : null}
-            {card.printPromo && card.printPromo !== card.printVersion ? (
-              <span className="rounded-md border border-fuchsia-500/20 bg-fuchsia-500/10 px-1.5 py-0.5 text-fuchsia-200/90">
-                {card.printPromo}
-              </span>
-            ) : null}
             {card.condition ? (
               <span className="rounded-md bg-white/5 px-1.5 py-0.5">{card.condition}</span>
             ) : null}
@@ -222,6 +207,7 @@ export function CardMatchResult({
           </div>
           {card.fmvHeld ||
           card.hasSticker ||
+          card.marketPending ||
           (card.fmvUsd != null && card.fmvUsd > 0) ||
           card.soldCompCount > 0 ? (
             <div className="mt-2 space-y-2">
@@ -235,10 +221,22 @@ export function CardMatchResult({
                       : "grid-cols-1",
                 )}
               >
-                <FmvHeadlineBlock
-                  headline={buildFmvHeadlineFromCardMatch(card)}
-                  size="default"
-                />
+                {card.marketPending && card.fmvUsd == null && !card.fmvHeld ? (
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+                      FMV
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 font-mono text-base text-slate-400">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      Loading comps…
+                    </p>
+                  </div>
+                ) : (
+                  <FmvHeadlineBlock
+                    headline={buildFmvHeadlineFromCardMatch(card)}
+                    size="default"
+                  />
+                )}
 
                 {card.hasSticker ? (
                   <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2">

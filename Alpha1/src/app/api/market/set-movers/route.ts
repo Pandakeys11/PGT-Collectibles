@@ -52,5 +52,7 @@ export async function GET(req: NextRequest) {
   }
 
   const body = await ensureBuilt(setId, setName, refresh);
-  return NextResponse.json(body);
+  const res = NextResponse.json(body);
+  res.headers.set("Cache-Control", refresh ? "no-store" : "private, max-age=300");
+  return res;
 }

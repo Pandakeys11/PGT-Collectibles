@@ -4,8 +4,10 @@ import {
   pickPriceUsd,
   pickPrimaryTierRow,
   pickSpotUsd,
+  pickTierPrices,
   pickUsMomentumTierRow,
   pokeTraceTrendPct,
+  tierForLane,
   trendLabelFromPct,
   isPokeTraceAnomaly,
 } from "@/lib/market/poketrace/tiers";
@@ -50,14 +52,30 @@ function mergeTcgFromSource(
 function mergeCardMarketFromSource(
   snapshot: CatalogPriceSnapshot,
   sourceKey: PokeTracePriceSource,
-  row: { avg?: number; median7d?: number; median30d?: number },
+  row: {
+    avg?: number;
+    median7d?: number;
+    median30d?: number;
+    avg7d?: number;
+    avg30d?: number;
+  },
   cmUrl: string | null,
   observedAt: string | null,
 ): void {
   if (sourceKey !== "cardmarket" && sourceKey !== "cardmarket_unsold") return;
   const trend = pickSpotUsd(row);
-  const avg7 = typeof row.median7d === "number" ? row.median7d : null;
-  const avg30 = typeof row.median30d === "number" ? row.median30d : null;
+  const avg7 =
+    typeof row.median7d === "number"
+      ? row.median7d
+      : typeof row.avg7d === "number"
+        ? row.avg7d
+        : null;
+  const avg30 =
+    typeof row.median30d === "number"
+      ? row.median30d
+      : typeof row.avg30d === "number"
+        ? row.avg30d
+        : null;
   snapshot.cardMarket = {
     averageSellPrice: sourceKey === "cardmarket" ? trend : snapshot.cardMarket?.averageSellPrice ?? null,
     trendPrice: trend,
@@ -87,6 +105,8 @@ export function buildCatalogSnapshotFromPokeTrace(
     ? `https://www.tcgplayer.com/product/${pokeCard.refs.tcgplayerId}`
     : `https://poketrace.com/cards/${pokeCard.id}`;
 
+  const preferred = tierForLane(card);
+
   if (usMomentum?.sourceKey === "tcgplayer") {
     const priceUsd = pickPriceUsd(usMomentum.row) ?? 0;
     mergeTcgFromSource(base, "tcgplayer", usMomentum.tier, priceUsd, tcgUrl, observedAt);
@@ -96,8 +116,20 @@ export function buildCatalogSnapshotFromPokeTrace(
     mergeCardMarketFromSource(base, primary.sourceKey, primary.row, tcgUrl, observedAt);
   }
 
-  const momentumRow = usMomentum;
-  const momentumPct = momentumRow ? pokeTraceTrendPct(momentumRow.row) : null;
+  // EU Cardmarket tiers often carry 7d/30d when US lanes lack medians (modern sets).
+  const cmTier =
+    pickTierPrices(pokeCard.prices?.cardmarket, preferred)[0] ??
+    pickTierPrices(pokeCard.prices?.cardmarket_unsold, preferred)[0];
+  if (cmTier) {
+    mergeCardMarketFromSource(base, "cardmarket", cmTier.row, tcgUrl, observedAt);
+  }
+
+  let momentumRow = usMomentum;
+  let momentumPct = momentumRow ? pokeTraceTrendPct(momentumRow.row) : null;
+  if (momentumPct == null && cmTier) {
+    momentumPct = pokeTraceTrendPct(cmTier.row);
+    momentumRow = { tier: cmTier.tier, sourceKey: "cardmarket", row: cmTier.row };
+  }
   const meta: PokeTraceCatalogMeta = {
     cardId: pokeCard.id,
     syncedAt: new Date().toISOString(),

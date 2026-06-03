@@ -1,6 +1,11 @@
-/** Matches eBay search: Pokémon TCG · ending soonest · US preferred. */
-export const EBAY_ENDING_SOON_HUB_URL =
-  "https://www.ebay.com/sch/i.html?_nkw=Pokemon&_sacat=2536&_from=R40&_sop=1&rt=nc&LH_PrefLoc=2";
+import type { EbayEndingSoonFeedId } from "@/lib/market/ebay-ending-soon-feeds";
+
+export type { EbayEndingSoonFeedId } from "@/lib/market/ebay-ending-soon-feeds";
+export {
+  EBAY_ENDING_SOON_HUB_URL,
+  EBAY_ENDING_SOON_FEEDS,
+  DEFAULT_EBAY_ENDING_SOON_FEED_ID,
+} from "@/lib/market/ebay-ending-soon-feeds";
 
 export type EbayEndingSoonListing = {
   id: string;
@@ -14,6 +19,8 @@ export type EbayEndingSoonListing = {
 };
 
 export type EbayEndingSoonPayload = {
+  feedId: EbayEndingSoonFeedId;
+  feedLabel: string;
   ready: boolean;
   error?: string;
   /** Actionable fix when `ready` is false (local .env vs Vercel, etc.). */

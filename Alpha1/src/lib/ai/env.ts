@@ -45,7 +45,7 @@ export function getGeminiTextModel(): string {
 }
 
 export function getGeminiEmbeddingModel(): string {
-  return process.env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-001";
+  return process.env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-2";
 }
 
 export function getGeminiEmbeddingDimensions(): number {

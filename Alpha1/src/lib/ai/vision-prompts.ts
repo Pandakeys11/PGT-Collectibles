@@ -69,13 +69,22 @@ const PRINT_EDITION_RULES = `
   - **Other TCG** (Yu-Gi-Oh, Magic, One Piece, Lorcana): foil type, alt art, full art, secret rare, borderless, first edition, language print.
   - **Graded slabs**: copy edition/parallel from the **label** when printed (e.g. "1st Edition", "Reverse Holo", "Prizm"); if not on the label, leave printStamps empty — do not guess from art alone.
   - Combine multiple visible marks with " · " (e.g. \`1st Edition · Holo\`, \`Silver Prizm · /99\`).
+  - **Reverse Holo:** foil sparkle on the **image border** / cosmos holo treatment — write **Reverse Holo** in printStamps (Legendary Collection, e-Card era, EX, etc.).
+  - **Same-art reprint sets** — art may match an older set; use **number /N** + **set symbol** + **finish** to pick the correct set:
+    - **Legendary Collection (2002):** **/110**, LC flame symbol, reverse holo — **set** = "Legendary Collection", not Base Set /102.
+    - **Base Set 2 (2000):** **/130**, Poké Ball + **"2"** — **set** = "Base Set 2", not Base Set /102.
+    - **Evolutions (2016):** **/112**, modern XY card frame — **set** = "Evolutions", not Wizards /102.
   - If uncertain, set your best read in printStamps and note doubt in **details**.`;
 
 const POKEMON_PRINT_EDITION_RULES = `
-- Pokémon raw examples for printStamps:
-  - **1st Edition** — circular logo bottom-left of art (Wizards era).
-  - **Shadowless** — Base Set era without 1st stamp.
-  - **Unlimited** — no 1st stamp, later print run.
+- Pokémon raw — read **printStamps** from visible stamps AND art-frame cues (required for Wizards Base / Rocket / Gym / Neo):
+  - **1st Edition** — circular "Edition 1" logo **bottom-left of the art box** (Wizards era). Always write **1st Edition** in printStamps when visible.
+  - **Base Set English only — Shadowless vs Unlimited (critical):**
+    - **Shadowless:** **NO dark drop shadow** on the right/bottom edge of the yellow art frame. Copyright line often includes **"99"** (©1995-99). Write **Shadowless** in printStamps. Note in **details**: "no drop shadow on art frame" when visible.
+    - **Unlimited (shadowed):** **Distinct dark drop shadow** on the right/bottom of the art frame. Copyright often stops at **"98"**. Write **Unlimited** in printStamps. Note in **details**: "drop shadow on art frame" when visible.
+    - **1st Edition Shadowless:** has **both** the 1st stamp AND no art-box shadow — printStamps = \`1st Edition · Shadowless\` (or 1st Edition alone; catalog uses 1st Edition row).
+  - **Team Rocket / Gym / Neo:** usually **1st Edition** stamp vs **Unlimited** (no shadowless tab). Read the stamp; do not guess from art alone.
+  - **German / foreign Wizards:** preserve **language** + **printedName** (e.g. Glurak); still read 1st stamp and set symbol.
   - **Reverse Holo** / **Holo** / promo marks as visible.`;
 
 const SHARED_RULES = `
@@ -92,6 +101,12 @@ ${PRINT_EDITION_RULES}
 - Pokémon raw stamp examples:
 ${POKEMON_PRINT_EDITION_RULES}`;
 
+const BINDER_SLAB_GRID_RULES = `
+- **Graded slab table / shelf shot:** One JSON entry per **visible slab** (PSA/CGC/BGS/SGC/ACE/TAG). Read each **holder label** — not card art below.
+- **labelTitle** per slab: copy the full tag text (year · set · # · name · grade). **cert** when digits are on the front of that label.
+- **location** = center of the **slab case** (label area), not the tabletop between slabs.
+- Price stickers on cases → **extractedPrice** + **stickerNote** when legible.`;
+
 const BINDER_GRID_RULES = `
 - **Dense binder / grid / table flat-lay:** Include **every** visible trading card — do not stop early (often 12–20+ cards).
 - List cards **row-major** (left→right, top→bottom). Match the real layout (common: **4 rows × 5 columns**, **3×4**, **5×4** table shots).
@@ -101,6 +116,7 @@ const BINDER_GRID_RULES = `
 - Read **set** + **number** from **that card's face** (set symbol + collector number) — never copy from a neighbor.
 - **Every card must have set + number** when the print is legible — missing set/number is a failure mode; re-read the symbol and fraction on that card.
 - **Pokémon binder grids:** /82 = Team Rocket (Dark Pokémon); /102 = Base Set; /130 = Base Set 2; /132 = Gym Heroes or Gym Challenge — read the tens digit carefully (82 vs 102).
+- **Wizards print runs on raw binder shots:** For each card read **1st Edition stamp** (bottom-left of art) and **Base Set art-frame shadow** (shadowless = flat frame; unlimited = drop shadow). Put results in **printStamps** — never skip on Base /102 cards.
 - **Japanese** cards: set **language** to Japanese; **printedName** = visible title; **name** = English catalog name when known.
 - Mixed Wizards/Neo sets on one photo are normal — each card keeps its own set name and fraction (e.g. 62/62 Fossil vs 64/64 Jungle).`;
 
@@ -127,7 +143,9 @@ export function buildVisionPrompt(options: {
     options.compact && !useDenseFields
       ? "- Omit bbox; location [y,x] on 0-1000 is enough."
       : "- bbox is the visible card/slab rectangle on 0-1000: top, left, width, height when edges are visible.";
-  const binderBlock = options.binderGrid ? BINDER_GRID_RULES : "";
+  const binderBlock = options.binderGrid
+    ? `${BINDER_GRID_RULES}${options.gradedFocus ? BINDER_SLAB_GRID_RULES : ""}`
+    : "";
 
   if (options.singleCardCrop) {
     return `${gradedBlock}You are a multi-franchise trading-card vision extractor (TCG + sports). This image is a **tight crop of ONE card or slab**.

@@ -32,6 +32,10 @@ import {
   persistReferenceCompsBatch,
 } from "./lib/catalog-reference-comps.mjs";
 import {
+  tickRowsFromPricesJson,
+  upsertPgtUsPriceTicksBatch,
+} from "./lib/pgt-us-price-ticks.mjs";
+import {
   fetchPokemonSetCardsFromApi,
   pokemonTcgHeaders,
   priceDelayMs,
@@ -299,6 +303,7 @@ async function processSet(setMeta, state) {
 
   const upserts = [];
   const compRows = [];
+  const tickRows = [];
   let priced = 0;
   let noPrice = 0;
 
@@ -343,6 +348,7 @@ async function processSet(setMeta, state) {
     if (!skipComps) {
       compRows.push(...referenceCompsFromPricesJson(row.catalog_id, row.name, pricesJson));
     }
+    tickRows.push(...tickRowsFromPricesJson(row.catalog_id, pricesJson));
   }
 
   log(`  priced: ${priced} / ${dbCards.length} (no API price: ${noPrice})`);
@@ -362,6 +368,12 @@ async function processSet(setMeta, state) {
   if (compRows.length) {
     compsWritten = await persistReferenceCompsBatch(supabase, compRows);
     log(`  comps: ${compsWritten} reference rows`);
+  }
+
+  let ticksWritten = 0;
+  if (tickRows.length) {
+    ticksWritten = await upsertPgtUsPriceTicksBatch(supabase, tickRows);
+    log(`  ticks: ${ticksWritten} price anchors`);
   }
 
   const verify = await verifySetPriced(setId);

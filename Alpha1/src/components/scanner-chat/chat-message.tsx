@@ -6,6 +6,7 @@ import { ExpandableImageThumb, ImageLightbox } from "@/components/ui/image-light
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { CompanionController } from "@/hooks/use-companion";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import type { SlabzPack, SlabzRipRecord } from "@/lib/slabz/types";
 import type { CatalogCandidate } from "@/lib/scan/schemas";
 import type { ChatMessage, ScanSummary, SystemChatMessage } from "@/lib/scanner-chat/types";
 import { scanModeLabel } from "@/lib/scanner-chat/scan-mode-labels";
@@ -96,6 +97,7 @@ export function ChatMessageList({
   cardHandlers,
   companion,
   onCatalogScanPrefill,
+  onOpenSlabzRipInScan,
   onDismissMessage,
   digitalScanOn,
   digitalScanAssets,
@@ -106,6 +108,9 @@ export function ChatMessageList({
   onSaveDigitalScansToVault,
   onDownloadSingleDigitalScan,
   vaultSaving,
+  scanPipelineActive = false,
+  scanProgressLabel = null,
+  scanSessionKey = null,
   className,
 }: {
   messages: ChatMessage[];
@@ -114,6 +119,7 @@ export function ChatMessageList({
   cardHandlers?: CardInteractionHandlers;
   companion?: CompanionController;
   onCatalogScanPrefill?: (prefill: CatalogScanPrefill) => void;
+  onOpenSlabzRipInScan?: (rip: SlabzRipRecord, pack: SlabzPack | null) => void;
   onDismissMessage?: (messageId: string) => void;
   digitalScanOn?: boolean;
   digitalScanAssets?: import("@/lib/digital-scan/types").DigitalScanAsset[];
@@ -124,10 +130,22 @@ export function ChatMessageList({
   onSaveDigitalScansToVault?: () => void;
   onDownloadSingleDigitalScan?: (asset: import("@/lib/digital-scan/types").DigitalScanAsset) => void;
   vaultSaving?: boolean;
+  /** Vision + enrich in flight — drives evolution pipeline UI. */
+  scanPipelineActive?: boolean;
+  scanProgressLabel?: string | null;
+  scanSessionKey?: string | null;
   className?: string;
 }) {
   const systemSteps = messages.filter((m): m is SystemChatMessage => m.role === "system");
-  const showTimeline = systemSteps.length > 0 && systemSteps.some((s) => s.active || s.done);
+  const pendingScan = messages.find(
+    (m): m is Extract<ChatMessage, { role: "assistant" }> =>
+      m.role === "assistant" && m.id === "pending-result" && Boolean(m.streaming),
+  );
+  const showTimeline =
+    scanPipelineActive &&
+    (systemSteps.length > 0 || Boolean(pendingScan)) &&
+    (systemSteps.some((s) => s.active || s.done) || Boolean(pendingScan));
+  const pipelineStatusText = pendingScan?.text ?? scanProgressLabel ?? null;
 
   return (
     <div className={cn("space-y-2.5 sm:space-y-4 lg:space-y-6", className)}>
@@ -145,6 +163,7 @@ export function ChatMessageList({
               cardHandlers={cardHandlers}
               companion={companion}
               onCatalogScanPrefill={onCatalogScanPrefill}
+              onOpenSlabzRipInScan={onOpenSlabzRipInScan}
               onDismissOutput={
                 msg.output && onDismissMessage ? () => onDismissMessage(msg.id) : undefined
               }
@@ -162,13 +181,20 @@ export function ChatMessageList({
               onSaveDigitalScansToVault={onSaveDigitalScansToVault}
               onDownloadSingleDigitalScan={onDownloadSingleDigitalScan}
               vaultSaving={vaultSaving}
+              hidePipelineNarrative={showTimeline && pendingScan?.id === msg.id}
             />
           );
         }
         return null;
       })}
       {showTimeline ? (
-        <ScanProgressTimeline steps={systemSteps} className="max-w-xl" />
+        <ScanProgressTimeline
+          steps={systemSteps}
+          bootstrapping={Boolean(pendingScan) && systemSteps.length === 0}
+          statusText={pipelineStatusText}
+          scanSessionKey={scanSessionKey}
+          className="max-w-xl"
+        />
       ) : null}
     </div>
   );

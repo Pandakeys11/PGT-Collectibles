@@ -23,7 +23,7 @@ export function moversSignalSubtitle(signalKind?: MoversSignalKind): string | nu
     return "Moves below ±3% vs 30-day median — showing the largest shifts in this set.";
   }
   if (signalKind === "strong") {
-    return "7-day vs 30-day median · US TCGPlayer/eBay when PokeTrace is configured, else EU Cardmarket.";
+    return "7-day vs 30-day median · US: PokeTrace or JustTCG · EU: Cardmarket.";
   }
   return null;
 }
@@ -37,4 +37,6 @@ export type WeeklyMoversPayload = {
   momentumEuCount?: number;
   signalKind?: MoversSignalKind;
   error?: string | null;
+  /** User-facing hint when movers are empty (e.g. PokeTrace rate limit). */
+  hint?: string | null;
 };

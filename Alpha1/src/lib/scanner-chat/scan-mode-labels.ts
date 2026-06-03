@@ -2,6 +2,11 @@ import type { ScanMode } from "./types";
 
 export const SCAN_MODE_OPTIONS: { id: ScanMode; label: string; description: string }[] = [
   {
+    id: "auto",
+    label: "Liquid Scan",
+    description: "Auto-detects binder pages, slabs, and single cards — one pipeline",
+  },
+  {
     id: "fast",
     label: "Fast Scan",
     description: "Single card or photo — one vision pass, catalog + market after",
@@ -29,5 +34,6 @@ export const SCAN_MODE_OPTIONS: { id: ScanMode; label: string; description: stri
 ];
 
 export function scanModeLabel(mode: ScanMode): string {
+  if (mode === "auto") return "Liquid Scan";
   return SCAN_MODE_OPTIONS.find((o) => o.id === mode)?.label ?? mode;
 }

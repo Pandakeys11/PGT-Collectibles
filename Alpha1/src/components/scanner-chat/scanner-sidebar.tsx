@@ -18,7 +18,9 @@ import {
   Star,
   Trash2,
   Tv,
+  Gamepad2,
   Gavel,
+  Gift,
   X,
   FileImage,
 } from "lucide-react";
@@ -37,7 +39,9 @@ export type SidebarNavId =
   | "catalog"
   | "live-market"
   | "pgt-youtube"
+  | "pgt-arcade"
   | "ebay-ending"
+  | "slabz-rip"
   | "companion"
   | "history"
   | "collections"
@@ -57,6 +61,8 @@ const NAV_TOOLS: NavItem[] = [
   { id: "calculator", label: "Deal calculator", icon: Calculator },
   { id: "catalog", label: "Master catalog", icon: BookOpen },
   { id: "ebay-ending", label: "eBay ending soon", icon: Gavel },
+  { id: "slabz-rip", label: "Slabz pack rip", icon: Gift },
+  { id: "pgt-arcade", label: "PGT Arcade", icon: Gamepad2 },
   { id: "companion", label: "Companion", icon: Sparkles },
 ];
 

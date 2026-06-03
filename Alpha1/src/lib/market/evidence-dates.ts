@@ -36,3 +36,32 @@ export function sanitizeMarketEvidenceDates(item: MarketEvidence): MarketEvidenc
 export function sanitizeEvidenceList(items: MarketEvidence[]): MarketEvidence[] {
   return items.map(sanitizeMarketEvidenceDates);
 }
+
+/** Sold-comp lookback for FMV backfills (`MARKET_SOLD_LOOKBACK_DAYS`). 0 = no extra filter. */
+export function resolveSoldLookbackDays(override?: number): number {
+  if (typeof override === "number" && Number.isFinite(override) && override > 0) {
+    return Math.min(Math.floor(override), 365);
+  }
+  const env = process.env.MARKET_SOLD_LOOKBACK_DAYS?.trim();
+  const days = env ? Number(env) : NaN;
+  if (!Number.isFinite(days) || days <= 0) return 0;
+  return Math.min(Math.floor(days), 365);
+}
+
+/**
+ * Keep active/reference rows; drop dated sold comps older than the lookback window.
+ * Undated sold rows are kept (sources often omit sale day).
+ */
+export function filterSoldEvidenceByLookback(
+  items: MarketEvidence[],
+  days: number,
+): MarketEvidence[] {
+  const windowDays = Math.max(1, Math.floor(days));
+  const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+  return items.filter((item) => {
+    if (item.kind !== "sold") return true;
+    const ts = parseEvidenceDate(item.observedAt);
+    if (ts == null) return true;
+    return ts >= cutoff;
+  });
+}

@@ -15,6 +15,7 @@ import {
   buildEbayGradeHubs,
   buildEbayHubForCard,
   buildHubUrlMap,
+  mergeMarketSourceLinks,
   resolveEvidenceExternalUrl,
   type EbayGradeHub,
   type EbayGradeHubKey,
@@ -133,7 +134,10 @@ export function buildSpecimenMarketView(specimen: ScanSpecimen | null) {
     seen.add(key);
     return true;
   });
-  const hubLinks = specimen.context.marketSourceLinks ?? [];
+  const hubLinks = mergeMarketSourceLinks(
+    specimen.context.marketSourceLinks ?? [],
+    specimen.card,
+  );
   const hubMap = buildHubUrlMap(hubLinks);
   const ebayGradeHubs = buildEbayGradeHubs(specimen.card);
   const intel = analyzeMarketEvidence(evidence, {

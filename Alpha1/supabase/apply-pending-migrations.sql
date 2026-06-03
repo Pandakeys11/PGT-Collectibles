@@ -2030,3 +2030,122 @@ comment on table public.catalog_binder_owned_cards is
 
 alter table public.catalog_binder_owned_cards enable row level security;
 
+-- Refresh PostgREST schema cache (Supabase API) after DDL
+notify pgrst, 'reload schema';
+
+
+-- ========== 202606020001_catalog_art_embeddings.sql ==========
+-- Cached art embeddings for visual catalog matching (crop → vector → shortlist).
+-- Populated lazily at scan time and via scripts/backfill-catalog-art-embeddings.mjs.
+
+create table if not exists public.tcg_catalog_art_embeddings (
+  id uuid primary key default gen_random_uuid(),
+  franchise text not null,
+  catalog_id text not null,
+  model text not null default 'gemini-embedding-001',
+  dimensions integer not null default 768,
+  embedding jsonb not null,
+  image_url text,
+  synced_at timestamptz not null default now(),
+  unique (franchise, catalog_id, model)
+);
+
+create index if not exists tcg_catalog_art_embeddings_franchise_catalog_idx
+  on public.tcg_catalog_art_embeddings (franchise, catalog_id);
+
+comment on table public.tcg_catalog_art_embeddings is
+  'Gemini image embeddings for tcg_catalog_cards rows; used for art-first disambiguation';
+
+
+-- ========== 202606030001_user_slabz_partner.sql ==========
+-- Slabz Partner API — per-user Solana wallet + rip history (Clerk → app_users)
+
+create table if not exists public.user_slabz_wallets (
+  user_id uuid primary key references public.app_users(id) on delete cascade,
+  wallet_address text not null,
+  network text not null default 'devnet',
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.user_slabz_rips (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.app_users(id) on delete cascade,
+  slabz_transaction_id uuid not null,
+  pack_id text not null,
+  pack_name text,
+  status text not null default 'created',
+  wallet_address text not null,
+  price_cents integer,
+  card jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint user_slabz_rips_tx_unique unique (slabz_transaction_id)
+);
+
+create index if not exists user_slabz_rips_user_created_idx
+  on public.user_slabz_rips (user_id, created_at desc);
+
+alter table public.user_slabz_wallets enable row level security;
+alter table public.user_slabz_rips enable row level security;
+
+drop policy if exists "Service role manages user_slabz_wallets" on public.user_slabz_wallets;
+create policy "Service role manages user_slabz_wallets"
+on public.user_slabz_wallets for all
+using (true) with check (true);
+
+drop policy if exists "Service role manages user_slabz_rips" on public.user_slabz_rips;
+create policy "Service role manages user_slabz_rips"
+on public.user_slabz_rips for all
+using (true) with check (true);
+
+comment on table public.user_slabz_wallets is 'Linked Solana wallet for Slabz mystery pack rips (per Clerk user)';
+comment on table public.user_slabz_rips is 'Cached Slabz pack purchase/open history for Liquid Scan partner panel';
+
+
+-- ========== 202606030002_slabz_master_catalog.sql ==========
+insert into public.tcg_catalog_sources (id, franchise, label, api_base_url, license_notes, sync_enabled)
+values (
+  'slabz.com',
+  'sports',
+  'Slabz Partner API',
+  'https://api-docs.slabz.com/',
+  'Graded slab NFTs from mystery pack rips; SLABZ_API_KEY required',
+  true
+)
+on conflict (id) do update set
+  label = excluded.label,
+  api_base_url = excluded.api_base_url,
+  license_notes = excluded.license_notes,
+  sync_enabled = excluded.sync_enabled;
+
+create table if not exists public.pgt_slabz_assets (
+  id uuid primary key default gen_random_uuid(),
+  nft_mint text not null,
+  slabz_transaction_id uuid,
+  pack_id text,
+  name text not null,
+  category text,
+  grade text,
+  grading_company text,
+  serial_number text,
+  insured_value_cents integer,
+  image_front_url text,
+  image_back_url text,
+  catalog_id text,
+  raw_json jsonb not null default '{}'::jsonb,
+  synced_at timestamptz not null default now(),
+  constraint pgt_slabz_assets_nft_unique unique (nft_mint)
+);
+
+create index if not exists pgt_slabz_assets_pack_idx on public.pgt_slabz_assets (pack_id);
+create index if not exists pgt_slabz_assets_catalog_idx on public.pgt_slabz_assets (catalog_id);
+
+alter table public.pgt_slabz_assets enable row level security;
+
+drop policy if exists "Service role manages pgt_slabz_assets" on public.pgt_slabz_assets;
+create policy "Service role manages pgt_slabz_assets"
+on public.pgt_slabz_assets for all
+using (true) with check (true);
+
+comment on table public.pgt_slabz_assets is 'Slabz graded slab images + metadata synced from Partner API transactions';
+

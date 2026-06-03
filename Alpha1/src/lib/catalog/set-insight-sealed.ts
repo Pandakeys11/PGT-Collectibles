@@ -100,6 +100,7 @@ export function primaryTrackedLinks(links: MarketSourceLink[] | undefined): Mark
   const order: MarketSourceLink["source"][] = [
     "pricecharting",
     "ebay",
+    "oneThirtyPoint",
     "tcgplayer",
     "cardmarket",
   ];
@@ -112,5 +113,5 @@ export function primaryTrackedLinks(links: MarketSourceLink[] | undefined): Mark
       if (active) picked.push(active);
     }
   }
-  return picked.slice(0, 4);
+  return picked.slice(0, 5);
 }

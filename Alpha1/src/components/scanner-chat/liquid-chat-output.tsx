@@ -2,6 +2,8 @@
 
 import { BookOpen, Calculator, Sparkles, X } from "lucide-react";
 import { EbayEndingSoonPanel } from "@/components/scanner-chat/ebay-ending-soon-panel";
+import { SlabzRipPanel } from "@/components/scanner-chat/slabz-rip-panel";
+import { PgtArcadePartnerPanel } from "@/components/scanner-chat/pgt-arcade-partner-panel";
 import { PgtYoutubePlayerPanel } from "@/components/scanner-chat/pgt-youtube-player-panel";
 import { LiveMarketTickerPanel } from "@/components/scanner-chat/live-market-ticker-panel";
 import { CollectorVendorCalculator } from "@/components/scanner-chat/collector-vendor-calculator";
@@ -10,6 +12,7 @@ import { MasterCatalogBrowser } from "@/components/catalog/master-catalog-browse
 import type { CompanionController } from "@/hooks/use-companion";
 import { LIQUID_SCAN_PATH } from "@/lib/app-routes";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import type { SlabzPack, SlabzRipRecord } from "@/lib/slabz/types";
 import type { ChatOutputKind } from "@/lib/scanner-chat/types";
 import { cn } from "@/lib/cn";
 
@@ -17,6 +20,7 @@ export function LiquidChatOutputPanel({
   kind,
   companion,
   onCatalogScanPrefill,
+  onOpenSlabzRipInScan,
   calculatorBaseAmount = 0,
   calculatorCardCount = 0,
   onDismiss,
@@ -25,6 +29,7 @@ export function LiquidChatOutputPanel({
   kind: ChatOutputKind;
   companion?: CompanionController;
   onCatalogScanPrefill?: (prefill: CatalogScanPrefill) => void;
+  onOpenSlabzRipInScan?: (rip: SlabzRipRecord, pack: SlabzPack | null) => void;
   calculatorBaseAmount?: number;
   calculatorCardCount?: number;
   onDismiss?: () => void;
@@ -106,6 +111,36 @@ export function LiquidChatOutputPanel({
         )}
       >
         <PgtYoutubePlayerPanel onDismiss={onDismiss} />
+      </div>
+    );
+  }
+
+  if (kind === "pgt-arcade") {
+    return (
+      <div
+        className={cn(
+          "sc-pgt-arcade-embed-panel sc-assistant-wide-embed sc-chat-output-panel sc-chat-output-panel--stacked flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-indigo-500/25 sc-glass-raised",
+          className,
+        )}
+      >
+        <PgtArcadePartnerPanel onDismiss={onDismiss} />
+      </div>
+    );
+  }
+
+  if (kind === "slabz-rip") {
+    return (
+      <div
+        className={cn(
+          "sc-slabz-rip-embed-panel sc-assistant-wide-embed sc-chat-output-panel sc-chat-output-panel--stacked flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-cyan-400/25 sc-glass-raised",
+          className,
+        )}
+      >
+        <SlabzRipPanel
+          onDismiss={onDismiss}
+          onOpenRipInScan={onOpenSlabzRipInScan}
+          className="min-h-0 flex-1"
+        />
       </div>
     );
   }

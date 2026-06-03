@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useScanSession, type ScanImageSlot } from "@/hooks/use-scan-session";
-import { scanModeToLane } from "@/lib/scanner-chat/scan-mode-config";
 import {
   buildBatchScanAssistantText,
   buildScanSummaryFromSpecimens,
@@ -34,6 +33,7 @@ import { getCardDisplayTitle } from "@/lib/scan/card-display";
 import { SYSTEM_SCAN_STEPS } from "@/lib/scanner-chat/mock-data";
 import type { CatalogCandidate, ExtractedCard } from "@/lib/scan/schemas";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import type { SlabzPack, SlabzRipRecord } from "@/lib/slabz/types";
 import type {
   AssistantChatMessage,
   CardMatch,
@@ -101,9 +101,9 @@ export function useScannerChat() {
     setSpeedOn(on);
   }, []);
 
-  const scanModeRef = useRef<ScanMode>("binder");
+  const scanModeRef = useRef<ScanMode>("auto");
 
-  const [scanMode, setScanMode] = useState<ScanMode>("binder");
+  const [scanMode, setScanMode] = useState<ScanMode>("auto");
   const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
   scanModeRef.current = scanMode;
 
@@ -140,6 +140,7 @@ export function useScannerChat() {
     catalogRefreshingId,
     hydrateSavedSession,
     ingestCatalogPrefill,
+    ingestSlabzRip,
     rescanSpecimen,
     setUserEvidenceCrop,
     rescanningId,
@@ -186,7 +187,7 @@ export function useScannerChat() {
           id: DIGITAL_SCAN_HOW_TO_MESSAGE_ID,
           role: "assistant",
           createdAt: Date.now(),
-          text: buildDigitalScanHowToMarkdown(scanModeRef.current),
+          text: buildDigitalScanHowToMarkdown(),
           digitalScanHowTo: true,
         };
         return [...without, howTo];
@@ -194,21 +195,9 @@ export function useScannerChat() {
     }
   }, []);
 
-  const setScanModeAndRefreshHowTo = useCallback(
-    (mode: ScanMode) => {
-      setScanMode(mode);
-      if (digitalScanOn) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === DIGITAL_SCAN_HOW_TO_MESSAGE_ID && m.role === "assistant"
-              ? { ...m, text: buildDigitalScanHowToMarkdown(mode) }
-              : m,
-          ),
-        );
-      }
-    },
-    [digitalScanOn],
-  );
+  const setScanModeAndRefreshHowTo = useCallback((mode: ScanMode) => {
+    setScanMode(mode);
+  }, []);
 
   const selectedSpecimenId = selectedId;
   const setSelectedSpecimenId = setSelectedId;
@@ -227,10 +216,6 @@ export function useScannerChat() {
       setSelectedSpecimenId(specimens[0]!.id);
     }
   }, [specimens, selectedSpecimenId, setSelectedSpecimenId]);
-
-  useEffect(() => {
-    setLaneMode(scanModeToLane(scanMode));
-  }, [scanMode, setLaneMode]);
 
   const refreshRecentSessions = useCallback(async () => {
     setRecentLoading(true);
@@ -266,9 +251,14 @@ export function useScannerChat() {
 
   const images = useMemo(() => slotsToUploadedImages(slots), [slots]);
 
+  const scanPresent = useMemo(
+    () => ({ catalogEnriching: enriching, marketEnriching }),
+    [enriching, marketEnriching],
+  );
+
   const cards: CardMatch[] = useMemo(
-    () => specimens.map((s, i) => specimenToCardMatch(s, i)),
-    [specimens],
+    () => specimens.map((s, i) => specimenToCardMatch(s, i, scanPresent)),
+    [specimens, scanPresent],
   );
 
   const summary: ScanSummary | null = useMemo(
@@ -280,8 +270,9 @@ export function useScannerChat() {
     specimensRef.current = specimens;
   }, [specimens]);
 
-  const isScanning = scanning || enriching;
-  const isBusy = isScanning || isAsking || isGeneratingReport;
+  const isScanning = scanning;
+  const isEnriching = enriching || marketEnriching;
+  const isBusy = scanning || isEnriching || isAsking || isGeneratingReport;
 
   const syncProgressMessages = useCallback(
     (progress: string | null, scanId: string | null) => {
@@ -321,7 +312,7 @@ export function useScannerChat() {
     if (!scanning && !enriching && !marketEnriching) return;
     if (specimens.length === 0) return;
 
-    const resultCards = specimens.map((s, i) => specimenToCardMatch(s, i));
+    const resultCards = specimens.map((s, i) => specimenToCardMatch(s, i, scanPresent));
     const scanSummary = buildScanSummaryFromSpecimens(specimens);
     const statusText =
       progress ??
@@ -352,7 +343,7 @@ export function useScannerChat() {
 
   useEffect(() => {
     if (!activeScanId || finalizedScanRef.current === activeScanId) return;
-    if (scanning || enriching) return;
+    if (scanning || enriching || marketEnriching) return;
     if (specimens.length === 0 && !error) return;
 
     finalizedScanRef.current = activeScanId;
@@ -369,7 +360,7 @@ export function useScannerChat() {
     }
 
     const scanSummary = buildScanSummaryFromSpecimens(specimens);
-    const resultCards = specimens.map((s, i) => specimenToCardMatch(s, i));
+    const resultCards = specimens.map((s, i) => specimenToCardMatch(s, i, scanPresent));
     const text = buildBatchScanAssistantText(specimens, scanSummary);
 
     setMessages((prev) => {
@@ -1072,6 +1063,22 @@ export function useScannerChat() {
     );
   }, [pushChatOutput]);
 
+  const openPgtArcadeOutput = useCallback(() => {
+    pushChatOutput(
+      "pgt-arcade",
+      "Open PGT Arcade",
+      "Play **retro emulator games** in the embedded **PGT Arcade** below — sign in with your **wallet on PGTools** inside the frame to unlock the full catalog. Use **Full screen** if you prefer the standalone tab.",
+    );
+  }, [pushChatOutput]);
+
+  const openSlabzRipOutput = useCallback(() => {
+    pushChatOutput(
+      "slabz-rip",
+      "Open Slabz pack rip",
+      "Rip **graded mystery packs** powered by [Slabz](https://slabz.com) — connect Phantom on **Devnet**, pay with **USDC-DEV**, and reveal slab NFTs without leaving Liquid Scan. History syncs to your Clerk account.",
+    );
+  }, [pushChatOutput]);
+
   const loadCatalogPrefill = useCallback(
     async (prefill: CatalogScanPrefill) => {
       if (isBusy) return;
@@ -1129,6 +1136,61 @@ export function useScannerChat() {
       }
     },
     [ingestCatalogPrefill, isBusy],
+  );
+
+  const loadSlabzRipInScan = useCallback(
+    async (rip: SlabzRipRecord, pack?: SlabzPack | null) => {
+      if (isBusy) return;
+      const pendingId = "pending-slabz-load";
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "user",
+          createdAt: Date.now(),
+          text: `Open Slabz slab: ${rip.card?.name ?? rip.packName ?? "rip"}`,
+        },
+        {
+          id: pendingId,
+          role: "assistant",
+          createdAt: Date.now(),
+          text: `Loading **${rip.card?.name ?? "your slab"}** with partner identity and catalog match…`,
+          streaming: true,
+        },
+      ]);
+      setResultsDrawerOpen(true);
+      setSidebarOpen(false);
+
+      try {
+        const loaded = await ingestSlabzRip(rip, pack ?? null);
+        const scanSummary = loaded.length > 0 ? buildScanSummaryFromSpecimens(loaded) : null;
+        const resultCards = loaded.map((s, i) => specimenToCardMatch(s, i));
+        setMessages((prev) =>
+          prev
+            .filter((m) => m.id !== pendingId)
+            .concat({
+              id: uid(),
+              role: "assistant",
+              createdAt: Date.now(),
+              text: `Slabz slab loaded — identity comes from the partner API and art match, not slab-label OCR alone. Review comps in the intelligence panel.`,
+              cards: resultCards.length > 0 ? resultCards : undefined,
+              summary: scanSummary ?? undefined,
+            }),
+        );
+      } catch (err) {
+        setMessages((prev) =>
+          prev
+            .filter((m) => m.id !== pendingId)
+            .concat({
+              id: uid(),
+              role: "assistant",
+              createdAt: Date.now(),
+              text: err instanceof Error ? err.message : "Failed to load Slabz slab",
+            }),
+        );
+      }
+    },
+    [ingestSlabzRip, isBusy],
   );
 
   const loadSession = useCallback(
@@ -1194,7 +1256,6 @@ export function useScannerChat() {
     async (chip: string) => {
       const lower = chip.toLowerCase();
       if (lower.includes("binder")) {
-        setScanMode("binder");
         setPrompt("");
         setMessages((prev) => [
           ...prev,
@@ -1202,13 +1263,12 @@ export function useScannerChat() {
             id: uid(),
             role: "assistant",
             createdAt: Date.now(),
-            text: "Binder mode selected. Upload one or more page photos, then tap Start AI Scan.",
+            text: "Upload a flat binder page photo (landscape works best) and tap Scan — Liquid Scan detects the grid automatically.",
           },
         ]);
         return;
       }
       if (lower.includes("graded")) {
-        setScanMode("graded");
         setPrompt("");
         setMessages((prev) => [
           ...prev,
@@ -1216,7 +1276,7 @@ export function useScannerChat() {
             id: uid(),
             role: "assistant",
             createdAt: Date.now(),
-            text: "Graded slab mode selected. Upload slab photos and run Start AI Scan.",
+            text: "Upload slab photos with the full label visible and tap Scan — graded slabs are detected automatically.",
           },
         ]);
         return;
@@ -1260,6 +1320,22 @@ export function useScannerChat() {
         openPgtYoutubeOutput();
         return;
       }
+      if (
+        lower.includes("slabz") ||
+        lower.includes("pack rip") ||
+        lower.includes("mystery pack")
+      ) {
+        openSlabzRipOutput();
+        return;
+      }
+      if (
+        lower.includes("pgt arcade") ||
+        lower.includes("pgtools arcade") ||
+        (lower.includes("arcade") && (lower.includes("emulator") || lower.includes("pgt") || lower.includes("game")))
+      ) {
+        openPgtArcadeOutput();
+        return;
+      }
       if (lower.includes("export") && lower.includes("csv")) {
         if (specimens.length === 0) {
           setMessages((prev) => [
@@ -1292,6 +1368,8 @@ export function useScannerChat() {
       openLiveMarketOutput,
       openEbayEndingOutput,
       openPgtYoutubeOutput,
+      openPgtArcadeOutput,
+      openSlabzRipOutput,
       sendLiquidAsk,
       specimens,
     ],
@@ -1376,6 +1454,7 @@ export function useScannerChat() {
     prompt,
     setPrompt,
     isScanning,
+    isEnriching,
     isAsking,
     isGeneratingReport,
     isBusy,
@@ -1383,6 +1462,7 @@ export function useScannerChat() {
     enriching,
     marketEnriching,
     progress,
+    activeScanId,
     error,
     scanLimit,
     clearScanLimit,
@@ -1442,7 +1522,10 @@ export function useScannerChat() {
     openLiveMarketOutput,
     openEbayEndingOutput,
     openPgtYoutubeOutput,
+    openPgtArcadeOutput,
+    openSlabzRipOutput,
     loadCatalogPrefill,
+    loadSlabzRipInScan,
     rescanSpecimen,
     setUserEvidenceCrop,
     rescanningId,

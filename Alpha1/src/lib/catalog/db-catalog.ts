@@ -5,12 +5,26 @@ import {
   normalizeCatalogToken,
   scoreNameSetNumber,
 } from "@/lib/market/catalog-match-utils";
+import { mergeCatalogMatches } from "@/lib/market/catalog-candidate-merge";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { effectiveCatalogSearchName } from "@/lib/scan/card-display";
 import { parseCollectorFraction } from "@/lib/scan/collector-fraction";
 import type { CardFranchise } from "@/lib/scan/franchise";
+import {
+  applyCatalogIdentityHardening,
+  detectSameArtCatalogCollision,
+  needsVariantAwareCatalogSearch,
+  reprintSetCodesForSearch,
+  requestedCatalogVariantFromCard,
+  scoreSameArtCatalogRow,
+} from "@/lib/scan/same-art-disambiguation";
+import {
+  detectVintagePrintCatalogCollision,
+  scoreVintagePrintCatalogRow,
+  vintagePrintRunSetCodesForSearch,
+} from "@/lib/scan/vintage-print-run";
 import { toCatalogCounterpartCard } from "@/lib/scan/japanese-pokemon";
-import { resolvePrintEdition, type PrintEditionId } from "@/lib/scan/print-edition";
+import { resolvePrintEdition } from "@/lib/scan/print-edition";
 import type { ExtractedCard, IdentityEvidence } from "@/lib/scan/schemas";
 
 type DbCatalogRow = {
@@ -44,13 +58,10 @@ function looksLikeSetCode(raw: string): boolean {
   return /^[a-z0-9-]+$/i.test(s);
 }
 
-function requestedCatalogVariantKey(card: Pick<ExtractedCard, "printStamps" | "details">): string | null {
-  const printEdition = resolvePrintEdition(card);
-  if (
-    printEdition &&
-    ["reverse_holo", "unlimited", "first_edition", "shadowless"].includes(printEdition.id)
-  ) {
-    return printEdition.id;
+function requestedCatalogVariantKey(card: Pick<ExtractedCard, "printStamps" | "details" | "rarity" | "set">): string | null {
+  const id = requestedCatalogVariantFromCard(card);
+  if (id && ["reverse_holo", "unlimited", "first_edition", "shadowless"].includes(id)) {
+    return id;
   }
   return null;
 }
@@ -60,7 +71,7 @@ export async function searchDbCatalog(
   franchise: CardFranchise,
 ): Promise<CatalogMatch | null> {
   if (!isSupabaseConfigured()) return null;
-  const catalogCard = toCatalogCounterpartCard(card);
+  const catalogCard = applyCatalogIdentityHardening(toCatalogCounterpartCard(card));
   const name = effectiveCatalogSearchName(catalogCard);
   if (!name) return null;
 
@@ -156,6 +167,40 @@ export async function searchDbCatalog(
     }
   }
 
+  if (needsVariantAwareCatalogSearch(catalogCard) && numberNeedle) {
+    const numberEsc = escapeIlike(numberNeedle);
+    for (const setCode of reprintSetCodesForSearch(catalogCard)) {
+      const { data, error } = await supabase
+        .from("tcg_catalog_cards")
+        .select(
+          "catalog_id,name,printed_name,set_name,set_code,card_number,year,rarity,image_small_url,image_large_url,prices_json,raw_json",
+        )
+        .eq("franchise", franchise)
+        .eq("set_code", setCode)
+        .ilike("name", `%${nameEsc}%`)
+        .ilike("card_number", `${numberEsc}%`)
+        .limit(12);
+      if (!error && data?.length) {
+        return rowsToMatch(catalogCard, franchise, data as DbCatalogRow[], searchBlob);
+      }
+    }
+    if (variantKey === "reverse_holo") {
+      const { data, error } = await supabase
+        .from("tcg_catalog_cards")
+        .select(
+          "catalog_id,name,printed_name,set_name,set_code,card_number,year,rarity,image_small_url,image_large_url,prices_json,raw_json",
+        )
+        .eq("franchise", franchise)
+        .eq("raw_json->>catalogVariantKey", "reverse_holo")
+        .ilike("name", `%${nameEsc}%`)
+        .ilike("card_number", `${numberEsc}%`)
+        .limit(12);
+      if (!error && data?.length) {
+        return rowsToMatch(catalogCard, franchise, data as DbCatalogRow[], searchBlob);
+      }
+    }
+  }
+
   const tsQuery = searchBlob
     .split(" ")
     .filter((t) => t.length > 2)
@@ -167,6 +212,11 @@ export async function searchDbCatalog(
   if (fallback.error || !fallback.data?.length) return null;
   return rowsToMatch(catalogCard, franchise, fallback.data as DbCatalogRow[], searchBlob);
 }
+
+/** Official printed denominators when API `card_count` differs (e.g. Team Rocket /82 vs 83 rows). */
+const PRINTED_TOTAL_BY_SET_CODE: Record<string, number> = {
+  base5: 82,
+};
 
 async function hydrateSetTotals(
   franchise: CardFranchise,
@@ -195,7 +245,9 @@ async function hydrateSetTotals(
 
   return rows.map((row) => ({
     ...row,
-    set_total: row.set_code ? totals.get(row.set_code) ?? null : null,
+    set_total: row.set_code
+      ? PRINTED_TOTAL_BY_SET_CODE[row.set_code] ?? totals.get(row.set_code) ?? null
+      : null,
   }));
 }
 
@@ -229,22 +281,6 @@ function rowCatalogVariantLabel(row: DbCatalogRow): string | null {
   return typeof label === "string" && label.trim() ? label.trim() : null;
 }
 
-function editionMatchesVariant(edition: PrintEditionId, variantKey: string | null): boolean {
-  if (!variantKey) return false;
-  if (edition === "holo") return variantKey === "holo" || variantKey === "rare_holo";
-  return edition === variantKey;
-}
-
-function editionConflictsVariant(edition: PrintEditionId, variantKey: string | null): boolean {
-  if (!variantKey || edition === "unknown") return false;
-  if (edition === "holo") return variantKey === "reverse_holo";
-  if (edition === "reverse_holo") return variantKey !== "reverse_holo";
-  if (edition === "unlimited") return variantKey === "first_edition" || variantKey === "shadowless";
-  if (edition === "first_edition") return variantKey === "unlimited" || variantKey === "shadowless";
-  if (edition === "shadowless") return variantKey === "unlimited" || variantKey === "first_edition";
-  return false;
-}
-
 function hardCatalogConflictCount(row: { conflicts: string[] }): number {
   return row.conflicts.filter((conflict) => /^(name|number|print_variant)$/i.test(conflict)).length;
 }
@@ -264,6 +300,23 @@ function hasReason(row: { reasons: string[] } | undefined, reason: string): bool
   return Boolean(row?.reasons.includes(reason));
 }
 
+/** Adjacent collector numbers in the same set are distinct cards (Neo Typhlosion 17 vs 18). */
+function collectorNumeratorsAllowOcrCorrection(
+  cardNumber: string | undefined,
+  hitNumber: string | undefined,
+): boolean {
+  const cardFrac = parseCollectorFraction(cardNumber);
+  const hitFrac = parseCollectorFraction(hitNumber);
+  if (!cardFrac || !hitFrac) return false;
+  if (cardFrac.den !== hitFrac.den) return false;
+  if (cardFrac.num === hitFrac.num) return true;
+  const a = Number(cardFrac.num);
+  const b = Number(hitFrac.num);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  if (Math.abs(a - b) === 1) return false;
+  return true;
+}
+
 function removeConflict(conflicts: string[], conflict: string): void {
   const index = conflicts.indexOf(conflict);
   if (index >= 0) conflicts.splice(index, 1);
@@ -272,6 +325,9 @@ function removeConflict(conflicts: string[], conflict: string): void {
 function catalogSetKey(value: string | null | undefined): string {
   const normalized = normalizeCatalogToken(value);
   if (normalized === "base") return "base set";
+  if (normalized === "legendary collection" || normalized === "legendary coll") {
+    return "legendary collection";
+  }
   return normalized;
 }
 
@@ -314,26 +370,51 @@ async function rowsToMatch(
       if (!conflicts.includes("set")) conflicts.push("set");
     }
 
-    const variantKey = rowCatalogVariantKey(row);
-    if (printEdition && printEdition.id !== "unknown") {
-      if (editionMatchesVariant(printEdition.id, variantKey)) {
-        score += 24;
-        reasons.push("print_variant");
-      } else if (editionConflictsVariant(printEdition.id, variantKey)) {
-        score -= 35;
-        conflicts.push("print_variant");
-      } else if (variantKey) {
-        score -= 8;
-      } else if (["reverse_holo", "unlimited", "first_edition", "shadowless"].includes(printEdition.id)) {
-        score -= 8;
-        reasons.push("base_print_fallback");
-      }
+    const sameArt = scoreSameArtCatalogRow(
+      card,
+      {
+        setName: hitSetName,
+        setCode: row.set_code,
+        setTotal: row.set_total ?? null,
+        variantKey: rowCatalogVariantKey(row),
+      },
+      printEdition ?? null,
+    );
+    score += sameArt.scoreDelta;
+    for (const reason of sameArt.reasons) {
+      if (!reasons.includes(reason)) reasons.push(reason);
     }
+    for (const conflict of sameArt.conflicts) {
+      if (!conflicts.includes(conflict)) conflicts.push(conflict);
+    }
+
+    const vintagePrint = scoreVintagePrintCatalogRow(
+      card,
+      { catalogId: row.catalog_id, variantKey: rowCatalogVariantKey(row) },
+      printEdition ?? null,
+    );
+    score += vintagePrint.scoreDelta;
+    for (const reason of vintagePrint.reasons) {
+      if (!reasons.includes(reason)) reasons.push(reason);
+    }
+    for (const conflict of vintagePrint.conflicts) {
+      if (!conflicts.includes(conflict)) conflicts.push(conflict);
+    }
+
+    if (vintagePrint.reasons.includes("print_variant")) {
+      removeConflict(conflicts, "print_variant");
+    }
+
     if (frac && row.set_total === frac.den) {
       score += 28;
       reasons.push("denominator");
       removeConflict(conflicts, "set");
-      if (exactName && exactSet && conflicts.includes("number")) {
+      if (
+        exactName &&
+        exactSet &&
+        conflicts.includes("number") &&
+        collectorNumeratorsAllowOcrCorrection(card.number, cardNumber)
+      ) {
         score += 30;
         reasons.push("number_ocr_corrected");
         removeConflict(conflicts, "number");
@@ -415,13 +496,47 @@ async function rowsToMatch(
   const match = buildCatalogMatch(sorted, evidence, matchBasis);
   if (!match || !top) return match;
 
+  if (detectSameArtCatalogCollision(top, runnerUp)) {
+    return {
+      ...match,
+      catalogIdentityStatus: "ambiguous",
+      catalogConfidence: top.confidence,
+      score: top.score,
+    };
+  }
+
+  if (detectVintagePrintCatalogCollision(card, top, runnerUp)) {
+    return {
+      ...match,
+      catalogIdentityStatus: "ambiguous",
+      catalogConfidence: top.confidence,
+      score: top.score,
+    };
+  }
+
+  const requiresPrintVariant = Boolean(requestedCatalogVariantKey(card));
+  if (requiresPrintVariant && !variantOk) {
+    return {
+      ...match,
+      catalogIdentityStatus: "ambiguous",
+      catalogConfidence: top.confidence,
+      score: top.score,
+    };
+  }
+
+  const vintageSingleVariantHit =
+    requiresPrintVariant &&
+    sorted.length === 1 &&
+    variantOk &&
+    topHardConflicts === 0;
+
   if (
     nameOk &&
     numOk &&
     topHardConflicts === 0 &&
     (denomOk || variantOk || setOk) &&
     top.score >= 82 &&
-    gap >= 8
+    (gap >= 8 || vintageSingleVariantHit)
   ) {
     return {
       ...match,
@@ -444,7 +559,7 @@ export async function searchDbCatalogBroad(
   franchise: CardFranchise,
 ): Promise<CatalogMatch | null> {
   if (!isSupabaseConfigured()) return null;
-  const catalogCard = toCatalogCounterpartCard(card);
+  const catalogCard = applyCatalogIdentityHardening(toCatalogCounterpartCard(card));
   const name = effectiveCatalogSearchName(catalogCard);
   if (!name) return null;
 
@@ -530,6 +645,36 @@ export async function searchDbCatalogBroad(
     }
   }
 
+  for (const setCode of [
+    ...reprintSetCodesForSearch(catalogCard),
+    ...vintagePrintRunSetCodesForSearch(catalogCard),
+  ]) {
+    if (!numberNeedle) continue;
+    absorb(
+      (await supabase
+        .from("tcg_catalog_cards")
+        .select(selectCols)
+        .eq("franchise", franchise)
+        .eq("set_code", setCode)
+        .ilike("name", `%${nameEsc}%`)
+        .ilike("card_number", `${escapeIlike(numberNeedle)}%`)
+        .limit(12)).data as DbCatalogRow[],
+    );
+  }
+
+  if (needsVariantAwareCatalogSearch(catalogCard) && numberNeedle && !variantKey) {
+    absorb(
+      (await supabase
+        .from("tcg_catalog_cards")
+        .select(selectCols)
+        .eq("franchise", franchise)
+        .eq("raw_json->>catalogVariantKey", "reverse_holo")
+        .ilike("name", `%${nameEsc}%`)
+        .ilike("card_number", `${escapeIlike(numberNeedle)}%`)
+        .limit(12)).data as DbCatalogRow[],
+    );
+  }
+
   if (seen.size < 8) {
     const tsQuery = searchBlob
       .split(" ")
@@ -546,6 +691,130 @@ export async function searchDbCatalogBroad(
 
   if (seen.size === 0) return null;
   return rowsToMatch(catalogCard, franchise, [...seen.values()], searchBlob);
+}
+
+const DB_CATALOG_SELECT_COLS =
+  "catalog_id,name,printed_name,set_name,set_code,card_number,year,rarity,image_small_url,image_large_url,prices_json,raw_json";
+
+function isExactSameNameCatalogRow(row: DbCatalogRow, normalizedTarget: string): boolean {
+  return (
+    normalizeCatalogToken(row.name) === normalizedTarget ||
+    normalizeCatalogToken(row.printed_name) === normalizedTarget
+  );
+}
+
+/** Fetch catalog rows sharing the extracted card name — for pick UI when art/number collide (e.g. Neo Typhlosion 17 vs 18). */
+async function fetchSameNameCatalogRows(
+  card: ExtractedCard,
+  franchise: CardFranchise,
+  skipIds: ReadonlySet<string>,
+): Promise<DbCatalogRow[]> {
+  if (!isSupabaseConfigured()) return [];
+  const name = effectiveCatalogSearchName(card);
+  if (!name || name.length < 2) return [];
+
+  const normalizedTarget = normalizeCatalogToken(name);
+  const supabase = getSupabaseAdmin();
+  const nameEsc = escapeIlike(name.slice(0, 48));
+  const found: DbCatalogRow[] = [];
+  const seen = new Set(skipIds);
+
+  const absorb = (rows: DbCatalogRow[] | null | undefined) => {
+    for (const row of rows ?? []) {
+      const id = row.catalog_id?.trim();
+      if (!id || seen.has(id)) continue;
+      if (!isExactSameNameCatalogRow(row, normalizedTarget)) continue;
+      seen.add(id);
+      found.push(row);
+    }
+  };
+
+  const setNeedle = asTrimmed(card.set);
+  if (setNeedle) {
+    const setEsc = escapeIlike(setNeedle.slice(0, 64));
+    const { data } = await supabase
+      .from("tcg_catalog_cards")
+      .select(DB_CATALOG_SELECT_COLS)
+      .eq("franchise", franchise)
+      .ilike("name", `%${nameEsc}%`)
+      .ilike("set_name", `%${setEsc}%`)
+      .limit(32);
+    absorb(data as DbCatalogRow[]);
+  }
+
+  const { data: broad } = await supabase
+    .from("tcg_catalog_cards")
+    .select(DB_CATALOG_SELECT_COLS)
+    .eq("franchise", franchise)
+    .ilike("name", `%${nameEsc}%`)
+    .limit(48);
+  absorb(broad as DbCatalogRow[]);
+
+  return found;
+}
+
+/**
+ * Merge every same-name master-catalog row into pick options — even when the auto-match
+ * score is below confirmation threshold (duplicate names in one set, same-art reprints).
+ */
+export async function supplementCatalogMatchSameNameVariants(
+  card: ExtractedCard,
+  franchise: CardFranchise,
+  match: CatalogMatch | null,
+): Promise<CatalogMatch | null> {
+  if (!isSupabaseConfigured()) return match;
+
+  const catalogCard = applyCatalogIdentityHardening(toCatalogCounterpartCard(card));
+  const skipIds = new Set(match?.candidates.map((row) => row.catalogId) ?? []);
+  const extraRows = await fetchSameNameCatalogRows(catalogCard, franchise, skipIds);
+  if (extraRows.length === 0) return match;
+
+  const searchBlob = buildCatalogSearchText([
+    effectiveCatalogSearchName(catalogCard),
+    catalogCard.printedName,
+    catalogCard.set,
+    catalogCard.number,
+    parseCollectorFraction(catalogCard.number)?.num,
+    catalogCard.year,
+  ]);
+
+  const extraMatch = await rowsToMatch(catalogCard, franchise, extraRows, searchBlob);
+  if (!extraMatch) return match;
+  const merged = mergeCatalogMatches(match, extraMatch);
+  if (!match?.candidates[0]) return merged;
+
+  const primaryTop = match.candidates[0];
+  const keepPrimaryTop =
+    match.catalogIdentityStatus === "confirmed" &&
+    primaryTop.reasons.includes("number") &&
+    !primaryTop.conflicts.includes("number");
+
+  if (!keepPrimaryTop || !merged) return merged;
+
+  const primaryId = primaryTop.catalogId;
+  const reordered = [
+    merged.candidates.find((row) => row.catalogId === primaryId),
+    ...merged.candidates.filter((row) => row.catalogId !== primaryId),
+  ].filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+  const pinned = reordered[0];
+  if (!pinned) return merged;
+
+  return {
+    ...merged,
+    catalogId: pinned.catalogId,
+    name: pinned.name,
+    setName: pinned.setName,
+    cardNumber: pinned.cardNumber,
+    year: pinned.year,
+    rarity: pinned.rarity,
+    imageSmallUrl: pinned.imageSmallUrl,
+    imageLargeUrl: pinned.imageLargeUrl,
+    imageUrl: pinned.imageLargeUrl ?? pinned.imageSmallUrl ?? merged.imageUrl,
+    score: pinned.score,
+    catalogConfidence: pinned.confidence,
+    candidates: reordered,
+  };
 }
 
 export type CatalogCardUpsert = {

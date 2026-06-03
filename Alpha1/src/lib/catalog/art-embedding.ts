@@ -15,6 +15,8 @@ const ALLOWED_IMAGE_HOSTS = new Set([
   "tcgplayer-cdn.tcgplayer.com",
   "assets.tcgdex.net",
   "assets.pokemon.com",
+  "cards.scryfall.io",
+  "images.ygoprodeck.com",
 ]);
 
 function hostAllowed(hostname: string): boolean {
@@ -87,10 +89,29 @@ export async function fetchCatalogImageBase64(
   }
 }
 
+function buildEmbedParts(args: {
+  base64: string;
+  mimeType: string;
+  textLabel?: string | null;
+}): Array<{ text?: string; inline_data?: { mime_type: string; data: string } }> {
+  const parts: Array<{ text?: string; inline_data?: { mime_type: string; data: string } }> = [];
+  const label = args.textLabel?.trim();
+  if (label) parts.push({ text: label });
+  parts.push({
+    inline_data: {
+      mime_type: args.mimeType,
+      data: args.base64,
+    },
+  });
+  return parts;
+}
+
 export async function embedArtImage(args: {
   base64: string;
   mimeType: string;
   task: ArtEmbeddingTask;
+  /** Card identity hint — required for gemini-embedding-001; improves embedding-2 quality. */
+  textLabel?: string | null;
 }): Promise<number[] | null> {
   if (!isArtMatchEnabled()) return null;
   const key = getGeminiApiKey();
@@ -112,14 +133,7 @@ export async function embedArtImage(args: {
         body: JSON.stringify({
           model: `models/${model}`,
           content: {
-            parts: [
-              {
-                inline_data: {
-                  mime_type: args.mimeType,
-                  data: args.base64,
-                },
-              },
-            ],
+            parts: buildEmbedParts(args),
           },
           taskType,
           outputDimensionality: dimensions,

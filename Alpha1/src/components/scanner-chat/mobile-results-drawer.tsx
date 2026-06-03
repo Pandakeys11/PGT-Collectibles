@@ -19,6 +19,7 @@ import type { CatalogCandidate } from "@/lib/scan/schemas";
 import type { CardMatch, ScanSummary } from "@/lib/scanner-chat/types";
 import { ExtractedCardsCarousel } from "./extracted-cards-carousel";
 import { ScanResultsSheet } from "./scan-results-sheet";
+import type { MarketIntelIdleAction } from "./market-intelligence-idle-showcase";
 import { ScanIntelligencePanel } from "./scan-intelligence-panel";
 import type { CardInteractionHandlers } from "./chat-message";
 import { cn } from "@/lib/cn";
@@ -152,6 +153,7 @@ export function MobileResultsDrawer({
   rescanningId,
   isPro,
   onOpenMasterCatalog,
+  onIdleAction,
   digitalScanAsset = null,
   onDownloadDigitalScan,
 }: {
@@ -184,7 +186,8 @@ export function MobileResultsDrawer({
   onRescanSpecimen?: () => void;
   rescanningId?: string | null;
   isPro?: boolean;
-  onOpenMasterCatalog?: () => void;
+  onOpenMasterCatalog?: (specimenId: string) => void;
+  onIdleAction?: (action: MarketIntelIdleAction) => void;
   digitalScanAsset?: import("@/lib/digital-scan/types").DigitalScanAsset | null;
   onDownloadDigitalScan?: () => void;
 }) {
@@ -376,6 +379,7 @@ export function MobileResultsDrawer({
                   compsSectionRef={compsSectionRef}
                   isPro={isPro}
                   onOpenMasterCatalog={onOpenMasterCatalog}
+                  onIdleAction={onIdleAction}
                   digitalScanAsset={digitalScanAsset}
                   onDownloadDigitalScan={onDownloadDigitalScan}
                   className="sc-mobile-drawer-intel min-h-0 border-0 bg-transparent shadow-none"

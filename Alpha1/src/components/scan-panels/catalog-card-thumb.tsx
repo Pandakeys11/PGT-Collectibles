@@ -11,6 +11,8 @@ type Props = {
   specimenId: string;
   card: ExtractedCard;
   catalogImageUrl?: string | null;
+  /** Vision crop shown until catalog art resolves. */
+  previewUrl?: string | null;
   className?: string;
 };
 
@@ -23,14 +25,22 @@ function isPlaceholderIdentity(card: ExtractedCard): boolean {
   return false;
 }
 
-export function CatalogCardThumb({ specimenId, card, catalogImageUrl, className }: Props) {
-  const [url, setUrl] = useState<string | null>(catalogImageUrl?.trim() || null);
+export function CatalogCardThumb({
+  specimenId,
+  card,
+  catalogImageUrl,
+  previewUrl,
+  className,
+}: Props) {
+  const [url, setUrl] = useState<string | null>(
+    catalogImageUrl?.trim() || previewUrl?.trim() || null,
+  );
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     setFailed(false);
-    setUrl(catalogImageUrl?.trim() || null);
-  }, [catalogImageUrl, specimenId]);
+    setUrl(catalogImageUrl?.trim() || previewUrl?.trim() || null);
+  }, [catalogImageUrl, previewUrl, specimenId]);
 
   useEffect(() => {
     if (url) return;
@@ -54,12 +64,12 @@ export function CatalogCardThumb({ specimenId, card, catalogImageUrl, className 
           if (typeof u === "string" && u.trim()) setUrl(u.trim());
         })
         .catch(() => {});
-    }, catalogImageUrl ? 0 : 180);
+    }, catalogImageUrl ? 0 : 60);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [url, card, specimenId, catalogImageUrl]);
+  }, [url, card, specimenId, catalogImageUrl, previewUrl]);
 
   const frame = cn(
     "pointer-events-none flex h-11 w-[2.125rem] shrink-0 select-none items-center justify-center overflow-hidden rounded-md border border-border-subtle bg-panel-raised/90 sm:h-12 sm:w-9",

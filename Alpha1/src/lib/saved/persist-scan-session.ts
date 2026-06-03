@@ -173,6 +173,40 @@ export async function clearAllSessionsForUser(
   return ids.length;
 }
 
+export async function appendSessionSpecimens(
+  supabase: SupabaseClient,
+  args: {
+    userId: string;
+    sessionId: string;
+    specimens: SessionSpecimenInput[];
+  },
+): Promise<{ savedCount: number; specimenCount: number }> {
+  const { data: session, error: sessionError } = await supabase
+    .from("scan_sessions")
+    .select("specimen_count")
+    .eq("id", args.sessionId)
+    .eq("user_id", args.userId)
+    .maybeSingle();
+  if (sessionError) throw new Error(sessionError.message);
+  if (!session) throw new Error("Session not found");
+
+  const { savedCount } = await persistSessionSpecimens(supabase, {
+    userId: args.userId,
+    sessionId: args.sessionId,
+    specimens: args.specimens,
+  });
+
+  const specimenCount = (session.specimen_count ?? 0) + savedCount;
+  const { error: updateError } = await supabase
+    .from("scan_sessions")
+    .update({ specimen_count: specimenCount, updated_at: new Date().toISOString() })
+    .eq("id", args.sessionId)
+    .eq("user_id", args.userId);
+  if (updateError) throw new Error(updateError.message);
+
+  return { savedCount, specimenCount };
+}
+
 export async function replaceSessionSpecimens(
   supabase: SupabaseClient,
   args: {

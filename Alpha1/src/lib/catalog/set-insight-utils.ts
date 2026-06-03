@@ -5,6 +5,7 @@ import {
   resolveCatalogMomentum,
   resolvedCatalogMomentumPct,
 } from "@/lib/market/catalog-momentum";
+import { cardmarketMomentumPct7dVs30d } from "@/lib/market/cardmarket-eur";
 import { primaryTcgPlayerFromSnapshot } from "@/lib/market/catalog-raw-fmv";
 import { resolveCatalogRawFmv } from "@/lib/market/catalog-raw-fmv";
 import type { TcgCardSetEmbed, TcgCardSummary } from "@/lib/pokedex/tcg-api-types";
@@ -168,6 +169,52 @@ export function cardInsightPriceLabel(
   return fmv.sourceLabel;
 }
 
+function snapshotNeedsCardmarketMomentum(existing: CatalogPriceSnapshot): boolean {
+  if (resolvedCatalogMomentumPct(existing) != null) return false;
+  const cm = existing.cardMarket;
+  if (cm && cardmarketMomentumPct7dVs30d(cm) != null) return false;
+  return true;
+}
+
+function mergeLiveIntoSnapshot(
+  existing: CatalogPriceSnapshot,
+  live: CatalogPriceSnapshot,
+): CatalogPriceSnapshot {
+  const cm = live.cardMarket;
+  const hasCmMomentum =
+    cm != null && cm.avg7 != null && cm.avg30 != null && cm.avg30 > 0;
+  return {
+    ...existing,
+    tcgPlayerUrl: existing.tcgPlayerUrl ?? live.tcgPlayerUrl,
+    tcgPlayerUpdatedAt: existing.tcgPlayerUpdatedAt ?? live.tcgPlayerUpdatedAt,
+    tcgPlayerPrices:
+      existing.tcgPlayerPrices.length > 0 ? existing.tcgPlayerPrices : live.tcgPlayerPrices,
+    cardMarketUrl: existing.cardMarketUrl ?? live.cardMarketUrl,
+    cardMarketUpdatedAt: existing.cardMarketUpdatedAt ?? live.cardMarketUpdatedAt,
+    cardMarket: hasCmMomentum
+      ? {
+          averageSellPrice: cm.averageSellPrice ?? existing.cardMarket?.averageSellPrice ?? null,
+          trendPrice: cm.trendPrice ?? existing.cardMarket?.trendPrice ?? null,
+          lowPrice: cm.lowPrice ?? existing.cardMarket?.lowPrice ?? null,
+          avg7: cm.avg7 ?? null,
+          avg30: cm.avg30 ?? null,
+          reverseHoloTrend:
+            cm.reverseHoloTrend ?? existing.cardMarket?.reverseHoloTrend ?? null,
+        }
+      : existing.cardMarket,
+  };
+}
+
+/** Share of cards with any 7d/30d momentum signal (US or EU). */
+export function setMomentumCoverage(cards: SetInsightCardSource[]): number {
+  if (!cards.length) return 0;
+  let n = 0;
+  for (const card of cards) {
+    if (resolvedCatalogMomentumPct(pricesForInsightCard(card)) != null) n += 1;
+  }
+  return n / cards.length;
+}
+
 /** Fill missing TCGPlayer/Cardmarket snapshots from live Pokémon TCG API rows. */
 export function enrichCardsWithLiveTcgPrices(
   catalogCards: SetInsightCardSource[],
@@ -188,9 +235,11 @@ export function enrichCardsWithLiveTcgPrices(
       "catalogFinish" in card && card.catalogFinish === "reverse_holo"
         ? "reverse_holo"
         : undefined;
-    if (primaryTcgPlayerFromSnapshot(existing, { catalogFinish: finish, rarity: card.rarity }) != null) {
-      return card;
-    }
+    const hasTcg = primaryTcgPlayerFromSnapshot(existing, {
+      catalogFinish: finish,
+      rarity: card.rarity,
+    }) != null;
+    const needsCm = snapshotNeedsCardmarketMomentum(existing);
 
     const apiId =
       ("sourceCatalogId" in card && card.sourceCatalogId?.trim()) ||
@@ -204,7 +253,13 @@ export function enrichCardsWithLiveTcgPrices(
       byKey.get(normalizeInsightKey(card.name, card.number ?? null));
     if (!hit) return card;
 
-    const mergedPrices = priceSnapshotFromTcgCard(hit);
+    const liveSnap = priceSnapshotFromTcgCard(hit);
+    const mergedPrices = hasTcg && needsCm
+      ? mergeLiveIntoSnapshot(existing, liveSnap)
+      : liveSnap;
+
+    if (hasTcg && !needsCm) return card;
+
     if ("prices" in card) {
       return { ...card, prices: mergedPrices } satisfies CatalogCardSummary;
     }
@@ -218,6 +273,7 @@ export function enrichCardsWithLiveTcgPrices(
       catalogVariantLabel:
         "catalogVariantLabel" in card ? card.catalogVariantLabel : hit.catalogVariantLabel,
       sourceCatalogId: apiId ?? hit.id,
+      catalogPrices: mergedPrices,
     } satisfies TcgCardSummary;
   });
 }

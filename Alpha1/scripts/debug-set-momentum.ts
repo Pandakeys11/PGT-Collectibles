@@ -2,68 +2,98 @@
  * Server-side momentum audit for a set.
  * npx tsx scripts/debug-set-momentum.ts me2
  */
-import { config } from "dotenv";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-config({ path: resolve(process.cwd(), ".env.local") });
-config({ path: resolve(process.cwd(), ".env") });
+for (const name of [".env.local", ".env"]) {
+  const p = resolve(process.cwd(), name);
+  if (!existsSync(p)) continue;
+  for (const line of readFileSync(p, "utf8").split("\n")) {
+    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (!m || process.env[m[1]]) continue;
+    process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+  }
+}
 
 async function main() {
   const setId = process.argv[2]?.trim() || "me2";
   const { loadSetCardsForCatalogInsight } = await import(
     "../src/lib/catalog/build-catalog-set-insight"
   );
-  const { hydrateSetUsMomentum } = await import("../src/lib/market/hydrate-catalog-momentum");
-  const { cardInsightRow, pricesForInsightCard } = await import(
+  const { hydrateSetMomentum } = await import("../src/lib/market/hydrate-catalog-momentum");
+  const { isJustTcgConfigured } = await import("../src/lib/market/env-market");
+  const { cardInsightRow, pricesForInsightCard, setMomentumCoverage } = await import(
     "../src/lib/catalog/set-insight-utils"
   );
   const { resolveCatalogMomentum } = await import("../src/lib/market/catalog-momentum");
   const { isPokeTraceConfigured } = await import("../src/lib/market/env-market");
+  const { buildSetMovers } = await import("../src/lib/market/build-weekly-movers");
 
   console.log("setId:", setId);
   console.log("PokeTrace configured:", isPokeTraceConfigured());
+  console.log("JustTCG configured:", isJustTcgConfigured());
 
-  let { cards } = await loadSetCardsForCatalogInsight(setId);
-  console.log("cards loaded:", cards.length);
+  let { cards, tcgCards } = await loadSetCardsForCatalogInsight(setId);
+  console.log("cards:", cards.length, "live tcg rows:", tcgCards.length);
+  console.log("momentum coverage:", (setMomentumCoverage(cards) * 100).toFixed(1) + "%");
 
-  let us = 0;
-  let eu = 0;
-  let none = 0;
-  const sampleNone: string[] = [];
-  for (const c of cards) {
-    const mom = resolveCatalogMomentum(pricesForInsightCard(c));
-    if (mom.region === "us") us += 1;
-    else if (mom.region === "eu") eu += 1;
-    else {
-      none += 1;
-      if (sampleNone.length < 5) sampleNone.push(c.name);
-    }
+  const top = [...cards]
+    .map((c) => cardInsightRow(c))
+    .filter((r) => r.priceUsd != null)
+    .sort((a, b) => (b.priceUsd ?? 0) - (a.priceUsd ?? 0))
+    .slice(0, 3);
+  for (const row of top) {
+    const card = cards.find((c) => c.id === row.catalogId)!;
+    const snap = pricesForInsightCard(card);
+    const mom = resolveCatalogMomentum(snap);
+    console.log(
+      " top:",
+      row.name,
+      "| cm avg7/30:",
+      snap.cardMarket?.avg7,
+      snap.cardMarket?.avg30,
+      "| poke:",
+      snap.pokeTrace?.momentumPct,
+      "| mom:",
+      mom.pct,
+      mom.region,
+    );
   }
-  console.log("BEFORE hydrate — US:", us, "EU:", eu, "none:", none, "samples:", sampleNone);
 
-  cards = await hydrateSetUsMomentum(cards, { limit: 12, delayMs: 0 });
-  us = eu = none = 0;
-  const movers: Array<{ name: string; pct: number; label: string; region: string }> = [];
-  for (const c of cards) {
-    const row = cardInsightRow(c);
-    const mom = resolveCatalogMomentum(pricesForInsightCard(c));
-    if (mom.region === "us") us += 1;
-    else if (mom.region === "eu") eu += 1;
-    else none += 1;
-    if (row.momentumPct != null && row.momentumPct !== 0) {
-      movers.push({
-        name: row.name,
-        pct: row.momentumPct,
-        label: row.momentumLabel ?? mom.label,
-        region: mom.region ?? "?",
-      });
-    }
+  const topId = top[0]?.catalogId;
+  if (topId) {
+    const { buildPokeTraceCatalogSnapshot } = await import(
+      "../src/lib/market/poketrace/build-catalog-snapshot"
+    );
+    const snap = await buildPokeTraceCatalogSnapshot(topId);
+    console.log(
+      " pokeTrace build:",
+      topId,
+      "| cm:",
+      snap?.cardMarket?.avg7,
+      snap?.cardMarket?.avg30,
+      "| meta:",
+      snap?.pokeTrace?.momentumPct,
+      "| mom:",
+      snap ? resolveCatalogMomentum(snap).pct : null,
+    );
   }
-  movers.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
-  console.log("AFTER hydrate(12) — US:", us, "EU:", eu, "none:", none, "with momentum:", movers.length);
-  for (const m of movers.slice(0, 8)) {
-    console.log(`  ${m.pct > 0 ? "+" : ""}${m.pct}%`, m.name, "|", m.label, "|", m.region);
+
+  cards = await hydrateSetMomentum(cards, { limit: 40, delayMs: 0 });
+  console.log("after hydrate:", (setMomentumCoverage(cards) * 100).toFixed(1) + "%");
+
+  const movers = cards
+    .map((c) => ({ row: cardInsightRow(c), mom: resolveCatalogMomentum(pricesForInsightCard(c)) }))
+    .filter((x) => x.row.momentumPct != null && x.row.momentumPct !== 0)
+    .sort((a, b) => Math.abs(b.row.momentumPct!) - Math.abs(a.row.momentumPct!));
+
+  console.log("mover candidates:", movers.length);
+  for (const { row, mom } of movers.slice(0, 6)) {
+    console.log(`  ${row.momentumPct! > 0 ? "+" : ""}${row.momentumPct}%`, row.name, "|", mom.label);
   }
+
+  const api = await buildSetMovers(setId, "test");
+  console.log("buildSetMovers ready:", api.ready, "up:", api.increases.length, "down:", api.decreases.length);
 }
 
 main().catch((e) => {

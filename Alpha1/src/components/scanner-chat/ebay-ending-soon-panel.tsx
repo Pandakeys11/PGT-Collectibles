@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Gavel, Loader2, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEbayEndingSoon } from "@/hooks/use-ebay-ending-soon";
-import { EBAY_ENDING_SOON_HUB_URL } from "@/lib/market/ebay-ending-soon-types";
+import {
+  ebayAuctionUrgencyClass,
+  formatEbayAuctionTimeLeft,
+} from "@/lib/market/ebay-ending-soon-display";
+import { ebayEndingSoonHubUrl } from "@/lib/market/ebay-ending-soon-feeds";
+import type { EbayEndingSoonFeedId } from "@/lib/market/ebay-ending-soon-feeds";
 import type { EbayEndingSoonListing } from "@/lib/market/ebay-ending-soon-types";
 import { cn } from "@/lib/cn";
 
@@ -13,33 +18,34 @@ function fmtUsd(n: number | null | undefined): string {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
-function formatCountdown(endsAt: string, nowMs: number): string {
-  const endMs = Date.parse(endsAt);
-  if (!Number.isFinite(endMs)) return "—";
-  const diff = endMs - nowMs;
-  if (diff <= 0) return "Ended";
-  const totalSec = Math.floor(diff / 1000);
-  const days = Math.floor(totalSec / 86_400);
-  const hours = Math.floor((totalSec % 86_400) / 3600);
-  const mins = Math.floor((totalSec % 3600) / 60);
-  const secs = totalSec % 60;
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${mins}m`;
-  if (mins > 0) return `${mins}m ${secs}s`;
-  return `${secs}s`;
-}
-
-function urgencyClass(endsAt: string, nowMs: number): string {
-  const diff = Date.parse(endsAt) - nowMs;
-  if (diff <= 0) return "text-slate-500";
-  if (diff < 15 * 60 * 1000) return "text-rose-300";
-  if (diff < 60 * 60 * 1000) return "text-amber-300";
-  return "text-violet-200";
+function FeedToggle({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "shrink-0 rounded-md px-2 py-1 text-[9px] font-semibold transition",
+        active
+          ? "bg-rose-500/25 text-rose-100 ring-1 ring-rose-400/40"
+          : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200",
+      )}
+    >
+      {label}
+    </button>
+  );
 }
 
 function AuctionCard({ listing, nowMs }: { listing: EbayEndingSoonListing; nowMs: number }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const countdown = formatCountdown(listing.endsAt, nowMs);
+  const timeLeft = formatEbayAuctionTimeLeft(listing.endsAt, nowMs);
 
   return (
     <a
@@ -73,12 +79,22 @@ function AuctionCard({ listing, nowMs }: { listing: EbayEndingSoonListing; nowMs
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[9px] uppercase tracking-wide text-slate-500">Ends in</p>
-            <p className={cn("font-mono text-xs font-semibold tabular-nums", urgencyClass(listing.endsAt, nowMs))}>
-              {countdown}
+            <p className="text-[9px] uppercase tracking-wide text-slate-500">Time left</p>
+            <p
+              className={cn(
+                "font-mono text-xs font-semibold tabular-nums",
+                ebayAuctionUrgencyClass(listing.endsAt, nowMs),
+              )}
+            >
+              {timeLeft.primary}
+            </p>
+            <p className="font-mono text-[9px] tabular-nums text-slate-500" title={listing.endsAt}>
+              {timeLeft.endsAtLabel}
             </p>
             {listing.bidCount != null ? (
-              <p className="text-[9px] text-slate-500">{listing.bidCount} bid{listing.bidCount === 1 ? "" : "s"}</p>
+              <p className="text-[9px] text-slate-500">
+                {listing.bidCount} bid{listing.bidCount === 1 ? "" : "s"}
+              </p>
             ) : null}
           </div>
         </div>
@@ -119,6 +135,9 @@ export function EbayEndingSoonPanel({
       })
     : null;
 
+  const hubUrl =
+    feed.payload?.hubUrl ?? ebayEndingSoonHubUrl(feed.activeFeed);
+
   return (
     <div className={cn("sc-ebay-ending-panel flex min-w-0 flex-col", className)}>
       <div className="flex items-center justify-between gap-2 border-b border-rose-500/20 bg-rose-500/[0.07] px-3 py-2">
@@ -129,7 +148,7 @@ export function EbayEndingSoonPanel({
               eBay ending soon
             </p>
             <p className="truncate text-[10px] text-slate-500">
-              Pokémon TCG auctions · US · live Browse API
+              {feed.activeFeed.label} · US auctions · live Browse API
               {fetchedLabel ? ` · ${fetchedLabel}` : ""}
             </p>
           </div>
@@ -159,11 +178,24 @@ export function EbayEndingSoonPanel({
         </div>
       </div>
 
+      <div className="border-b border-rose-500/15 bg-black/20 px-2 py-1.5">
+        <div className="flex gap-1 overflow-x-auto scanner-chat-scrollbar pb-0.5">
+          {feed.feeds.map((row) => (
+            <FeedToggle
+              key={row.id}
+              active={feed.activeFeedId === row.id}
+              label={row.shortLabel}
+              onClick={() => feed.setActiveFeedId(row.id as EbayEndingSoonFeedId)}
+            />
+          ))}
+        </div>
+      </div>
+
       <div className="sc-ebay-ending-panel__scroll min-h-0 flex-1 overflow-y-auto p-2.5 scanner-chat-scrollbar sm:p-3">
         {feed.loading && listings.length === 0 ? (
           <div className="flex min-h-[12rem] items-center justify-center gap-2 text-sm text-muted">
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-            Loading live eBay auctions…
+            Loading {feed.activeFeed.shortLabel} auctions…
           </div>
         ) : feed.error && listings.length === 0 ? (
           <div className="flex min-h-[10rem] flex-col items-center justify-center gap-2 px-2 text-center">
@@ -186,10 +218,11 @@ export function EbayEndingSoonPanel({
 
       <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-white/6 px-3 py-2">
         <p className="text-[10px] text-muted">
-          <span className="font-mono text-slate-400">{listings.length}</span> live auctions
+          <span className="font-mono text-slate-400">{listings.length}</span> live ·{" "}
+          {feed.activeFeed.shortLabel}
         </p>
         <a
-          href={feed.payload?.hubUrl ?? EBAY_ENDING_SOON_HUB_URL}
+          href={hubUrl}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-200/90 hover:text-rose-100"

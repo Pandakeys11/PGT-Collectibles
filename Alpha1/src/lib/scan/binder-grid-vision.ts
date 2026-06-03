@@ -160,8 +160,10 @@ function inferDedupeGridShape(
     return { cols: 3, rows: 3 };
   }
   if (aspectRatio != null && aspectRatio >= 1.15) {
-    if (count >= 18) return { cols: 5, rows: 4 };
-    if (count >= 12) return { cols: 4, rows: 3 };
+    if (count >= 20) return { cols: 5, rows: 4 };
+    if (count >= 15) return { cols: 5, rows: 3 };
+    if (count >= 10) return { cols: 5, rows: 3 };
+    if (count >= 6) return { cols: 4, rows: 3 };
     return { cols: 4, rows: 2 };
   }
   if (count >= 20) return { cols: 4, rows: 5 };
@@ -181,15 +183,33 @@ export function shouldTileBinderGridImage(width: number, height: number): boolea
  * Merge tiled vision hits: one card per grid slot; overlap duplicates lose to the richer read.
  * Identical Pokémon in different slots (e.g. two Jolteon) are kept when centers differ.
  */
+export function resolveDedupeGridShape(
+  cardCount: number,
+  aspectRatio: number | undefined,
+  naturalWidth?: number,
+  naturalHeight?: number,
+): { cols: number; rows: number } {
+  const fromCount = inferDedupeGridShape(Math.max(cardCount, 1), aspectRatio);
+  if (!naturalWidth || !naturalHeight) return fromCount;
+  const plan = planBinderGridTiles(naturalWidth, naturalHeight);
+  const planSlots = plan.cols * plan.rows;
+  if (cardCount <= planSlots + 1) {
+    return { cols: plan.cols, rows: plan.rows };
+  }
+  return fromCount;
+}
+
 export function dedupeBinderGridVisionCards<T extends Record<string, unknown>>(
   cards: T[],
   aspectRatio?: number,
+  naturalSize?: { width: number; height: number },
 ): T[] {
-  const slotBudget =
-    aspectRatio != null && aspectRatio >= 0.82 && aspectRatio <= 1.18
-      ? 9
-      : cards.length;
-  const { cols, rows } = inferDedupeGridShape(slotBudget, aspectRatio);
+  const { cols, rows } = resolveDedupeGridShape(
+    cards.length,
+    aspectRatio,
+    naturalSize?.width,
+    naturalSize?.height,
+  );
   const bySlot = new Map<string, T>();
   const noLocation: T[] = [];
 

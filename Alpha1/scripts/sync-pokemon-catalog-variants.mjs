@@ -25,6 +25,7 @@ if (!url || !key) {
 
 const supabase = createClient(url, key, { auth: { persistSession: false } });
 const overlayPath = path.join(process.cwd(), "src", "data", "pokedex", "catalog-set-overlays.json");
+const tcgplayerMapPath = path.join(process.cwd(), "src", "data", "pokedex", "tcgplayer-vintage-print-ids.json");
 
 const TCGPLAYER_UNLIMITED_PRODUCT_BASE = {
   base1: 42378,
@@ -87,8 +88,44 @@ function base1UnlimitedUrls(row, merged) {
   };
 }
 
+function loadTcgplayerVintageMap() {
+  if (!existsSync(tcgplayerMapPath)) return { sets: {} };
+  return JSON.parse(readFileSync(tcgplayerMapPath, "utf8"));
+}
+
+function tcgplayerVintageUrls(setId, catalogId, variantKey, merged) {
+  const map = loadTcgplayerVintageMap();
+  const setRow = map.sets?.[setId];
+  if (!setRow) return null;
+
+  if (variantKey === "shadowless") {
+    const productId = setRow.shadowless?.[catalogId] ?? setRow.shadowlessOverrides?.[catalogId];
+    if (productId) return { ...tcgplayerImageUrl(productId), source: "tcgplayer_shadowless" };
+  }
+
+  if (variantKey === "first_edition" && setId === "base1") {
+    const productId = setRow.shadowless?.[catalogId];
+    if (productId) return { ...tcgplayerImageUrl(productId), source: "tcgplayer_first_edition" };
+  }
+
+  if (variantKey === "unlimited" && setRow.unlimited?.productIdBase) {
+    const num = Number.parseInt(String(catalogId.split("-").pop() ?? ""), 10);
+    if (Number.isFinite(num)) {
+      return {
+        ...tcgplayerImageUrl(setRow.unlimited.productIdBase + num),
+        source: "tcgplayer_unlimited",
+      };
+    }
+  }
+
+  return null;
+}
+
 function printingVariantUrls(row, merged, variantKey) {
   const setId = String(row.set_code ?? "");
+  const vintageUrls = tcgplayerVintageUrls(setId, row.catalog_id, variantKey, merged);
+  if (vintageUrls) return vintageUrls;
+
   const mergedUrls = variantUrls(merged, setId, row.catalog_id, variantKey);
   if (variantKey === "unlimited") {
     const productIdBase = TCGPLAYER_UNLIMITED_PRODUCT_BASE[setId];

@@ -4,6 +4,8 @@ import {
   runEnrichForSpecimen,
   type EnrichPhase,
 } from "@/lib/scan/enrich-runner";
+import { isSlabzPartnerExtraction } from "@/lib/slabz/card-identity";
+import { enrichSlabzSpecimenLikeScan } from "@/lib/slabz/enrich-slabz-specimen";
 import type { CatalogContextSnapshot } from "@/lib/scan/context-builder";
 import {
   catalogCandidateSchema,
@@ -104,18 +106,46 @@ export async function POST(req: NextRequest) {
       ? body.artMatchMimeType.trim()
       : undefined;
 
+  const partnerExtraction =
+    typeof body.extraction === "object" && body.extraction !== null
+      ? (body.extraction as Record<string, unknown>)
+      : typeof body.context === "object" && body.context !== null
+        ? ((body.context as { extraction?: Record<string, unknown> }).extraction ?? null)
+        : null;
+
+  const catalogIdHint =
+    typeof catalogSnapshot.catalogId === "string" ? catalogSnapshot.catalogId : null;
+  const useSlabzEnrich =
+    catalogIdHint?.startsWith("slabz:") || isSlabzPartnerExtraction(partnerExtraction);
+
   try {
-    const result = await runEnrichForSpecimen({
-      specimenId,
-      card: parsedCard.data,
-      phase,
-      skipRegistry,
-      skipCache,
-      userId,
-      artMatchImageBase64,
-      artMatchMimeType,
-      ...catalogSnapshot,
-    });
+    const result = useSlabzEnrich
+      ? await enrichSlabzSpecimenLikeScan({
+          specimenId,
+          card: parsedCard.data,
+          phase,
+          skipRegistry,
+          skipCache,
+          userId,
+          artMatchImageBase64,
+          artMatchMimeType,
+          ...catalogSnapshot,
+          context: {
+            ...catalogSnapshot,
+            extraction: partnerExtraction ?? {},
+          },
+        })
+      : await runEnrichForSpecimen({
+          specimenId,
+          card: parsedCard.data,
+          phase,
+          skipRegistry,
+          skipCache,
+          userId,
+          artMatchImageBase64,
+          artMatchMimeType,
+          ...catalogSnapshot,
+        });
 
     return NextResponse.json({
       card: result.card,

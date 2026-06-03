@@ -173,6 +173,7 @@ async function runCatalogBatch<T extends SessionEnrichSpecimen>(
     /** Combined catalog+market in one pass — disabled when market is deferred. */
     allowFullEnrich: boolean;
   },
+  onEachResolved?: (specimen: T, next: T) => void,
 ): Promise<Map<string, T>> {
   const full = options.allowFullEnrich
     ? chunk.filter((s) => shouldUseCombinedFullEnrich(s.card))
@@ -182,37 +183,50 @@ async function runCatalogBatch<T extends SessionEnrichSpecimen>(
   );
   const merged = new Map<string, T>();
 
-  const runWave = async (wave: T[], phase: "full" | "catalog") => {
+  const runWave = async (
+    wave: T[],
+    phase: "full" | "catalog",
+    onEachResolved?: (specimen: T, next: T) => void,
+  ) => {
     if (wave.length === 0) return;
-    const batchItems: EnrichBatchItemInput[] = wave.map((specimen) => ({
-      specimenId: specimen.id,
-      card: specimen.card,
-      phase,
-      skipRegistry: skipRegistryFor(specimen, options.skipRegistryOnBulk),
-      ...artMatchFieldsFromPreview(specimen.previewUrl),
-    }));
-    let results: EnrichBatchItemResult[] = [];
-    try {
-      results = await enrichExtractedCardsBatch({
-        items: batchItems,
-        phase,
-        concurrency: options.catalogConcurrency,
-        skipRegistry: options.skipRegistryOnBulk,
-      });
-    } catch {
-      results = [];
-    }
-    const resolved = await mergeBatchResults(
-      wave,
-      results,
-      phase,
-      options.skipRegistryOnBulk,
+
+    await Promise.all(
+      wave.map(async (specimen) => {
+        const batchItems: EnrichBatchItemInput[] = [
+          {
+            specimenId: specimen.id,
+            card: specimen.card,
+            phase,
+            skipRegistry: skipRegistryFor(specimen, options.skipRegistryOnBulk),
+            ...artMatchFieldsFromPreview(specimen.previewUrl),
+          },
+        ];
+        let results: EnrichBatchItemResult[] = [];
+        try {
+          results = await enrichExtractedCardsBatch({
+            items: batchItems,
+            phase,
+            concurrency: 1,
+            skipRegistry: options.skipRegistryOnBulk,
+          });
+        } catch {
+          results = [];
+        }
+        const resolved = await mergeBatchResults(
+          [specimen],
+          results,
+          phase,
+          options.skipRegistryOnBulk,
+        );
+        const next = resolved.get(specimen.id) ?? specimen;
+        merged.set(specimen.id, next);
+        onEachResolved?.(specimen, next);
+      }),
     );
-    for (const [id, row] of resolved) merged.set(id, row);
   };
 
-  await runWave(full, "full");
-  await runWave(catalogOnly, "catalog");
+  await runWave(full, "full", onEachResolved);
+  await runWave(catalogOnly, "catalog", onEachResolved);
   return merged;
 }
 
@@ -235,21 +249,22 @@ export async function runCatalogEnrichSession<T extends SessionEnrichSpecimen>(
 
   for (let offset = 0; offset < items.length; offset += catalogConcurrency) {
     const chunk = items.slice(offset, offset + catalogConcurrency);
-    const resolved = await runCatalogBatch(chunk, {
-      skipRegistryOnBulk,
-      catalogConcurrency,
-      allowFullEnrich,
-    });
-
-    for (const specimen of chunk) {
-      const next = resolved.get(specimen.id) ?? specimen;
-      catalogById.set(specimen.id, next);
-      onSpecimensPatch((current) =>
-        current.map((entry) => (entry.id === specimen.id ? next : entry)),
-      );
-      enrichDone += 1;
-      onProgress(`Matching catalog ${enrichDone}/${total}…`);
-    }
+    await runCatalogBatch(
+      chunk,
+      {
+        skipRegistryOnBulk,
+        catalogConcurrency,
+        allowFullEnrich,
+      },
+      (_specimen, next) => {
+        catalogById.set(next.id, next);
+        onSpecimensPatch((current) =>
+          current.map((entry) => (entry.id === next.id ? next : entry)),
+        );
+        enrichDone += 1;
+        onProgress(`Matching catalog ${enrichDone}/${total}…`);
+      },
+    );
   }
 
   const weakCatalog = [...catalogById.values()].filter((entry) => needsCatalogWiden(entry));
@@ -339,51 +354,50 @@ export async function runMarketEnrichSession<T extends SessionEnrichSpecimen>(
 
   for (let offset = 0; offset < needsMarket.length; offset += marketConcurrency) {
     const chunk = needsMarket.slice(offset, offset + marketConcurrency);
-    const batchItems: EnrichBatchItemInput[] = chunk.map((specimen) => {
-      const base = catalogById.get(specimen.id) ?? specimen;
-      return {
-        specimenId: base.id,
-        card: base.card,
-        phase: "market",
-        ...pickCatalogContext(base.context),
-        skipRegistry: skipRegistryFor(base, skipRegistryOnBulk),
-      };
-    });
 
-    let results: EnrichBatchItemResult[] = [];
-    try {
-      results = await enrichExtractedCardsBatch({
-        items: batchItems,
-        phase: "market",
-        concurrency: marketConcurrency,
-        skipRegistry: skipRegistryOnBulk,
-      });
-    } catch {
-      results = [];
-    }
+    await Promise.all(
+      chunk.map(async (specimen) => {
+        const base = catalogById.get(specimen.id) ?? specimen;
+        const batchItems: EnrichBatchItemInput[] = [
+          {
+            specimenId: base.id,
+            card: base.card,
+            phase: "market",
+            ...pickCatalogContext(base.context),
+            skipRegistry: skipRegistryFor(base, skipRegistryOnBulk),
+          },
+        ];
+        let rowResults: EnrichBatchItemResult[] = [];
+        try {
+          rowResults = await enrichExtractedCardsBatch({
+            items: batchItems,
+            phase: "market",
+            concurrency: 1,
+            skipRegistry: skipRegistryOnBulk,
+          });
+        } catch {
+          rowResults = [];
+        }
+        const resolved = await mergeBatchResults(
+          [base],
+          rowResults,
+          "market",
+          skipRegistryOnBulk,
+        );
+        const catalogCtx = pickCatalogContext(base.context);
+        const next = resolved.get(specimen.id) ?? base;
+        const patched =
+          next.id === base.id && next.context !== base.context
+            ? applyEnrichSuccess(next, next.card, next.context, catalogCtx)
+            : next;
 
-    const resolved = await mergeBatchResults(
-      chunk.map((s) => catalogById.get(s.id) ?? s),
-      results,
-      "market",
-      skipRegistryOnBulk,
+        onSpecimensPatch((current) =>
+          current.map((entry) => (entry.id === base.id ? patched : entry)),
+        );
+        enrichDone += 1;
+        onProgress(`Loading market ${enrichDone}/${needsMarket.length}…`);
+      }),
     );
-
-    for (const specimen of chunk) {
-      const base = catalogById.get(specimen.id) ?? specimen;
-      const catalogCtx = pickCatalogContext(base.context);
-      const next = resolved.get(specimen.id) ?? base;
-      const patched =
-        next.id === base.id && next.context !== base.context
-          ? applyEnrichSuccess(next, next.card, next.context, catalogCtx)
-          : next;
-
-      onSpecimensPatch((current) =>
-        current.map((entry) => (entry.id === base.id ? patched : entry)),
-      );
-      enrichDone += 1;
-      onProgress(`Loading market ${enrichDone}/${needsMarket.length}…`);
-    }
   }
 }
 

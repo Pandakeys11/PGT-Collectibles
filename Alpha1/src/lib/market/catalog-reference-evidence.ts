@@ -105,6 +105,59 @@ export function parseCatalogPriceSnapshot(
         }
       : null;
 
+  const pu = p.pgtUs;
+  const pgtUs =
+    pu && typeof pu === "object" && asNumber((pu as Record<string, unknown>).momentumPct) != null
+      ? {
+          momentumPct: asNumber((pu as Record<string, unknown>).momentumPct),
+          median7dUsd: asNumber((pu as Record<string, unknown>).median7dUsd),
+          median30dUsd: asNumber((pu as Record<string, unknown>).median30dUsd),
+          lane:
+            (pu as Record<string, unknown>).lane === "sold_comps" ||
+            (pu as Record<string, unknown>).lane === "tcg_anchor" ||
+            (pu as Record<string, unknown>).lane === "price_ticks" ||
+            (pu as Record<string, unknown>).lane === "blended"
+              ? ((pu as Record<string, unknown>).lane as
+                  | "sold_comps"
+                  | "tcg_anchor"
+                  | "price_ticks"
+                  | "blended")
+              : ("blended" as const),
+          comps7d:
+            typeof (pu as Record<string, unknown>).comps7d === "number"
+              ? Number((pu as Record<string, unknown>).comps7d)
+              : 0,
+          comps30d:
+            typeof (pu as Record<string, unknown>).comps30d === "number"
+              ? Number((pu as Record<string, unknown>).comps30d)
+              : 0,
+          syncedAt:
+            typeof (pu as Record<string, unknown>).syncedAt === "string"
+              ? String((pu as Record<string, unknown>).syncedAt)
+              : new Date().toISOString(),
+        }
+      : null;
+
+  const jt = p.justTcg;
+  const justTcg =
+    jt && typeof jt === "object" && typeof (jt as Record<string, unknown>).cardId === "string"
+      ? {
+          cardId: String((jt as Record<string, unknown>).cardId),
+          syncedAt:
+            typeof (jt as Record<string, unknown>).syncedAt === "string"
+              ? String((jt as Record<string, unknown>).syncedAt)
+              : new Date().toISOString(),
+          tcgplayerId:
+            typeof (jt as Record<string, unknown>).tcgplayerId === "string"
+              ? String((jt as Record<string, unknown>).tcgplayerId)
+              : null,
+          momentumPct: asNumber((jt as Record<string, unknown>).momentumPct),
+          avgPrice7dUsd: asNumber((jt as Record<string, unknown>).avgPrice7dUsd),
+          avgPrice30dUsd: asNumber((jt as Record<string, unknown>).avgPrice30dUsd),
+          priceUsd: asNumber((jt as Record<string, unknown>).priceUsd),
+        }
+      : null;
+
   const legacyTp = tcgPlayerPricesFromLegacyObject(p.tcgplayer);
   const parsedRows = parseTcgPlayerVariants(p.tcgPlayerPrices);
   const tcgPlayerPrices =
@@ -143,6 +196,8 @@ export function parseCatalogPriceSnapshot(
     priceChartingPsa9Usd: asNumber(p.priceChartingPsa9Usd),
     priceChartingPsa8Usd: asNumber(p.priceChartingPsa8Usd),
     pokeTrace,
+    justTcg,
+    pgtUs,
   };
 }
 

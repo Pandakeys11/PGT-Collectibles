@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Download, FileImage, Maximize2, Crop } from "lucide-react";
 import { MarketEvidenceTable } from "@/components/scan-panels/market-evidence-table";
 import { MarketSourceHub } from "@/components/scan-panels/market-source-hub";
@@ -21,6 +21,7 @@ import { SpecimenMarketSummary } from "@/components/scan-panels/specimen-market-
 import type { ExtractedCard } from "@/lib/scan/schemas";
 import { formatGradedSlabTag, formatSlabLabelLine } from "@/lib/scan/graded-slab";
 import { getCardDisplayTitle, getCardImageAlt } from "@/lib/scan/card-display";
+import { mergeMarketSourceLinks } from "@/lib/market/sources";
 import { cn } from "@/lib/cn";
 import type { DigitalScanAsset } from "@/lib/digital-scan/types";
 import { buildPrintIdentitySnapshot } from "@/lib/scan/print-identity-ui";
@@ -186,6 +187,14 @@ export function EvidenceRail({
   const zoomSession = useRef(0);
   const specimenRef = useRef(specimen);
   specimenRef.current = specimen;
+
+  const hubLinks = useMemo(
+    () =>
+      specimen
+        ? mergeMarketSourceLinks(specimen.context.marketSourceLinks ?? [], specimen.card)
+        : [],
+    [specimen],
+  );
 
   useEffect(() => {
     userToggledIdentityRef.current = false;
@@ -672,14 +681,14 @@ export function EvidenceRail({
         </section>
       ) : null}
       <div className="mt-4">
-        <MarketSourceHub links={specimen.context.marketSourceLinks} />
+        <MarketSourceHub links={hubLinks} />
       </div>
       <section className="mt-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-faint">Recent sales and listings</h3>
         <div className="mt-2 max-h-[min(18rem,42vh)] overflow-y-auto pr-0.5">
           <MarketEvidenceTable
             items={specimen.context.marketEvidence}
-            hubLinks={specimen.context.marketSourceLinks}
+            hubLinks={hubLinks}
             card={specimen.card}
             maxRows={12}
           />

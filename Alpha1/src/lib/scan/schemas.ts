@@ -56,6 +56,7 @@ export const marketSourceLinkSchema = z.object({
     "pricecharting",
     "cardmarket",
     "tcgplayer",
+    "oneThirtyPoint",
   ]),
   label: z.string(),
   lane: z.enum(["sold", "active"]),

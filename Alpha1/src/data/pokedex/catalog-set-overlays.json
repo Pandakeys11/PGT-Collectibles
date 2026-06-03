@@ -698,6 +698,33 @@
       ]
     },
     {
+      "setId": "xy12",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Evolutions_(TCG)",
+      "setValueNotes": "Evolutions (2016): classic art reprints with modern XY card frame. Denominator /112 — not Wizards /102. No 1st/Unlimited print tabs; one API row per slot.",
+      "printingVariants": [
+        {
+          "id": "catalog",
+          "label": "Catalog default",
+          "hint": "Official API artwork & IDs",
+          "marketSuffix": null
+        }
+      ],
+      "sealedProducts": [
+        {
+          "id": "bb36",
+          "label": "Booster box (36 packs)",
+          "category": "booster_box",
+          "searchQuery": "Pokemon Evolutions Booster Box 36 sealed"
+        },
+        {
+          "id": "pack",
+          "label": "Single booster pack",
+          "category": "booster_pack",
+          "searchQuery": "Pokemon Evolutions Booster Pack sealed"
+        }
+      ]
+    },
+    {
       "setId": "bp",
       "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Best_of_Game_(TCG)",
       "setValueNotes": "Best of Game is a small Wizards-era promo/prize set. The API spine is one row per card; stamp/event nuance should stay in print stamps/details and marketplace search terms.",

@@ -156,12 +156,13 @@ async function extractVisionForBinderGridImage(
     timeoutMs: number;
     gradedFocus?: boolean;
     visionVerify?: boolean;
+    forceFullPage?: boolean;
   },
 ): Promise<unknown[]> {
   const prepared = await ensureScanUploadDataUrl(imageDataUrl);
   const { width, height } = await readImageNaturalSize(prepared);
 
-  if (!shouldTileBinderGridImage(width, height)) {
+  if (options.forceFullPage || !shouldTileBinderGridImage(width, height)) {
     return extractVisionForImage(prepared, imageIndex, {
       timeoutMs: options.timeoutMs,
       gradedFocus: options.gradedFocus,
@@ -201,6 +202,7 @@ async function extractVisionForBinderGridImage(
       imageBase64s: preparedTiles.map(dataUrlToBase64),
       imageMimeTypes: preparedTiles.map(dataUrlMimeType),
       binderGrid: true,
+      gradedFocus: options.gradedFocus === true ? true : undefined,
       scanCreditCount: 1,
     }),
     signal,
@@ -232,7 +234,7 @@ async function extractVisionForBinderGridImage(
     if (mapped) merged.push(mapped);
   }
 
-  return dedupeBinderGridVisionCards(merged, width / height);
+  return dedupeBinderGridVisionCards(merged, width / height, { width, height });
 }
 
 export async function runVisionExtraction(
@@ -245,6 +247,8 @@ export async function runVisionExtraction(
     gradedFocus?: boolean;
     /** Multi-card binder / grid screenshot — tiled vision + binder prompts. */
     binderGrid?: boolean;
+    /** One vision request on the full page (no client tile split). */
+    forceFullPageBinder?: boolean;
     /** Optional second pass using Gemini to verify/fix single-image extraction. */
     visionVerify?: boolean;
     /** Parallel vision requests (default 3). Set 1 for strictly sequential. */
@@ -284,6 +288,7 @@ export async function runVisionExtraction(
             timeoutMs,
             gradedFocus: options.gradedFocus,
             visionVerify,
+            forceFullPage: options.forceFullPageBinder === true,
           })
         : await extractVisionForImage(images[imageIndex], imageIndex, {
             timeoutMs,

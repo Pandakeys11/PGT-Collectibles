@@ -23,6 +23,7 @@ import {
   runCatalogEnrichSession,
   runMarketEnrichSession,
 } from "@/lib/scan/enrich-session-pipeline";
+import { prefetchCatalogThumbsForSpecimens } from "@/lib/scan/prefetch-catalog-thumbs";
 import {
   stabilizeOmniVisionCards,
   normalizeVisionGridLocation,
@@ -30,6 +31,12 @@ import {
   type VisionGridLocation,
 } from "@/lib/scan/spatial";
 import { classifyCardLane } from "@/lib/scan/lane";
+import {
+  mergeVisionWithSlabzPartnerCard,
+  slabzCardFromExtraction,
+} from "@/lib/slabz/card-identity";
+import { buildSlabzRipSpecimen } from "@/lib/slabz/slab-to-specimen";
+import type { SlabzPack, SlabzRipRecord } from "@/lib/slabz/types";
 import {
   CARD_EVIDENCE_VISION_RADIUS_MULTIPLIER,
   clampCropRadiusMultiplier,
@@ -79,11 +86,13 @@ import {
 } from "@/lib/scan/vision-client";
 import type { ScanMode } from "@/lib/scanner-chat/types";
 import {
-  scanModeRequestsVisionVerify,
-  scanModeUsesBinderGrid,
-  scanModeUsesBinderUploadPrep,
-  scanModeUsesSingleCardCrop,
-} from "@/lib/scanner-chat/scan-mode-config";
+  alternateLiquidScanStrategy,
+  sparseFlatLayRetryStrategy,
+  liquidScanProgressLabel,
+  readFileCaptureAspect,
+  resolveLiquidScanStrategy,
+  type LiquidScanStrategy,
+} from "@/lib/scanner-chat/resolve-liquid-scan-strategy";
 import {
   refreshDigitalScanSidecars,
   renderDigitalScansForSession,
@@ -198,8 +207,8 @@ export function useScanSession(options?: {
   const { userId } = useAuth();
   const speedOnRef = useRef(options?.speedOn ?? false);
   speedOnRef.current = options?.speedOn ?? false;
-  const scanModeRef = useRef<ScanMode>(options?.scanMode ?? "binder");
-  scanModeRef.current = options?.scanMode ?? "binder";
+  const scanModeRef = useRef<ScanMode>(options?.scanMode ?? "auto");
+  scanModeRef.current = options?.scanMode ?? "auto";
   const digitalScanOnRef = useRef(options?.digitalScanOn ?? false);
   digitalScanOnRef.current = options?.digitalScanOn ?? false;
   const isProRef = useRef(options?.isPro ?? false);
@@ -366,23 +375,33 @@ export function useScanSession(options?: {
   const ingestImageFiles = useCallback(async (files: File[]) => {
     const list = files.filter((file) => file.type.startsWith("image/"));
     if (list.length === 0) return;
-    const mode = scanModeRef.current;
     const projectedSlots = slots.length + list.length;
-    const binderPrep = scanModeUsesBinderUploadPrep(mode, projectedSlots, laneMode);
-    const singlePrep =
-      projectedSlots === 1 && scanModeUsesSingleCardCrop(mode, 1, laneMode);
+    let captureAspect: number | undefined;
+    if (projectedSlots === 1 && list.length === 1) {
+      try {
+        captureAspect = await readFileCaptureAspect(list[0]!);
+      } catch {
+        // aspect optional — resolver falls back to square-ish single path
+      }
+    }
+    const strategy = resolveLiquidScanStrategy({
+      imageCount: projectedSlots,
+      captureAspect,
+      speedOn: speedOnRef.current,
+      manualMode: scanModeRef.current !== "auto" ? scanModeRef.current : undefined,
+    });
     const next = await Promise.all(
       list.map(async (file) => ({
         id: makeId("slot"),
         file,
         previewUrl: await readImageFileAsDataUrl(file, {
-          binderGrid: binderPrep,
-          singleCard: singlePrep,
+          binderGrid: strategy.binderUploadPrep,
+          singleCard: strategy.singleCardCrop && projectedSlots === 1,
         }),
       })),
     );
     setSlots((current) => [...current, ...next]);
-  }, [laneMode, slots.length]);
+  }, [slots.length]);
 
   const drainUploadQueue = useCallback(async () => {
     if (uploadDrainRef.current) return;
@@ -732,15 +751,6 @@ export function useScanSession(options?: {
     setDigitalScanProgress(null);
     setDigitalScanRendering(false);
     digitalScanRunRef.current += 1;
-    const mode = scanModeRef.current;
-    const binderGridScan = scanModeUsesBinderGrid(mode, slots.length, laneMode);
-    const singleCardCrop = scanModeUsesSingleCardCrop(mode, slots.length, laneMode);
-    const requestVisionVerify = scanModeRequestsVisionVerify(mode);
-    setProgress(
-      binderGridScan
-        ? "Running vision on binder page…"
-        : "Running vision extraction…",
-    );
     try {
       const images = slots.map((slot) => slot.previewUrl);
       const captureAspects = new Map<number, number>();
@@ -755,52 +765,105 @@ export function useScanSession(options?: {
           }
         }),
       );
+      const primaryAspect = captureAspects.get(0);
+      let strategy = resolveLiquidScanStrategy({
+        imageCount: slots.length,
+        captureAspect: primaryAspect,
+        speedOn: speedOnRef.current,
+        manualMode: scanModeRef.current !== "auto" ? scanModeRef.current : undefined,
+      });
+      if (strategy.laneMode !== laneMode) {
+        setLaneMode(strategy.laneMode);
+      }
+      setProgress(liquidScanProgressLabel(strategy.kind));
+
       const specimensByImage = new Map<number, ScanSpecimen[]>();
       let visionCardCount = 0;
 
-      const speedProfile = getLiquidScanSpeedProfile(speedOnRef.current);
-      const binderGrid = binderGridScan;
-      const extracted = await runVisionExtraction(images, {
-        timeoutMs: getVisionClientTimeoutMs(),
-        concurrency: speedProfile.visionConcurrency,
-        binderGrid,
-        singleCardCrop,
-        gradedFocus: laneMode === "graded",
-        visionVerify: requestVisionVerify,
-        onProgress: (state) => {
-          setProgress(
-            `Vision ${state.imagesDone}/${state.imagesTotal} (${state.mode})`,
-          );
-        },
-        onImageComplete: (cards, imageIndex) => {
-          visionCardCount += cards.length;
-          const batch = buildSpecimensFromVisionCards(cards, laneMode, slots, {
-            captureAspects,
-          });
-          if (batch.length === 0) return;
-          specimensByImage.set(imageIndex, batch);
-          const ordered = Array.from(specimensByImage.keys())
-            .sort((a, b) => a - b)
-            .flatMap((key) => specimensByImage.get(key) ?? []);
-          setSpecimens(ordered);
-          setSelectedId((current) => current ?? ordered[0]?.id ?? null);
-          setProgress(
-            `Extracted ${visionCardCount} card(s) — scanning remaining images…`,
-          );
-        },
-      });
+      const runVisionWithStrategy = async (active: LiquidScanStrategy) =>
+        runVisionExtraction(images, {
+          timeoutMs: getVisionClientTimeoutMs(),
+          concurrency: getLiquidScanSpeedProfile(speedOnRef.current).visionConcurrency,
+          binderGrid: active.binderGrid,
+          singleCardCrop: active.singleCardCrop,
+          gradedFocus: active.gradedFocus,
+          visionVerify: active.visionVerify,
+          forceFullPageBinder: active.forceFullPageBinder,
+          onProgress: (state) => {
+            setProgress(
+              `Vision ${state.imagesDone}/${state.imagesTotal} (${state.mode})`,
+            );
+          },
+          onImageComplete: (cards, imageIndex) => {
+            visionCardCount += cards.length;
+            const batch = buildSpecimensFromVisionCards(cards, active.laneMode, slots, {
+              captureAspects,
+            });
+            if (batch.length === 0) return;
+            specimensByImage.set(imageIndex, batch);
+            const ordered = Array.from(specimensByImage.keys())
+              .sort((a, b) => a - b)
+              .flatMap((key) => specimensByImage.get(key) ?? []);
+            setSpecimens(ordered);
+            setSelectedId((current) => current ?? ordered[0]?.id ?? null);
+            setProgress(
+              `Extracted ${visionCardCount} card(s) — scanning remaining images…`,
+            );
+          },
+        });
 
-      const stabilizedCount = extracted.filter(
+      const speedProfile = getLiquidScanSpeedProfile(speedOnRef.current);
+      let extracted = await runVisionWithStrategy(strategy);
+
+      let stabilizedCount = extracted.filter(
         (row) => row && typeof row === "object",
       ).length;
-      let nextSpecimens = buildSpecimensFromVisionCards(extracted, laneMode, slots, {
-        captureAspects,
-      });
+      if (slots.length === 1 && scanModeRef.current === "auto") {
+        if (stabilizedCount === 0) {
+          const alt = alternateLiquidScanStrategy(strategy, primaryAspect);
+          if (alt) {
+            strategy = alt;
+            setProgress(liquidScanProgressLabel(strategy.kind));
+            visionCardCount = 0;
+            specimensByImage.clear();
+            setSpecimens([]);
+            extracted = await runVisionWithStrategy(strategy);
+            stabilizedCount = extracted.filter(
+              (row) => row && typeof row === "object",
+            ).length;
+          }
+        } else {
+          const slabTableRetry = sparseFlatLayRetryStrategy(
+            strategy,
+            primaryAspect,
+            stabilizedCount,
+          );
+          if (slabTableRetry) {
+            strategy = slabTableRetry;
+            setProgress(liquidScanProgressLabel(strategy.kind));
+            visionCardCount = 0;
+            specimensByImage.clear();
+            setSpecimens([]);
+            extracted = await runVisionWithStrategy(strategy);
+            stabilizedCount = extracted.filter(
+              (row) => row && typeof row === "object",
+            ).length;
+          }
+        }
+      }
+      let nextSpecimens = buildSpecimensFromVisionCards(
+        extracted,
+        strategy.laneMode,
+        slots,
+        {
+          captureAspects,
+        },
+      );
       const { specimens: resolved, laneNotice } =
         resolveSpecimensWithLaneFallback(
           nextSpecimens,
           stabilizedCount,
-          laneMode,
+          strategy.laneMode,
           slots,
           extracted,
         );
@@ -819,6 +882,7 @@ export function useScanSession(options?: {
       }
 
       setSpecimens(nextSpecimens);
+      prefetchCatalogThumbsForSpecimens(nextSpecimens);
       setSelectedId(nextSpecimens[0]?.id ?? null);
       if (laneNotice) setError(laneNotice);
 
@@ -1010,7 +1074,7 @@ export function useScanSession(options?: {
           }
         }
 
-        const nextCard: ExtractedCard = extractedCardSchema.parse({
+        let nextCard: ExtractedCard = extractedCardSchema.parse({
           ...normalized,
           location: finalCenter,
           sourceImageIndex:
@@ -1018,6 +1082,13 @@ export function useScanSession(options?: {
           visionLane: lane.lane,
           visionLaneConfidence: lane.confidence,
         });
+
+        const slabzCard = slabzCardFromExtraction(
+          item.context.extraction as Record<string, unknown> | undefined,
+        );
+        if (slabzCard) {
+          nextCard = mergeVisionWithSlabzPartnerCard(nextCard, slabzCard);
+        }
 
         const patchRow = (card: ExtractedCard, context: ScanCardContext) => {
           setSpecimens((current) =>
@@ -1154,6 +1225,8 @@ export function useScanSession(options?: {
           card: item.card,
           phase: "catalog",
           skipCache: true,
+          ...pickCatalogContext(item.context),
+          extraction: item.context.extraction as Record<string, unknown>,
         });
         if (enrichRunRef.current.get(id) !== runId) return;
 
@@ -1173,6 +1246,7 @@ export function useScanSession(options?: {
         card: cardForMarket,
         phase: "market",
         ...catalogSnapshot,
+        extraction: item.context.extraction as Record<string, unknown>,
         skipCache: true,
         skipRegistry: false,
       });
@@ -1528,11 +1602,22 @@ export function useScanSession(options?: {
         const specimenId = makeId("specimen");
         const evidenceCropLocation =
           normalizeVisionGridLocation(item.card.location) ?? null;
+        const extraction = item.context.extraction as Record<string, unknown> | undefined;
+        const slabzImage =
+          typeof extraction?.slabzImageUrl === "string"
+            ? extraction.slabzImageUrl
+            : typeof extraction?.slabzCard === "object" &&
+                extraction.slabzCard &&
+                typeof (extraction.slabzCard as { imageUrl?: string }).imageUrl === "string"
+              ? (extraction.slabzCard as { imageUrl: string }).imageUrl
+              : null;
+        const previewUrl = item.context.catalogImageUrl ?? slabzImage ?? null;
+
         return {
           id: specimenId,
           card: item.card,
           context: { ...item.context, specimenId },
-          previewUrl: null,
+          previewUrl,
           evidenceCropLocation,
           userEvidenceCropCenter: null,
           userEvidenceCropRadiusMultiplier: null,
@@ -1541,6 +1626,60 @@ export function useScanSession(options?: {
 
       setSpecimens(next);
       setSelectedId(next[0]?.id ?? null);
+
+      const slabzRows = next.filter((s) => {
+        const ext = s.context.extraction as Record<string, unknown> | undefined;
+        return ext?.partner === "slabz" || s.context.catalogId?.startsWith("slabz:");
+      });
+      if (slabzRows.length > 0) {
+        void (async () => {
+          setEnriching(true);
+          setProgress("Matching Slabz slabs to catalog…");
+          try {
+            for (const row of slabzRows) {
+              const catalogResult = await enrichExtractedCard({
+                specimenId: row.id,
+                card: row.card,
+                phase: "catalog",
+                ...pickCatalogContext(row.context),
+                extraction: row.context.extraction as Record<string, unknown>,
+                skipCache: true,
+              });
+              const marketResult = await enrichExtractedCard({
+                specimenId: row.id,
+                card: catalogResult.card,
+                phase: "market",
+                ...pickCatalogContext(catalogResult.context),
+                catalogId: catalogResult.context.catalogId ?? row.context.catalogId,
+                catalogImageUrl:
+                  catalogResult.context.catalogImageUrl ?? row.context.catalogImageUrl,
+                extraction: row.context.extraction as Record<string, unknown>,
+                skipCache: true,
+              });
+              setSpecimens((current) =>
+                current.map((s) =>
+                  s.id === row.id
+                    ? {
+                        ...s,
+                        card: marketResult.card,
+                        context: {
+                          ...marketResult.context,
+                          catalogId:
+                            marketResult.context.catalogId ?? s.context.catalogId,
+                        },
+                      }
+                    : s,
+                ),
+              );
+            }
+          } catch {
+            /* keep restored rows */
+          } finally {
+            setEnriching(false);
+            setProgress(null);
+          }
+        })();
+      }
     },
     [cancelPendingEnrich],
   );
@@ -1622,6 +1761,80 @@ export function useScanSession(options?: {
     [],
   );
 
+  const ingestSlabzRip = useCallback(
+    async (rip: SlabzRipRecord, pack?: SlabzPack | null): Promise<ScanSpecimen[]> => {
+      if (!rip.card) {
+        throw new Error("Reveal this slab before opening it in Liquid Scan.");
+      }
+
+      const built = buildSlabzRipSpecimen(rip, pack ?? null);
+      const specimen: ScanSpecimen = {
+        id: built.specimenId,
+        card: built.card,
+        context: built.context,
+        previewUrl: rip.card.imageUrl?.trim() || null,
+        evidenceCropLocation: null,
+        userEvidenceCropCenter: null,
+        userEvidenceCropRadiusMultiplier: null,
+      };
+
+      setSlots([]);
+      setSpecimens([specimen]);
+      setSelectedId(specimen.id);
+      setError(null);
+      setEnriching(true);
+      setEnrichingSpecimenId(specimen.id);
+      setProgress("Matching Slabz slab to catalog…");
+
+      try {
+        const catalogResult = await enrichExtractedCard({
+          specimenId: specimen.id,
+          card: specimen.card,
+          phase: "catalog",
+          ...pickCatalogContext(specimen.context),
+          extraction: specimen.context.extraction as Record<string, unknown>,
+          skipCache: true,
+        });
+
+        let row: ScanSpecimen = {
+          ...specimen,
+          card: catalogResult.card,
+          context: catalogResult.context,
+          previewUrl: specimen.previewUrl,
+        };
+        setSpecimens([row]);
+
+        const marketResult = await enrichExtractedCard({
+          specimenId: row.id,
+          card: row.card,
+          phase: "market",
+          ...pickCatalogContext(row.context),
+          catalogId: row.context.catalogId,
+          catalogImageUrl: row.context.catalogImageUrl,
+          extraction: row.context.extraction as Record<string, unknown>,
+          skipCache: true,
+        });
+
+        row = {
+          ...row,
+          card: marketResult.card,
+          context: marketResult.context,
+        };
+        setSpecimens([row]);
+        setProgress(null);
+        return [row];
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load Slabz slab");
+        setProgress(null);
+        return [];
+      } finally {
+        setEnriching(false);
+        setEnrichingSpecimenId(null);
+      }
+    },
+    [],
+  );
+
   const ingestLiveCameraScan = useCallback((result: LiveScanResult, file: File) => {
     const slotId = makeId("slot");
     setSlots((current) => [
@@ -1686,6 +1899,7 @@ export function useScanSession(options?: {
     clearSession,
     hydrateSavedSession,
     ingestCatalogPrefill,
+    ingestSlabzRip,
     ingestLiveCameraScan,
     digitalScanAssets,
     digitalScanProgress,

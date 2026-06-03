@@ -13,6 +13,8 @@ export function LiquidScanPanelBootstrap({
   onOpenLiveMarket,
   onOpenEbayEnding,
   onOpenPgtYoutube,
+  onOpenPgtArcade,
+  onOpenSlabzRip,
   onCatalogPrefill,
 }: {
   onOpenCatalog: () => void;
@@ -21,6 +23,8 @@ export function LiquidScanPanelBootstrap({
   onOpenLiveMarket: () => void;
   onOpenEbayEnding: () => void;
   onOpenPgtYoutube: () => void;
+  onOpenPgtArcade: () => void;
+  onOpenSlabzRip: () => void;
   onCatalogPrefill: (prefill: CatalogScanPrefill) => void;
 }) {
   const searchParams = useSearchParams();
@@ -48,6 +52,8 @@ export function LiquidScanPanelBootstrap({
     else if (panel === "live-market" || panel === "market") onOpenLiveMarket();
     else if (panel === "ebay-ending" || panel === "auctions") onOpenEbayEnding();
     else if (panel === "pgt-youtube" || panel === "pgt-video" || panel === "youtube") onOpenPgtYoutube();
+    else if (panel === "pgt-arcade" || panel === "arcade" || panel === "emulator") onOpenPgtArcade();
+    else if (panel === "slabz-rip" || panel === "slabz" || panel === "packs") onOpenSlabzRip();
     router.replace(LIQUID_SCAN_PATH, { scroll: false });
   }, [
     searchParams,
@@ -58,6 +64,8 @@ export function LiquidScanPanelBootstrap({
     onOpenLiveMarket,
     onOpenEbayEnding,
     onOpenPgtYoutube,
+    onOpenPgtArcade,
+    onOpenSlabzRip,
     onCatalogPrefill,
   ]);
 

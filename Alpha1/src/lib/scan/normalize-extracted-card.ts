@@ -5,6 +5,8 @@ import {
 } from "@/lib/scan/promo-set-aliases";
 import { classifyCardLane } from "@/lib/scan/lane";
 import { applyResolvedPrintEdition } from "@/lib/scan/print-edition";
+import { applyCatalogIdentityHardening } from "@/lib/scan/print-finish-inference";
+import { applyVintagePrintRunHardening } from "@/lib/scan/vintage-print-run";
 import { isDexLikeCardNumberOnly } from "@/lib/scan/collector-fraction";
 import { inferCardFranchise } from "@/lib/scan/franchise";
 import { normalizeJapanesePokemonIdentity } from "@/lib/scan/japanese-pokemon";
@@ -179,7 +181,13 @@ export function normalizeVisionCard(raw: unknown): ExtractedCard | null {
     labelTitle: asString(record.labelTitle),
   } as ExtractedCard);
   const wiz = franchiseHint.isPokemon
-    ? applyWizardsTitleAndFractionHeuristics(nameEarly, setAfterEdition, number, detailsAfterEdition)
+    ? applyWizardsTitleAndFractionHeuristics(
+        nameEarly,
+        setAfterEdition,
+        number,
+        detailsAfterEdition,
+        { year: asString(record.year), printStamps: asString(record.printStamps) },
+      )
     : {
         number,
         set: setAfterEdition,
@@ -189,6 +197,8 @@ export function normalizeVisionCard(raw: unknown): ExtractedCard | null {
   const numAfterWiz = wiz.number ?? number;
   const setAfterWiz = wiz.clearSet ? undefined : (wiz.set !== undefined ? wiz.set : setAfterEdition);
   const detAfterWiz = wiz.details ?? detailsAfterEdition;
+  const yearFromVision = asString(record.year);
+  const yearFromWiz = "year" in wiz && wiz.year ? wiz.year : undefined;
   const setFromFraction = applySetFromCollectorFraction(setAfterWiz, numAfterWiz, detAfterWiz);
   const setBeforePromo =
     setFromFraction.set !== undefined ? setFromFraction.set : setAfterWiz;
@@ -197,8 +207,7 @@ export function normalizeVisionCard(raw: unknown): ExtractedCard | null {
     : { set: setBeforePromo, number: numAfterWiz };
   const finalSet = canonicalPromoSetName(promoNorm.set) ?? promoNorm.set;
   const finalNumber = promoNorm.number ?? numAfterWiz;
-  const yearFromVision = asString(record.year);
-  const year = setFromFraction.year ?? yearFromVision;
+  const year = yearFromWiz ?? setFromFraction.year ?? yearFromVision;
   const bbox = asBbox(record.bbox);
 
   const printFromDetails = promoteFirstEditionFromDetails(
@@ -281,5 +290,7 @@ export function normalizeVisionCard(raw: unknown): ExtractedCard | null {
     ...graded,
     franchise: isNonTcgPokemonCollectible(graded) ? "other" : (graded.franchise ?? profile.id),
   };
-  return applyResolvedPrintEdition(withFranchise);
+  return applyVintagePrintRunHardening(
+    applyCatalogIdentityHardening(applyResolvedPrintEdition(withFranchise)),
+  );
 }

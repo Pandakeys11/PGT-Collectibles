@@ -1,30 +1,33 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Calculator, Camera, ChevronDown, Ellipsis, FileImage, Gavel, Loader2, Scan, TrendingUp, Tv, Upload, Zap, X } from "lucide-react";
+import {
+  Calculator,
+  Camera,
+  Ellipsis,
+  FileImage,
+  Gamepad2,
+  Gavel,
+  Loader2,
+  Scan,
+  TrendingUp,
+  Tv,
+  Upload,
+  Zap,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SCAN_MODE_OPTIONS } from "@/lib/scanner-chat/scan-mode-labels";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { CatalogCandidate } from "@/lib/scan/schemas";
-import type { ScanMode, UploadedImage } from "@/lib/scanner-chat/types";
+import type { UploadedImage } from "@/lib/scanner-chat/types";
 import { CatalogMatchQuickPick } from "./catalog-match-quick-pick";
 import { ImagePreviewStrip } from "./image-preview-strip";
 import { cn } from "@/lib/cn";
-
-const MODE_SHORT: Record<ScanMode, string> = {
-  fast: "Fast",
-  deep: "Deep",
-  market: "Market",
-  graded: "Graded",
-  binder: "Binder",
-};
 
 export function ScannerComposer({
   prompt,
   onPromptChange,
   images,
-  scanMode,
-  onScanModeChange,
   onFiles,
   onRemoveImage,
   onReorderImages,
@@ -42,6 +45,7 @@ export function ScannerComposer({
   onOpenLiveMarket,
   onOpenEbayEnding,
   onOpenPgtYoutube,
+  onOpenPgtArcade,
   supportsLiveCamera,
   reviewSpecimen,
   onConfirmCatalogCandidate,
@@ -55,8 +59,6 @@ export function ScannerComposer({
   prompt: string;
   onPromptChange: (v: string) => void;
   images: UploadedImage[];
-  scanMode: ScanMode;
-  onScanModeChange: (mode: ScanMode) => void;
   onFiles: (files: FileList | File[]) => void;
   onRemoveImage: (id: string) => void;
   onReorderImages: (from: number, to: number) => void;
@@ -74,6 +76,7 @@ export function ScannerComposer({
   onOpenLiveMarket?: () => void;
   onOpenEbayEnding?: () => void;
   onOpenPgtYoutube?: () => void;
+  onOpenPgtArcade?: () => void;
   supportsLiveCamera?: boolean;
   reviewSpecimen?: ScanSpecimen | null;
   onConfirmCatalogCandidate?: (specimenId: string, candidate: CatalogCandidate) => void;
@@ -85,7 +88,6 @@ export function ScannerComposer({
   className?: string;
 }) {
   const [liveCameraOk, setLiveCameraOk] = useState(supportsLiveCamera ?? false);
-  const [modesOpen, setModesOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -137,13 +139,10 @@ export function ScannerComposer({
       ? "Ask about FMV or comps…"
       : "Ask PGT…";
 
-  const activeMode = SCAN_MODE_OPTIONS.find((o) => o.id === scanMode);
-
   return (
     <div
       className={cn(
         "sc-mobile-composer shrink-0 border-t border-white/6 bg-chrome-deep backdrop-blur-xl",
-        modesOpen && "sc-composer-modes-open",
         className,
       )}
     >
@@ -258,6 +257,18 @@ export function ScannerComposer({
                   <Tv className="h-4 w-4" />
                 </button>
               ) : null}
+              {onOpenPgtArcade ? (
+                <button
+                  type="button"
+                  onClick={onOpenPgtArcade}
+                  disabled={isBusy}
+                  className="sc-composer-icon-btn hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/5 hover:text-indigo-200 disabled:opacity-40 touch-manipulation lg:flex lg:h-9 lg:w-9"
+                  aria-label="Open PGT Arcade"
+                  title="PGT Arcade — emulator games on PGTools (wallet sign-in)"
+                >
+                  <Gamepad2 className="h-4 w-4" />
+                </button>
+              ) : null}
               {onOpenCalculator ? (
                 <button
                   type="button"
@@ -323,7 +334,7 @@ export function ScannerComposer({
                 title={
                   speedOn
                     ? "Speed on — higher parallel vision/catalog/market"
-                    : "Speed off — gentler pacing; verify only on Deep Match or weak extraction"
+                    : "Speed off — gentler pacing; extra verify on weak single-card reads"
                 }
                 onClick={() => onSpeedOnChange(!speedOn)}
                 disabled={isBusy}
@@ -339,27 +350,7 @@ export function ScannerComposer({
                 <Zap className="h-4 w-4" />
               </button>
 
-              <button
-                type="button"
-                onClick={() => setModesOpen((v) => !v)}
-                disabled={isBusy}
-                aria-expanded={modesOpen}
-                aria-controls="sc-composer-modes"
-                className={cn(
-                  "sc-composer-mode-chip flex h-9 shrink-0 items-center gap-0.5 rounded-lg px-2 text-[10px] font-medium transition touch-manipulation sm:h-10 sm:gap-1 sm:px-2.5 sm:text-[11px] lg:h-9",
-                  modesOpen
-                    ? "bg-white/8 text-slate-200"
-                    : "text-slate-500 hover:bg-white/5 hover:text-slate-300",
-                )}
-              >
-                <span className="max-w-[3.25rem] truncate sm:max-w-none">{MODE_SHORT[scanMode]}</span>
-                <ChevronDown
-                  className={cn("h-3 w-3 shrink-0 transition sm:h-3.5 sm:w-3.5", modesOpen && "rotate-180")}
-                  aria-hidden
-                />
-              </button>
-
-              {(onOpenLiveMarket || onOpenEbayEnding || onOpenPgtYoutube || onOpenCalculator) ? (
+              {(onOpenLiveMarket || onOpenEbayEnding || onOpenPgtYoutube || onOpenPgtArcade || onOpenCalculator) ? (
                 <div ref={moreRef} className="relative shrink-0 lg:hidden">
                   <button
                     type="button"
@@ -437,6 +428,20 @@ export function ScannerComposer({
                           PGT Video
                         </button>
                       ) : null}
+                      {onOpenPgtArcade ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            onOpenPgtArcade();
+                            setMoreOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-slate-200 hover:bg-white/5"
+                        >
+                          <Gamepad2 className="h-4 w-4 shrink-0 text-indigo-300" />
+                          PGT Arcade
+                        </button>
+                      ) : null}
                       {onOpenCalculator ? (
                         <button
                           type="button"
@@ -473,51 +478,18 @@ export function ScannerComposer({
               <span className="text-sm font-semibold lg:text-xs">{submitLabel}</span>
             </Button>
           </div>
-
-          <div
-            id="sc-composer-modes"
-            className={cn(
-              "sc-composer-modes grid transition-[grid-template-rows] duration-200 ease-out",
-              modesOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-            )}
-          >
-            <div className="min-h-0 overflow-hidden">
-              <div className="flex gap-1 overflow-x-auto pb-0.5 pt-1.5 scanner-chat-scrollbar">
-                {SCAN_MODE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    title={opt.description}
-                    onClick={() => {
-                      onScanModeChange(opt.id);
-                      setModesOpen(false);
-                    }}
-                    disabled={isBusy}
-                    className={cn(
-                      "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-medium transition touch-manipulation sm:px-3 sm:py-1.5 sm:text-[11px]",
-                      scanMode === opt.id
-                        ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/30"
-                        : "text-slate-500 hover:bg-white/5 hover:text-slate-300",
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
 
         {!hasImages && !hasScanResults ? (
           <p className="sc-composer-hint mt-1 hidden text-center text-[10px] text-slate-600 sm:block lg:mt-0.5">
-            Upload or camera · tap mode for binder / graded · Enter to send
+            Upload or camera — binder pages, slabs, and singles auto-detect · Enter to send
           </p>
         ) : null}
         <p
           className="sc-composer-hint-sr sr-only"
           aria-live="polite"
         >
-          {activeMode?.description}
+          Liquid Scan auto-detects binder pages, slabs, and single cards.
           {digitalScanOn ? " Digital Scan on." : ""}
           {speedOn ? " Speed on." : " Speed off."}
         </p>

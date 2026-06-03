@@ -9,7 +9,9 @@ import { listPokemonSetsVintageFirst } from "@/lib/market/build-live-market-tick
 import { resolveCatalogMomentum } from "@/lib/market/catalog-momentum";
 import { hasParseableCatalogPrices, moverDisplayUsd } from "@/lib/market/catalog-price-utils";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
-import { hydrateSetUsMomentum } from "@/lib/market/hydrate-catalog-momentum";
+import { hydrateSetMomentum } from "@/lib/market/hydrate-catalog-momentum";
+import { momentumBackfillStatusMessage } from "@/lib/market/hydrate-catalog-momentum";
+import { setMomentumCoverage } from "@/lib/catalog/set-insight-utils";
 import type {
   MoversSignalKind,
   WeeklyMoverCard,
@@ -170,7 +172,7 @@ export async function buildSetMovers(
     // Same full-set + live TCG enrichment as set insight (not DB set_code scan alone).
     let { cards } = await loadSetCardsForCatalogInsight(needle);
     if (process.env.CATALOG_MOMENTUM_HYDRATE !== "0") {
-      cards = await hydrateSetUsMomentum(cards);
+      cards = await hydrateSetMomentum(cards);
     }
     const pool = cards.length > 0 ? moversFromInsightCards(cards, setName) : [];
     const regions = countMomentumRegions(pool);
@@ -186,6 +188,15 @@ export async function buildSetMovers(
       decreases = downs;
     }
 
+    const coverage = setMomentumCoverage(cards);
+    const hint =
+      increases.length === 0 && decreases.length === 0
+        ? momentumBackfillStatusMessage() ??
+          (coverage === 0
+            ? "No PGT US trend windows yet — run catalog price sync to build TCG ticks; sold comps fill in as scans ingest."
+            : null)
+        : null;
+
     return {
       setId: needle,
       setName,
@@ -196,6 +207,7 @@ export async function buildSetMovers(
       momentumUsCount: regions.us,
       momentumEuCount: regions.eu,
       signalKind,
+      hint,
     };
   } catch (e) {
     return {

@@ -1,5 +1,5 @@
 import { syncSetCatalogPricesFromTcgApi } from "@/lib/catalog/catalog-set-price-sync";
-import { hydrateSetUsMomentum } from "@/lib/market/hydrate-catalog-momentum";
+import { hydrateSetMomentum } from "@/lib/market/hydrate-catalog-momentum";
 import { loadSetMarketEvidenceMap } from "@/lib/catalog/set-insight-comps";
 import { listCardsFromDb } from "@/lib/catalog/db-catalog-browse";
 import type { CatalogSetInsightPayload, SetInsightPriceCard } from "@/lib/catalog/set-insight-payload";
@@ -23,6 +23,7 @@ import {
   enrichCardsWithLiveTcgPrices,
   promoCardsInSet,
   rollupSetInsightCards,
+  setMomentumCoverage,
   topMomentumCards,
   topValueCards,
   type SetInsightCardSource,
@@ -218,10 +219,12 @@ export async function loadSetCardsForCatalogInsight(setId: string): Promise<{
   let tcgCards: TcgCardSummary[] = [];
 
   const pricedBeforeLive = cards.length ? rollupSetInsightCards(cards).pricedSlots : 0;
+  const momentumBeforeLive = setMomentumCoverage(cards);
   const needsLivePrices =
     cards.length === 0 ||
     pricedBeforeLive === 0 ||
-    pricedBeforeLive / cards.length < divisorForLivePriceFetch(cards.length);
+    pricedBeforeLive / cards.length < divisorForLivePriceFetch(cards.length) ||
+    momentumBeforeLive < 0.12;
 
   if (needsLivePrices) {
     try {
@@ -280,7 +283,7 @@ export async function buildCatalogSetInsight(
   }
 
   if (process.env.CATALOG_MOMENTUM_HYDRATE !== "0") {
-    cards = await hydrateSetUsMomentum(cards);
+    cards = await hydrateSetMomentum(cards);
   }
 
   evidenceByCatalogId = await loadSetMarketEvidenceMap(cards.map((c) => c.id));

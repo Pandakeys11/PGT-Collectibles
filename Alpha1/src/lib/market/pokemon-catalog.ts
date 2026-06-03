@@ -26,6 +26,14 @@ import { inferCardFranchise } from "@/lib/scan/franchise";
 import { toCatalogCounterpartCard } from "@/lib/scan/japanese-pokemon";
 import { resolvePrintEdition } from "@/lib/scan/print-edition";
 import { hasReadableCertNumber } from "@/lib/scan/graded-slab";
+import {
+  detectSameArtCatalogCollision,
+  scoreSameArtCatalogRow,
+} from "@/lib/scan/same-art-disambiguation";
+import {
+  detectVintagePrintCatalogCollision,
+  scoreVintagePrintCatalogRow,
+} from "@/lib/scan/vintage-print-run";
 
 export type TcgPlayerVariantPrice = {
   variant: string;
@@ -60,6 +68,17 @@ export type PokeTraceCatalogMeta = {
   median30dUsd: number | null;
 };
 
+/** JustTCG statistics spine (7d/30d TCGPlayer trends when PokeTrace is unavailable). */
+export type JustTcgCatalogMeta = {
+  cardId: string;
+  syncedAt: string;
+  tcgplayerId: string | null;
+  momentumPct: number | null;
+  avgPrice7dUsd: number | null;
+  avgPrice30dUsd: number | null;
+  priceUsd: number | null;
+};
+
 export type CatalogPriceSnapshot = {
   tcgPlayerUrl: string | null;
   tcgPlayerUpdatedAt: string | null;
@@ -81,6 +100,10 @@ export type CatalogPriceSnapshot = {
   priceChartingPsa8Usd?: number | null;
   /** PokeTrace 24/7 price spine (when POKETRACE_API_KEY is set). */
   pokeTrace?: PokeTraceCatalogMeta | null;
+  /** JustTCG price + 7d/30d stats (when JUSTTCG_API_KEY is set). */
+  justTcg?: JustTcgCatalogMeta | null;
+  /** PGT-owned US 7d vs 30d trend (comps + daily TCG ticks). */
+  pgtUs?: import("@/lib/market/pgt-us-trends/types").PgtUsTrendMeta | null;
 };
 
 export type CatalogMatch = {
@@ -574,6 +597,37 @@ function scoreCatalogCandidate(
   }
 
   const edition = resolvePrintEdition(scoringCard);
+  const sameArt = scoreSameArtCatalogRow(
+    scoringCard,
+    {
+      setName: catalogSet,
+      setCode: hit.set?.id ?? null,
+      setTotal: hit.set?.printedTotal ?? hit.set?.total ?? null,
+      variantKey: null,
+    },
+    edition ?? null,
+  );
+  score += sameArt.scoreDelta;
+  for (const reason of sameArt.reasons) {
+    if (!reasons.includes(reason)) reasons.push(reason);
+  }
+  for (const conflict of sameArt.conflicts) {
+    if (!conflicts.includes(conflict)) conflicts.push(conflict);
+  }
+
+  const vintagePrint = scoreVintagePrintCatalogRow(
+    scoringCard,
+    { catalogId: hit.id, variantKey: null },
+    edition ?? null,
+  );
+  score += vintagePrint.scoreDelta;
+  for (const reason of vintagePrint.reasons) {
+    if (!reasons.includes(reason)) reasons.push(reason);
+  }
+  for (const conflict of vintagePrint.conflicts) {
+    if (!conflicts.includes(conflict)) conflicts.push(conflict);
+  }
+
   if (edition && edition.id !== "unknown") {
     score += pushEvidence(evidence, {
       field: "print edition",
@@ -675,6 +729,54 @@ function resolveCatalogIdentityStatus(
   if (scored.length === 0) return "failed";
   const [top, runnerUp] = scored;
   const gap = top.score - (runnerUp?.score ?? 0);
+
+  if (
+    detectSameArtCatalogCollision(
+      {
+        name: top.name,
+        setName: top.setName,
+        cardNumber: top.cardNumber,
+        score: top.score,
+        reasons: top.reasons,
+        conflicts: top.conflicts,
+      },
+      runnerUp
+        ? {
+            name: runnerUp.name,
+            setName: runnerUp.setName,
+            cardNumber: runnerUp.cardNumber,
+            score: runnerUp.score,
+            reasons: runnerUp.reasons,
+            conflicts: runnerUp.conflicts,
+          }
+        : undefined,
+    )
+  ) {
+    return "ambiguous";
+  }
+
+  if (
+    detectVintagePrintCatalogCollision(
+      card ?? { set: undefined, number: undefined, printStamps: undefined, details: undefined },
+      {
+        catalogId: top.catalogId,
+        score: top.score,
+        reasons: top.reasons,
+        conflicts: top.conflicts,
+      },
+      runnerUp
+        ? {
+            catalogId: runnerUp.catalogId,
+            score: runnerUp.score,
+            reasons: runnerUp.reasons,
+            conflicts: runnerUp.conflicts,
+          }
+        : undefined,
+    )
+  ) {
+    return "ambiguous";
+  }
+
   const slabTrusted =
     hasReadableCertNumber(card?.cert) &&
     (card?.encapsulation === "graded_slab" || card?.visionLane === "graded");
@@ -684,6 +786,13 @@ function resolveCatalogIdentityStatus(
 
   const canConfirm = (scoreFloor: number, gapFloor: number) => {
     if (nameConflict) return false;
+    if (
+      top.conflicts.includes("print_variant") ||
+      top.conflicts.includes("denominator") ||
+      top.conflicts.includes("denominator conflict")
+    ) {
+      return false;
+    }
     if (top.score < scoreFloor || gap < gapFloor) return false;
     if (expectsNumber && !numberOk) return false;
     return true;

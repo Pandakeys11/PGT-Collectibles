@@ -1,14 +1,21 @@
 import type { ScanLaneMode } from "@/lib/scan/build-specimens";
+import { resolveLiquidScanStrategy } from "./resolve-liquid-scan-strategy";
 import type { ScanMode } from "./types";
 
 /** Maps chat scan modes to the legacy lane filter used by vision + enrich. */
 export function scanModeToLane(mode: ScanMode): ScanLaneMode {
+  if (mode === "auto") return "all";
   if (mode === "graded") return "graded";
   return "all";
 }
 
+function autoStrategy(imageCount: number, laneMode: ScanLaneMode) {
+  return resolveLiquidScanStrategy({ imageCount, manualMode: "auto" });
+}
+
 /** Deep Match — optional second vision verify pass (OpenRouter/Groq, not Gemini when skipped). */
 export function scanModeRequestsVisionVerify(mode: ScanMode): boolean {
+  if (mode === "auto") return false;
   return mode === "deep";
 }
 
@@ -18,6 +25,7 @@ export function scanModeUsesBinderGrid(
   imageCount: number,
   laneMode: ScanLaneMode,
 ): boolean {
+  if (mode === "auto") return autoStrategy(imageCount, laneMode).binderGrid;
   return imageCount === 1 && mode === "binder" && laneMode !== "graded";
 }
 
@@ -27,6 +35,7 @@ export function scanModeUsesSingleCardCrop(
   imageCount: number,
   laneMode: ScanLaneMode,
 ): boolean {
+  if (mode === "auto") return autoStrategy(imageCount, laneMode).singleCardCrop;
   if (imageCount !== 1) return false;
   if (laneMode === "graded") return true;
   return mode === "fast" || mode === "deep" || mode === "market";

@@ -8,6 +8,7 @@ CLI utilities for catalog sync, market ingest, database migrations, and smoke te
 |------|---------|
 | `scripts/*.mjs` | Node ESM scripts (most npm commands) |
 | `scripts/backfill-pokemon-psa10-comps.ts` | PSA 10 comp backfill (tsx) |
+| `scripts/backfill-pokemon-fmv-comps.ts` | Full-catalog raw FMV + sold comps (tsx) |
 | `scripts/lib/` | Shared helpers imported by scripts (not npm entrypoints) |
 | `scripts/archive/` | Retired one-off probes — see [archive/README.md](./archive/README.md) |
 | `scripts/load-env-local.mjs` | Loads `.env.local` for CLI scripts |
@@ -34,6 +35,7 @@ See `package.json` for the full list. Common groups:
 | `catalog:sync` / `catalog:sync:pokemon` | Incremental catalog sync |
 | `catalog:backfill:prices` | Full TCGPlayer FMV backfill |
 | `catalog:backfill:psa10` | PSA 10 comps backfill |
+| `catalog:backfill:fmv` | Raw FMV + sold comps (60d lookback, resumable) |
 | `catalog:sync:justtcg-prices` | JustTCG price hydrate |
 | `verify:catalog-health` | Master DB coverage check |
 
@@ -43,7 +45,7 @@ See `package.json` for the full list. Common groups:
 |--------|---------|
 | `market:ingest` / `market:ingest:set` | Set-scoped market memory |
 | `platform:nightly` / `platform:nightly:final` | Cron-style platform jobs |
-| `verify:ebay-sold` / `verify:brightdata` | Sold pipeline smoke |
+| `verify:ebay-sold` / `verify:pricecharting` / `verify:brightdata` | Sold + PriceCharting smoke |
 | `setup:brightdata` | Bright Data cert/pop setup |
 
 ### App smoke (dev server on `:3002`)

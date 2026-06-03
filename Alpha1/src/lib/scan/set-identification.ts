@@ -68,6 +68,26 @@ export const UNIQUE_DENOMINATOR_RULES: DenominatorRule[] = [
     ],
   },
   {
+    printedTotal: 110,
+    candidates: [
+      {
+        name: "Legendary Collection",
+        year: "2002",
+        symbolNote: "LC flame logo — reverse holo reprints; not Base /102",
+      },
+    ],
+  },
+  {
+    printedTotal: 112,
+    candidates: [
+      {
+        name: "Evolutions",
+        year: "2016",
+        symbolNote: "retro XY reprints — not Wizards /102",
+      },
+    ],
+  },
+  {
     printedTotal: 130,
     candidates: [
       {
@@ -279,21 +299,95 @@ export function catalogHitMatchesCardHint(
 
 /**
  * Correct common Wizards-era vision errors: /82 misread as /102 (Team Rocket vs Base),
- * Gym owner's cards misread as /102 instead of /132.
+ * Gym owner's cards misread as /102 instead of /132,
+ * Base Set /102 misread as /130 (Base Set 2).
  */
+export function correctBaseSetVersusBaseSet2FractionOcr(
+  card: Pick<ExtractedCard, "name" | "set" | "number" | "year" | "printStamps" | "details">,
+): { number?: string; set?: string; year?: string; details?: string } {
+  const frac = parseCollectorFraction(card.number);
+  const setTrim = (card.set ?? "").trim();
+  const detailsTrim = (card.details ?? "").trim();
+  const blob = [card.year, card.printStamps, card.details, card.set, card.name]
+    .filter(Boolean)
+    .join(" ");
+
+  if (frac?.den === 102 && /\bbase\s*set\s*2\b/i.test(setTrim)) {
+    return {
+      set: "Base Set",
+      year: card.year?.trim() || "1999",
+      details: appendSetOcrNote(
+        detailsTrim,
+        "Auto-correct: /102 is Base Set — Base Set 2 prints use /130 only.",
+      ),
+    };
+  }
+
+  if (frac?.den !== 130) return {};
+
+  if (/\bbase\s*set\s*2\b/i.test(setTrim)) return {};
+
+  const wizardsBaseSignals =
+    (/\bbase\s*set\b/i.test(setTrim) && !/\bbase\s*set\s*2\b/i.test(setTrim)) ||
+    /\b1999\b/.test(blob) ||
+    /\b(shadowless|1st\s*ed(?:ition)?|unlimited)\b/i.test(blob) ||
+    /\b(drop\s*shadow|no\s*drop\s*shadow|shadow\s*on\s*art)\b/i.test(blob);
+
+  if (!wizardsBaseSignals) return {};
+
+  const numer = frac.num.replace(/^0+/, "") || frac.num;
+  return {
+    number: `${numer}/102`,
+    set: setTrim && /\bbase\s*set\b/i.test(setTrim) ? "Base Set" : setTrim || "Base Set",
+    year: card.year?.trim() || "1999",
+    details: appendSetOcrNote(
+      detailsTrim,
+      "Auto-correct: /130 is Base Set 2 only — Wizards Base Set is /102 (common 102↔130 OCR on vintage holos).",
+    ),
+  };
+}
+
+function appendSetOcrNote(details: string, note: string): string {
+  return [details, note].filter(Boolean).join(" ┃ ");
+}
+
 export function applyWizardsTitleAndFractionHeuristics(
   name: string | undefined,
   set: string | undefined,
   number: string | undefined,
   details: string | undefined,
-): { set?: string; number?: string; details?: string; clearSet?: boolean } {
+  extras?: Pick<ExtractedCard, "year" | "printStamps">,
+): { set?: string; number?: string; details?: string; clearSet?: boolean; year?: string } {
+  const baseSetOcr = correctBaseSetVersusBaseSet2FractionOcr({
+    name,
+    set,
+    number,
+    year: extras?.year,
+    printStamps: extras?.printStamps,
+    details,
+  });
+  const numAfterBase = baseSetOcr.number ?? number;
+  const setAfterBase = baseSetOcr.set ?? set;
+  const detAfterBase = baseSetOcr.details ?? details;
+  const yearAfterBase = baseSetOcr.year;
+
   const nameTrim = name?.trim() ?? "";
-  const setTrim = set?.trim() ?? "";
-  const numTrim = number?.trim() ?? "";
-  const detTrim = details?.trim() ?? "";
+  const setTrim = setAfterBase?.trim() ?? "";
+  const numTrim = numAfterBase?.trim() ?? "";
+  const detTrim = detAfterBase?.trim() ?? "";
 
   const frac102 = numTrim.match(/^#?\s*(\d+)\s*\/\s*102\s*$/i);
-  if (!frac102) return {};
+  if (!frac102) {
+    if (baseSetOcr.number || baseSetOcr.set || baseSetOcr.details) {
+      return {
+        number: numAfterBase,
+        set: setAfterBase,
+        details: detAfterBase,
+        year: yearAfterBase,
+      };
+    }
+    return {};
+  }
 
   const numer = frac102[1]!;
 
@@ -307,7 +401,7 @@ export function applyWizardsTitleAndFractionHeuristics(
       "Auto-correct: Dark Pokémon + /102 → Team Rocket /82 (common 82↔102 OCR).";
     return {
       number: `${numer}/82`,
-      set: /team\s*rocket/i.test(setTrim) ? set : "Team Rocket",
+      set: /team\s*rocket/i.test(setTrim) ? setAfterBase : "Team Rocket",
       details: [detTrim, note].filter(Boolean).join(" ┃ "),
     };
   }
@@ -330,6 +424,15 @@ export function applyWizardsTitleAndFractionHeuristics(
       number: `${numer}/132`,
       clearSet: true,
       details: [detTrim, note].filter(Boolean).join(" ┃ "),
+    };
+  }
+
+  if (baseSetOcr.number || baseSetOcr.set || baseSetOcr.details) {
+    return {
+      number: numAfterBase,
+      set: setAfterBase,
+      details: detAfterBase,
+      year: yearAfterBase,
     };
   }
 
@@ -403,6 +506,12 @@ export function applySetFromCollectorFraction(
       /\bbase\s*set\b/i.test(sl) &&
       !/\b2\b/.test(sl) &&
       !/\bbase\s*set\s*2\b/i.test(sl)) ||
+    (frac.den === 110 &&
+      /\bbase\s*set\b/i.test(sl) &&
+      !/\blegendary\s*collection\b/i.test(sl)) ||
+    (frac.den === 112 &&
+      /\b(base\s*set|jungle|fossil|team\s*rocket)\b/i.test(sl) &&
+      !/\bevolutions\b/i.test(sl)) ||
     (frac.den === 132 && /\bbase\b/i.test(sl) && !/\bgym\b/i.test(sl));
 
   if (contradicts && unique) {
@@ -612,6 +721,8 @@ export function buildVisionSetIdentificationBlock(): string {
   - **/18** = **Southern Islands** (2001 boutique sheet): **palm-tree on a tiny island** set symbol — **not** Base, Jungle, Fossil, or Neo even if the Pokémon appears there. **Never** substitute Neo Genesis **/111**, Fossil **/62**, Jungle **/64**, or a bare Wizards number; read **/18** and **Southern Islands**.
   - **/82** = **Team Rocket** (black **R**). **Dark** Pokémon (e.g. Dark Charizard) use **/82**, not Base /102.
   - **/102** = **Base Set** (1999) — e.g. non-Dark Charizard; **German “Glurak”** may be Base /102.
+  - **/110** = **Legendary Collection** (2002) — Wizards reprints; **reverse holo** foil on the image border; **not** Base /102.
+  - **/112** = **Evolutions** (2016) — classic art reprints with modern card frame; **not** Wizards /102.
   - **/130** = **Base Set 2** (Poké Ball + **“2”**) — **never** use /102 for Base Set 2.
   - **/111** Neo Genesis; **/105** Neo Destiny; **/75** Neo Discovery.
   - **/132** = **Gym Heroes** or **Gym Challenge** — **Blaine's / Brock's / …** use gym building symbol (not Base Set).

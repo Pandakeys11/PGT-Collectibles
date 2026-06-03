@@ -88,10 +88,14 @@ async function ensureEmbeddingsForCandidates(args: {
     const image = await fetchCatalogImageBase64(imageUrl);
     if (!image) continue;
 
+    const textLabel = [candidate.name, candidate.setName, candidate.cardNumber]
+      .filter(Boolean)
+      .join(" · ");
     const embedding = await embedArtImage({
       base64: image.base64,
       mimeType: image.mimeType,
       task: "document",
+      textLabel,
     });
     if (!embedding) continue;
 
@@ -138,6 +142,7 @@ export async function matchCatalogByArt(args: {
     base64: args.image.base64,
     mimeType: args.image.mimeType,
     task: "query",
+    textLabel: [name, args.card.set, args.card.number].filter(Boolean).join(" · "),
   });
   if (!queryEmbedding) return null;
 

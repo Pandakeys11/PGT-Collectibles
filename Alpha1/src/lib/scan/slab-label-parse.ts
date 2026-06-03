@@ -56,6 +56,8 @@ function extractPromoOrCollectorNumber(text: string): string | undefined {
 function normalizePokemonSetName(fragment: string): string {
   const setName = fragment.trim().replace(/\s+/g, " ");
   const map: Array<[RegExp, string]> = [
+    [/^LEGENDARY\s*COLLECTION\b/i, "Legendary Collection"],
+    [/^LEG\.?\s*COLL\b/i, "Legendary Collection"],
     [/^BASE\s*(?:II|2)\b/i, "Base Set 2"],
     [/^BASE\s*SET\s*(?:II|2)\b/i, "Base Set 2"],
     [/^FOSSIL\b/i, "Fossil"],
@@ -105,6 +107,8 @@ function appendDetail(existing: string | undefined, extra: string): string {
 }
 
 const PSA_SET_PATTERNS: Array<{ pattern: RegExp; set: string; printStamp?: string; language?: string; nonTcg?: boolean }> = [
+  { pattern: /\bLEGENDARY\s*COLLECTION\b|\bLEG\.?\s*COLL\b/i, set: "Legendary Collection", printStamp: "Reverse Holo" },
+  { pattern: /\bEVOLUTIONS\b/i, set: "Evolutions" },
   { pattern: /\bBASE\s*(?:II|2)\b/i, set: "Base Set 2" },
   { pattern: /\bBASE\s*SET\s*(?:II|2)\b/i, set: "Base Set 2" },
   { pattern: /\bBASIC\b/i, set: "Base Set", language: "Japanese" },
@@ -181,7 +185,14 @@ function parsePsaPokemonLabelIdentity(raw: string): PsaPokemonLabelIdentity {
     if (matchInfo.nonTcg) {
       identity.details = "Pokemon non-TCG collectible";
     }
-  } else if (/\bPOKEMON\s+GAME\b/i.test(text)) {
+  } else if (/\bLEGENDARY\s*COLLECTION\b|\bLEG\.?\s*COLL\b|\b\/\s*110\b/i.test(text)) {
+    identity.set = "Legendary Collection";
+    identity.printStamps = "Reverse Holo";
+  } else if (/\bEVOLUTIONS\b|\b\/\s*112\b/i.test(text)) {
+    identity.set = "Evolutions";
+  } else if (/\bBASE\s*(?:II|2)\b|\bBASE\s*SET\s*(?:II|2)\b|\b\/\s*130\b/i.test(text)) {
+    identity.set = "Base Set 2";
+  } else if (/\bPOKEMON\s+GAME\b/i.test(text) && !/\b\/\s*110\b|\bLEGENDARY\b/i.test(text)) {
     identity.set = "Base Set";
   }
 

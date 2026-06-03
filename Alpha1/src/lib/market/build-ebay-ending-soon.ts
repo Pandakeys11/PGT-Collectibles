@@ -3,17 +3,13 @@ import {
   fetchEbayBrowseAccessToken,
 } from "@/lib/market/adapters/ebay";
 import {
-  EBAY_ENDING_SOON_HUB_URL,
-  type EbayEndingSoonListing,
-  type EbayEndingSoonPayload,
-} from "@/lib/market/ebay-ending-soon-types";
-import {
-  getEbayApiEnv,
-  getEbayBrowseConfigStatus,
-} from "@/lib/market/env-market";
+  ebayEndingSoonHubUrl,
+  resolveEbayEndingSoonFeed,
+  type EbayEndingSoonFeedId,
+} from "@/lib/market/ebay-ending-soon-feeds";
+import type { EbayEndingSoonListing, EbayEndingSoonPayload } from "@/lib/market/ebay-ending-soon-types";
+import { getEbayApiEnv, getEbayBrowseConfigStatus } from "@/lib/market/env-market";
 
-const POKEMON_TCG_CATEGORY = "2536";
-const SEARCH_QUERY = "Pokemon";
 const LISTING_LIMIT = 24;
 
 type BrowseItemSummary = {
@@ -67,14 +63,24 @@ function mapBrowseItem(item: BrowseItemSummary): EbayEndingSoonListing | null {
   };
 }
 
-export async function buildEbayEndingSoonFeed(): Promise<EbayEndingSoonPayload> {
-  const hubUrl = EBAY_ENDING_SOON_HUB_URL;
-  const empty: EbayEndingSoonPayload = {
+function emptyPayload(
+  feed: ReturnType<typeof resolveEbayEndingSoonFeed>,
+): EbayEndingSoonPayload {
+  return {
+    feedId: feed.id,
+    feedLabel: feed.label,
     ready: false,
     fetchedAt: null,
-    hubUrl,
+    hubUrl: ebayEndingSoonHubUrl(feed),
     listings: [],
   };
+}
+
+export async function buildEbayEndingSoonFeed(
+  feedId?: string | null,
+): Promise<EbayEndingSoonPayload> {
+  const feed = resolveEbayEndingSoonFeed(feedId);
+  const empty = emptyPayload(feed);
 
   const config = getEbayBrowseConfigStatus();
   if (!config.configured) {
@@ -98,8 +104,8 @@ export async function buildEbayEndingSoonFeed(): Promise<EbayEndingSoonPayload> 
   }
 
   const params = new URLSearchParams({
-    q: SEARCH_QUERY,
-    category_ids: POKEMON_TCG_CATEGORY,
+    q: feed.query,
+    category_ids: feed.categoryId,
     limit: String(LISTING_LIMIT),
     sort: "endingSoonest",
   });
@@ -136,19 +142,21 @@ export async function buildEbayEndingSoonFeed(): Promise<EbayEndingSoonPayload> 
 
   if (listings.length === 0) {
     return {
-      ready: false,
+      ...empty,
       fetchedAt: new Date().toISOString(),
-      hubUrl,
-      listings: [],
-      error: "No live Pokémon auctions ending soon — try again in a moment.",
+      error: feed.emptyMessage,
     };
   }
 
   return {
+    feedId: feed.id,
+    feedLabel: feed.label,
     ready: true,
     configured: true,
     fetchedAt: new Date().toISOString(),
-    hubUrl,
+    hubUrl: ebayEndingSoonHubUrl(feed),
     listings,
   };
 }
+
+export type { EbayEndingSoonFeedId };

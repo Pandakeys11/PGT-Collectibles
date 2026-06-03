@@ -12,6 +12,10 @@ import {
   buildEbayCardKeywordQuery,
   ebaySearchCategoryIdForCard,
 } from "@/lib/market/ebay-sold-common";
+import {
+  build130PointSoldSearchUrl,
+  oneThirtyPointSoldSearchQuery,
+} from "@/lib/market/one-thirty-point-urls";
 
 export type MarketSourceId =
   | "ebay"
@@ -21,7 +25,8 @@ export type MarketSourceId =
   | "fanatics"
   | "pricecharting"
   | "cardmarket"
-  | "tcgplayer";
+  | "tcgplayer"
+  | "oneThirtyPoint";
 
 export type MarketSourceLink = {
   source: MarketSourceId;
@@ -327,7 +332,33 @@ export const MARKET_SOURCES: MarketSourceDefinition[] = [
     soldSearchQuery: (card) => compact([identity(card), "market price"]),
     activeSearchQuery: (card) => identity(card),
   },
+  {
+    id: "oneThirtyPoint",
+    label: "130 Point",
+    domain: "130point.com",
+    soldUrl: (query) => build130PointSoldSearchUrl(query),
+    activeUrl: (query) => build130PointSoldSearchUrl(query),
+    soldSearchQuery: (card) => oneThirtyPointSoldSearchQuery(card),
+    activeSearchQuery: (card) => oneThirtyPointSoldSearchQuery(card),
+  },
 ];
+
+/** Add hub links from current card identity without dropping persisted enrich links. */
+export function mergeMarketSourceLinks(
+  persisted: MarketSourceLink[],
+  card: ExtractedCard,
+): MarketSourceLink[] {
+  const fresh = buildMarketSourceLinks(card);
+  const seen = new Set(persisted.map((l) => `${l.source}:${l.lane}`));
+  const out = [...persisted];
+  for (const link of fresh) {
+    const key = `${link.source}:${link.lane}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(link);
+  }
+  return out;
+}
 
 export function buildMarketSourceLinks(card: ExtractedCard): MarketSourceLink[] {
   const { lane } = classifyCardLane(card as Record<string, unknown>);
@@ -377,6 +408,18 @@ export function buildMarketSourceLinks(card: ExtractedCard): MarketSourceLink[] 
         },
       ];
     }
+    if (source.id === "oneThirtyPoint") {
+      const query = source.soldSearchQuery(card);
+      const url = build130PointSoldSearchUrl(query);
+      return [
+        {
+          source: "oneThirtyPoint",
+          label: "130 Point sold",
+          lane: "sold",
+          url,
+        },
+      ];
+    }
     return [
       {
         source: source.id,
@@ -405,6 +448,7 @@ export function inferMarketSourceFromUrl(url: string): MarketSourceId | null {
     if (host.includes("pricecharting.")) return "pricecharting";
     if (host.includes("cardmarket.")) return "cardmarket";
     if (host.includes("tcgplayer.")) return "tcgplayer";
+    if (host.includes("130point.")) return "oneThirtyPoint";
   } catch {
     return null;
   }
@@ -423,6 +467,7 @@ export function normalizeMarketSource(value: string | null | undefined): MarketS
   if (normalized.includes("pricecharting") || normalized.includes("price charting")) return "pricecharting";
   if (normalized.includes("cardmarket") || normalized.includes("card market")) return "cardmarket";
   if (normalized.includes("tcgplayer") || normalized.includes("tcg player")) return "tcgplayer";
+  if (normalized.includes("130point") || normalized.includes("130 point")) return "oneThirtyPoint";
   return null;
 }
 

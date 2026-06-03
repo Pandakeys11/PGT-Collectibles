@@ -3,6 +3,7 @@ import {
   snapshotHasTcgMarketPrices,
 } from "@/lib/catalog/catalog-price-snapshot";
 import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
+import { justTcgCatalogMetaFromCard } from "@/lib/market/justtcg/momentum";
 import type { JustTcgCard, JustTcgVariant } from "@/lib/market/justtcg/types";
 
 function asNumber(value: unknown): number | null {
@@ -24,8 +25,13 @@ function variantKey(variant: JustTcgVariant): string {
 
 function variantUpdatedAt(variant: JustTcgVariant): string | null {
   const raw = variant.lastUpdatedAt ?? variant.lastUpdated;
-  if (!raw?.trim()) return null;
-  return raw.slice(0, 10);
+  if (raw == null) return null;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return new Date(raw > 1e12 ? raw : raw * 1000).toISOString().slice(0, 10);
+  }
+  const s = String(raw).trim();
+  if (!s) return null;
+  return s.slice(0, 10);
 }
 
 function variantPrices(variant: JustTcgVariant) {
@@ -69,11 +75,14 @@ export function priceSnapshotFromJustTcgCard(
     .sort()
     .at(-1);
 
+  const meta = justTcgCatalogMetaFromCard(card);
+
   return {
     ...base,
     tcgPlayerUrl,
     tcgPlayerUpdatedAt: latestVariantDate ?? new Date().toISOString().slice(0, 10),
     tcgPlayerPrices: variantRows.length ? variantRows : base.tcgPlayerPrices,
+    justTcg: meta,
   };
 }
 
@@ -100,11 +109,15 @@ export function mergeJustTcgIntoPricesJson(
 
   const merged = priceSnapshotFromJustTcgCard(card, prior);
   const out = priceSnapshotToPricesJson(merged);
-  out.justTcg = {
+  const meta = justTcgCatalogMetaFromCard(card);
+  out.justTcg = meta ?? {
     cardId: card.id,
     syncedAt: new Date().toISOString(),
-    game: card.game ?? null,
     tcgplayerId: card.tcgplayerId != null ? String(card.tcgplayerId) : null,
+    momentumPct: null,
+    avgPrice7dUsd: null,
+    avgPrice30dUsd: null,
+    priceUsd: null,
   };
   return out;
 }

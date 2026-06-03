@@ -19,8 +19,10 @@ import { openAppraisalPrint } from "@/lib/scan/appraisal-export";
 import { downloadSpecimensCsv, downloadSpecimensJson } from "@/lib/scan/export";
 import { ChatMessageList } from "./chat-message";
 import { EmptyScannerState } from "./empty-scanner-state";
+import { LiquidScanQuickActions } from "./liquid-scan-quick-actions";
 import { MobileResultsDrawer } from "./mobile-results-drawer";
 import { MobileResultsFab } from "./mobile-results-fab";
+import type { MarketIntelIdleAction } from "./market-intelligence-idle-showcase";
 import { ScanIntelligencePanel } from "./scan-intelligence-panel";
 import { ScannerComposer } from "./scanner-composer";
 import { ScannerHeader } from "./scanner-header";
@@ -28,6 +30,7 @@ import { ScannerSidebar, type SidebarNavId } from "./scanner-sidebar";
 import { MasterCatalogSessionPanel } from "@/components/catalog/master-catalog-session-panel";
 import { prefetchMasterCatalogDefaults } from "@/lib/catalog/catalog-fetch-cache";
 import { EbayEndingSoonProvider } from "./ebay-ending-soon-provider";
+import { SlabzPartnerProvider } from "./slabz-partner-provider";
 import { LiveMarketTickerProvider } from "./live-market-ticker-provider";
 import { LiquidScanPanelBootstrap } from "./liquid-scan-panel-bootstrap";
 import { UploadDropzoneOverlay } from "./upload-dropzone";
@@ -59,9 +62,25 @@ export function ScannerChatShell() {
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" });
   }, []);
 
+  /** Only follow the feed when a new message row is appended — not catalog/card actions. */
+  const feedTailKeyRef = useRef<string | null>(null);
   useEffect(() => {
+    const msgs = chat.messages;
+    if (msgs.length === 0) return;
+    const last = msgs[msgs.length - 1]!;
+    const tailKey = `${msgs.length}:${last.id}`;
+    const prev = feedTailKeyRef.current;
+    feedTailKeyRef.current = tailKey;
+    if (prev === null) return;
+
+    const [prevLenStr, prevId] = prev.split(":");
+    const prevLen = Number(prevLenStr);
+    const grew = msgs.length > prevLen;
+    const newTail = last.id !== prevId;
+    if (!grew && !newTail) return;
+
     scrollToBottom();
-  }, [chat.messages, chat.cards, scrollToBottom]);
+  }, [chat.messages, scrollToBottom]);
 
   const catalogOpenedRef = useRef(false);
   useEffect(() => {
@@ -175,6 +194,38 @@ export function ScannerChatShell() {
     chat.downloadSingleDigitalScan(selectedDigitalScanAsset);
   }, [chat, selectedDigitalScanAsset]);
 
+  const handleIntelIdleAction = useCallback(
+    (action: MarketIntelIdleAction) => {
+      switch (action) {
+        case "live-market":
+          chat.openLiveMarketOutput();
+          break;
+        case "ebay-ending":
+          chat.openEbayEndingOutput();
+          break;
+        case "slabz-rip":
+          chat.openSlabzRipOutput();
+          break;
+        case "catalog":
+          chat.openCatalogOutput();
+          break;
+        case "calculator":
+          chat.openCalculatorOutput();
+          break;
+        case "companion":
+          chat.openCompanionOutput();
+          break;
+        case "youtube":
+          chat.openPgtYoutubeOutput();
+          break;
+        case "arcade":
+          chat.openPgtArcadeOutput();
+          break;
+      }
+    },
+    [chat],
+  );
+
   const intelligenceCropProps = useMemo(
     () => ({
       onRequestAdjustCrop: openCropForSelected,
@@ -184,13 +235,15 @@ export function ScannerChatShell() {
       onUpdateSpecimen: chat.handleUpdateSpecimen,
       onCommitSpecimenEdit: chat.handleCommitSpecimenEdit,
       rescanningId: chat.rescanningId,
+      onIdleAction: handleIntelIdleAction,
     }),
-    [chat, openCropForSelected],
+    [chat, handleIntelIdleAction, openCropForSelected],
   );
 
   return (
     <LiveMarketTickerProvider>
     <EbayEndingSoonProvider>
+    <SlabzPartnerProvider>
     <div className="scanner-chat-root flex h-[100dvh] w-full max-w-[100vw] flex-col overflow-hidden">
       <Suspense fallback={null}>
         <LiquidScanPanelBootstrap
@@ -200,6 +253,8 @@ export function ScannerChatShell() {
           onOpenLiveMarket={chat.openLiveMarketOutput}
           onOpenEbayEnding={chat.openEbayEndingOutput}
           onOpenPgtYoutube={chat.openPgtYoutubeOutput}
+          onOpenPgtArcade={chat.openPgtArcadeOutput}
+          onOpenSlabzRip={chat.openSlabzRipOutput}
           onCatalogPrefill={(prefill) => void chat.loadCatalogPrefill(prefill)}
         />
       </Suspense>
@@ -242,7 +297,9 @@ export function ScannerChatShell() {
             if (id === "catalog") chat.openCatalogOutput();
             else if (id === "live-market") chat.openLiveMarketOutput();
             else if (id === "pgt-youtube") chat.openPgtYoutubeOutput();
+            else if (id === "pgt-arcade") chat.openPgtArcadeOutput();
             else if (id === "ebay-ending") chat.openEbayEndingOutput();
+            else if (id === "slabz-rip") chat.openSlabzRipOutput();
             else if (id === "companion") chat.openCompanionOutput();
             else if (id === "calculator") chat.openCalculatorOutput();
             else if (id === "exports") handleExport("csv");
@@ -273,7 +330,7 @@ export function ScannerChatShell() {
               {chat.isGeneratingReport ? (
                 <p className="text-[11px] text-emerald-400/90">Writing session intelligence report…</p>
               ) : null}
-              {chat.progress && (chat.isScanning || chat.digitalScanRendering) && !chat.isAsking && !chat.isGeneratingReport ? (
+              {chat.progress && (chat.isScanning || chat.isEnriching || chat.digitalScanRendering) && !chat.isAsking && !chat.isGeneratingReport ? (
                 <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-200/90">
                   {chat.digitalScanRendering && chat.digitalScanProgress
                     ? `Digital Scan ${chat.digitalScanProgress.done}/${chat.digitalScanProgress.total}${chat.digitalScanProgress.currentLabel ? ` · ${chat.digitalScanProgress.currentLabel}` : ""}…`
@@ -290,6 +347,7 @@ export function ScannerChatShell() {
                 cardHandlers={cardHandlers}
                 companion={companion}
                 onCatalogScanPrefill={(prefill) => void chat.loadCatalogPrefill(prefill)}
+                onOpenSlabzRipInScan={(rip, pack) => void chat.loadSlabzRipInScan(rip, pack)}
                 onDismissMessage={chat.dismissMessage}
                 digitalScanOn={chat.digitalScanOn}
                 digitalScanAssets={chat.digitalScanAssetsList}
@@ -300,6 +358,11 @@ export function ScannerChatShell() {
                 onSaveDigitalScansToVault={() => void chat.saveDigitalScansToVault()}
                 onDownloadSingleDigitalScan={chat.downloadSingleDigitalScan}
                 vaultSaving={chat.vaultSaving}
+                scanPipelineActive={
+                  chat.isScanning || chat.enriching || chat.marketEnriching
+                }
+                scanProgressLabel={chat.progress}
+                scanSessionKey={chat.activeScanId}
                 className={hasUserActivity ? "" : "mt-6 sm:mt-8"}
               />
             </div>
@@ -307,7 +370,7 @@ export function ScannerChatShell() {
             <MobileResultsFab
               visible={!!chat.summary && !chat.resultsDrawerOpen && !chat.catalogPanelOpen}
               cardCount={chat.specimens.length}
-              scanning={chat.isScanning || chat.enriching}
+              scanning={chat.isScanning || chat.isEnriching}
               onOpen={() => chat.setResultsDrawerOpen(true)}
             />
             {chat.catalogPanelMounted ? (
@@ -320,13 +383,18 @@ export function ScannerChatShell() {
             ) : null}
           </div>
           <div className="sc-composer-stack shrink-0 border-t border-white/6 bg-chrome-deep/90 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md sm:px-4 lg:px-5">
+            {hasUserActivity ? (
+              <LiquidScanQuickActions
+                compact
+                onChipClick={(text) => void chat.handlePromptChip(text)}
+                className="mb-2 rounded-xl border border-white/8 bg-white/[0.03] px-1.5 py-2"
+              />
+            ) : null}
             <ScannerComposer
             className="sc-mobile-composer"
             prompt={chat.prompt}
             onPromptChange={chat.setPrompt}
             images={chat.images}
-            scanMode={chat.scanMode}
-            onScanModeChange={chat.setScanMode}
             onFiles={chat.addImages}
             onRemoveImage={chat.removeImage}
             onReorderImages={chat.reorderImages}
@@ -344,6 +412,7 @@ export function ScannerChatShell() {
             onOpenLiveMarket={() => chat.openLiveMarketOutput()}
             onOpenEbayEnding={() => chat.openEbayEndingOutput()}
             onOpenPgtYoutube={() => chat.openPgtYoutubeOutput()}
+            onOpenPgtArcade={() => chat.openPgtArcadeOutput()}
             reviewSpecimen={
               chat.selectedSpecimen?.context.catalogIdentityStatus !== "confirmed" ||
               chat.selectedSpecimen?.context.verificationStatus !== "verified"
@@ -503,6 +572,7 @@ export function ScannerChatShell() {
         onDownloadDigitalScan={handleDownloadSelectedDigitalScan}
       />
     </div>
+    </SlabzPartnerProvider>
     </EbayEndingSoonProvider>
     </LiveMarketTickerProvider>
   );

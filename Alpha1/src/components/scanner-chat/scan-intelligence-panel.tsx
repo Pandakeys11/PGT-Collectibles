@@ -16,11 +16,16 @@ import Link from "next/link";
 import { EvidenceRail } from "@/components/scan-panels/evidence-rail";
 import { CatalogMatchPanel } from "@/components/scan-panels/catalog-match-panel";
 import { CollectorCalculatorCollapsible } from "@/components/scanner-chat/collector-calculator-collapsible";
+import {
+  MarketIntelligenceIdleShowcase,
+  type MarketIntelIdleAction,
+} from "@/components/scanner-chat/market-intelligence-idle-showcase";
 import { SpecimenMarketHub } from "@/components/scanner-chat/specimen-market-hub";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { ExtractedCard } from "@/lib/scan/schemas";
 import type { CatalogCandidate } from "@/lib/scan/schemas";
 import type { CardMatch, ScanSummary } from "@/lib/scanner-chat/types";
+import { CardIdentityMeta } from "@/components/scanner-chat/card-identity-meta";
 import { cn } from "@/lib/cn";
 
 export function ScanIntelligencePanel({
@@ -52,6 +57,7 @@ export function ScanIntelligencePanel({
   compsSectionRef,
   isPro,
   onOpenMasterCatalog,
+  onIdleAction,
   layoutMode = "sidebar",
   className,
   digitalScanAsset = null,
@@ -87,6 +93,8 @@ export function ScanIntelligencePanel({
   compsSectionRef?: React.RefObject<HTMLDivElement>;
   isPro?: boolean;
   onOpenMasterCatalog?: () => void;
+  /** Opens chat-embedded tools while no card market intel is active. */
+  onIdleAction?: (action: MarketIntelIdleAction) => void;
   /** Sidebar on desktop; drawer uses a single scroll column with external footer. */
   layoutMode?: "sidebar" | "drawer";
   className?: string;
@@ -190,7 +198,13 @@ export function ScanIntelligencePanel({
             cards · ${summary.estimatedTotal.toLocaleString()} FMV
           </p>
         ) : null}
-        {!summary ? (
+        {onIdleAction && !selectedSpecimen ? (
+          <MarketIntelligenceIdleShowcase
+            onAction={onIdleAction}
+            hasSession={Boolean(summary)}
+            variant={summary ? "compact" : "full"}
+          />
+        ) : !summary ? (
           <p className="text-sm text-slate-600">Run a scan to unlock market intelligence.</p>
         ) : null}
 
@@ -264,15 +278,16 @@ export function ScanIntelligencePanel({
               </div>
             </motion.div>
           ) : (
-            <motion.p
+            <motion.div
               key="empty"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="rounded-xl border border-dashed border-white/10 px-3 py-6 text-center text-sm text-slate-600"
+              className="space-y-2"
             >
-              Click a detected card in the feed to see FMV, premium graded comps, live listings,
-              and last solds.
-            </motion.p>
+              <p className="rounded-lg border border-dashed border-white/10 px-3 py-2 text-center text-[11px] text-slate-500">
+                Click a card in the feed for FMV, graded comps, listings, and sold history.
+              </p>
+            </motion.div>
           )}
         </AnimatePresence>
 
@@ -288,13 +303,13 @@ export function ScanIntelligencePanel({
                   type="button"
                   onClick={() => onSelectSpecimen(c.specimenId)}
                   className={cn(
-                    "w-full truncate rounded-lg px-2 py-1.5 text-left text-xs transition",
+                    "w-full rounded-lg px-2 py-1.5 text-left transition",
                     selectedSpecimenId === c.id
                       ? "bg-emerald-500/15 text-emerald-100"
                       : "text-slate-500 hover:bg-white/5 hover:text-slate-300",
                   )}
                 >
-                  {c.name}
+                  <CardIdentityMeta card={c} variant="compact" />
                 </button>
               ))}
             </div>

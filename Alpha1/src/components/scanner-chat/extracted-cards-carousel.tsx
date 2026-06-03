@@ -29,6 +29,7 @@ import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { CatalogCandidate } from "@/lib/scan/schemas";
 import type { CardMatch } from "@/lib/scanner-chat/types";
 import { CatalogMatchQuickPick } from "./catalog-match-quick-pick";
+import { CardIdentityMeta } from "./card-identity-meta";
 import { cn } from "@/lib/cn";
 
 const SWIPE_THRESHOLD = 56;
@@ -172,9 +173,7 @@ function ExtractedCardInfoPanel({
   const cert =
     card.graded?.cert && card.graded.cert !== "NA"
       ? card.graded.cert
-      : card.setNumber && card.setNumber !== "—"
-        ? `#${card.setNumber}`
-        : null;
+      : null;
   const slabStyle = resolveGraderBadgeFromCardMatch(card);
   const fmvGem =
     card.fmvUsd != null && card.fmvUsd > 0 ? card.fmvDisplay.replace(/^\$/, "") : null;
@@ -200,15 +199,7 @@ function ExtractedCardInfoPanel({
                 </span>
               ) : null}
             </div>
-            <h3 className="mt-1.5 truncate font-display text-lg font-semibold leading-snug text-white sm:text-xl">
-              {card.name}
-            </h3>
-            <p className="mt-1 truncate text-sm text-slate-400">{card.setName}</p>
-            {card.printVersion ? (
-              <p className="mt-0.5 truncate text-[11px] font-medium text-violet-300/90">
-                {card.printVersion}
-              </p>
-            ) : null}
+            <CardIdentityMeta card={card} variant="panel" />
             <div className="mt-2.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <p
                 className={cn(

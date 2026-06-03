@@ -37,6 +37,8 @@ export async function justTcgGetCards(
   if (!apiKey) return { cards: [], usage: undefined, error: "missing_api_key" };
 
   const url = new URL(`${getJustTcgBaseUrl()}/cards`);
+  url.searchParams.set("include_statistics", "7d,30d");
+  url.searchParams.set("include_price_history", "false");
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && String(value).length) {
       url.searchParams.set(key, String(value));
@@ -59,6 +61,8 @@ export async function justTcgGetCards(
   return { cards: body.data ?? [], usage: body.usage, error: null };
 }
 
+const STATS_QUERY = "include_statistics=7d%2C30d&include_price_history=false";
+
 /** Batch price lookup (Free max 20 items per call). */
 export async function justTcgBatchLookupCards(
   items: JustTcgBatchLookupItem[],
@@ -68,10 +72,10 @@ export async function justTcgBatchLookupCards(
     return { cards: [], usage: undefined, error: items.length ? "missing_api_key" : null };
   }
 
-  const res = await fetch(`${getJustTcgBaseUrl()}/cards`, {
+  const res = await fetch(`${getJustTcgBaseUrl()}/cards?${STATS_QUERY}`, {
     method: "POST",
     headers: headers(apiKey),
-    body: JSON.stringify({ cards: items }),
+    body: JSON.stringify(items),
     cache: "no-store",
     signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   });

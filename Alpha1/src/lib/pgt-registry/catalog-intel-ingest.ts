@@ -3,12 +3,17 @@ import {
   priceSnapshotToPricesJson,
 } from "@/lib/catalog/catalog-price-snapshot";
 import { getCardFromDb } from "@/lib/catalog/db-catalog-browse";
-import { upsertCatalogCards } from "@/lib/catalog/db-catalog";
+import { patchCatalogCardPricesJson, upsertCatalogCards } from "@/lib/catalog/db-catalog";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
 import { priceChartingUsdFromEvidence } from "@/lib/market/catalog-raw-fmv";
 import { inferEvidenceGradeBucket } from "@/lib/market/market-intelligence";
 import { isPokeTraceConfigured, isPokeTracePrimary } from "@/lib/market/env-market";
 import { refreshPokeTraceCatalogPrices } from "@/lib/market/poketrace/sync-catalog";
+import {
+  filterSoldEvidenceByLookback,
+  resolveSoldLookbackDays,
+} from "@/lib/market/evidence-dates";
+import { priceChartingGuideFieldsFromEvidence } from "@/lib/market/pricecharting/guide-from-evidence";
 import { harvestPriceChartingSoldEvidence } from "@/lib/market/pricecharting/harvest-sold";
 import { toPriceChartingHistoryUrl } from "@/lib/market/pricecharting/queries";
 import { researchCardMarket } from "@/lib/market/research";
@@ -17,6 +22,7 @@ import { fetchPokemonCardById } from "@/lib/pokedex/tcg-api-server";
 import { isBrightDataPopHarvestEnabled } from "@/lib/market/brightdata/config";
 import { harvestGraderPopForCatalogCard } from "@/lib/pgt-registry/grader-pop-ingest";
 import { persistTcgReferenceCompsForCatalogCard } from "@/lib/market/catalog-tcg-reference-comps";
+import { recordPgtUsPriceTickFromSnapshot } from "@/lib/market/pgt-us-trends/persist-ticks";
 import { persistMarketIntelFromEnrich } from "@/lib/pgt-registry/pgt-market-intel-persist";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { MarketEvidence } from "@/lib/scan/schemas";
@@ -81,6 +87,7 @@ export async function refreshCatalogPricesFromTcgApi(catalogId: string): Promise
     setName: card.set?.name ?? null,
     prices: snap,
   });
+  void recordPgtUsPriceTickFromSnapshot(catalogId, snap);
 
   return true;
 }
@@ -91,8 +98,18 @@ async function persistPriceChartingOnCatalogCard(
   evidence: MarketEvidence[],
   options?: { productUrl?: string | null; historyUrl?: string | null },
 ): Promise<void> {
-  const pcUsd = priceChartingUsdFromEvidence(evidence);
-  if (pcUsd == null && !options?.historyUrl && !options?.productUrl) return;
+  const guides = priceChartingGuideFieldsFromEvidence(evidence);
+  const pcUsd = guides.looseUsd ?? priceChartingUsdFromEvidence(evidence);
+  if (
+    pcUsd == null &&
+    guides.psa10Usd == null &&
+    guides.psa9Usd == null &&
+    guides.psa8Usd == null &&
+    !options?.historyUrl &&
+    !options?.productUrl
+  ) {
+    return;
+  }
   if (!isSupabaseConfigured()) return;
 
   const card = await getCardFromDb("pokemon", catalogId);
@@ -102,7 +119,10 @@ async function persistPriceChartingOnCatalogCard(
   const pcRow = evidence.find((e) => /pricecharting/i.test(e.source ?? "") && e.url);
   const historyUrl =
     options?.historyUrl ??
-    toPriceChartingHistoryUrl(options?.productUrl ?? pcRow?.url ?? snap.priceChartingUrl);
+    toPriceChartingHistoryUrl(
+      options?.productUrl ?? guides.productUrl ?? pcRow?.url ?? snap.priceChartingUrl,
+    );
+  const today = new Date().toISOString().slice(0, 10);
   const pricesJson = {
     tcgPlayerUrl: snap.tcgPlayerUrl,
     tcgPlayerUpdatedAt: snap.tcgPlayerUpdatedAt,
@@ -112,27 +132,15 @@ async function persistPriceChartingOnCatalogCard(
     cardMarket: snap.cardMarket,
     priceChartingLooseUsd: pcUsd ?? snap.priceChartingLooseUsd ?? null,
     priceChartingUrl: historyUrl ?? snap.priceChartingUrl,
-    priceChartingUpdatedAt: new Date().toISOString().slice(0, 10),
+    priceChartingUpdatedAt: today,
+    priceChartingPsa10Usd: guides.psa10Usd ?? snap.priceChartingPsa10Usd ?? null,
+    priceChartingPsa10Url: historyUrl ?? snap.priceChartingPsa10Url ?? null,
+    priceChartingPsa10UpdatedAt: guides.psa10Usd != null ? today : snap.priceChartingPsa10UpdatedAt ?? null,
+    priceChartingPsa9Usd: guides.psa9Usd ?? snap.priceChartingPsa9Usd ?? null,
+    priceChartingPsa8Usd: guides.psa8Usd ?? snap.priceChartingPsa8Usd ?? null,
   };
 
-  await upsertCatalogCards([
-    {
-      franchise: "pokemon",
-      catalogId,
-      name: card.name,
-      printedName: card.name,
-      setName: card.set?.name ?? null,
-      setCode: card.set?.code ?? null,
-      cardNumber: card.number,
-      year: card.set?.releaseDate?.slice(0, 4) ?? null,
-      rarity: card.rarity,
-      imageSmallUrl: card.images?.small ?? null,
-      imageLargeUrl: card.images?.large ?? null,
-      pricesJson,
-      rawJson: { catalogVariantKey: card.catalogVariantKey },
-      sourceId: "pgt_market_ingest",
-    },
-  ]);
+  await patchCatalogCardPricesJson("pokemon", catalogId, pricesJson);
 }
 
 /**
@@ -205,9 +213,10 @@ export type CatalogIntelIngestResult = {
 /** Per-card ingest: prices refresh + market research + comps + pop snapshots. */
 export async function ingestCatalogMarketIntel(
   catalogId: string,
-  options?: { profile?: "nightly" | "full" },
+  options?: { profile?: "nightly" | "full"; soldLookbackDays?: number },
 ): Promise<CatalogIntelIngestResult> {
   const profile = options?.profile ?? "full";
+  const soldLookbackDays = resolveSoldLookbackDays(options?.soldLookbackDays);
   const id = catalogId.trim();
   if (!id) {
     return {
@@ -266,12 +275,22 @@ export async function ingestCatalogMarketIntel(
       mergedEvidence.push(row);
     }
 
+    const evidenceToPersist =
+      soldLookbackDays > 0
+        ? filterSoldEvidenceByLookback(mergedEvidence, soldLookbackDays)
+        : mergedEvidence;
+
     await persistMarketIntelFromEnrich({
       catalogId: id,
       card,
-      marketEvidence: mergedEvidence,
+      marketEvidence: evidenceToPersist,
     });
-    await persistPriceChartingOnCatalogCard(id, mergedEvidence, {
+
+    const afterIngest = await getCardFromDb("pokemon", id);
+    if (afterIngest?.prices) {
+      void recordPgtUsPriceTickFromSnapshot(id, afterIngest.prices);
+    }
+    await persistPriceChartingOnCatalogCard(id, evidenceToPersist, {
       productUrl: pcHarvest.productUrl,
       historyUrl: pcHarvest.historyUrl,
     });

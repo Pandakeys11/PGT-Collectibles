@@ -7,6 +7,7 @@ import {
   type SetInsightCardSource,
 } from "@/lib/catalog/set-insight-utils";
 import { persistTcgReferenceCompsForCatalogCard } from "@/lib/market/catalog-tcg-reference-comps";
+import { recordPgtUsPriceTickFromSnapshot } from "@/lib/market/pgt-us-trends/persist-ticks";
 import { bestCatalogUsd } from "@/lib/market/catalog-price-utils";
 import { parseCatalogPriceSnapshot } from "@/lib/market/catalog-reference-evidence";
 import {
@@ -131,6 +132,8 @@ export async function syncSetCatalogPricesFromTcgApi(
       setName: row.set?.name ?? null,
       prices: snap,
     });
+
+    void recordPgtUsPriceTickFromSnapshot(row.id, snap);
   }
 
   if (upserts.length) {

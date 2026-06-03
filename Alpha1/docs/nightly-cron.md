@@ -67,3 +67,4 @@ Run on a machine with `.env.local` (not Vercel cron):
 1. **Raw TCGPlayer FMV (Pokémon)** — `npm run catalog:backfill:prices` (checkpoint `.tmp/pokemon-price-backfill.json`)
 2. **Raw TCGPlayer FMV (other franchises)** — `npm run catalog:sync:justtcg-prices` for magic / yugioh / lorcana / onepiece (requires `JUSTTCG_API_KEY`)
 3. **PSA 10 comps** — `npm run catalog:backfill:psa10` after raw completes (see [catalog-psa10-backfill.md](./catalog-psa10-backfill.md))
+4. **Raw FMV + sold comps (60-day lookback)** — `npm run catalog:backfill:fmv` (checkpoint `.tmp/pokemon-fmv-backfill.json`). Requires eBay sold + PriceCharting for best coverage; use `--refresh-set-insights` to rebuild set insight cache per set.

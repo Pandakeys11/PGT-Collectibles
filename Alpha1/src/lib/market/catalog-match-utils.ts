@@ -6,6 +6,7 @@ import type {
   IdentityEvidence,
 } from "@/lib/scan/schemas";
 import type { CatalogPriceSnapshot } from "@/lib/market/pokemon-catalog";
+import { parseCollectorFraction } from "@/lib/scan/collector-fraction";
 
 export type ScoredCatalogRow = {
   catalogId: string;
@@ -59,6 +60,23 @@ export function resolveCatalogIdentityStatus(
   return "failed";
 }
 
+function collectorNumbersAgree(
+  cardNumber: string | undefined,
+  hitNumber: string | undefined,
+): "match" | "mismatch" | "unknown" {
+  const cardFrac = parseCollectorFraction(cardNumber);
+  const hitFrac = parseCollectorFraction(hitNumber);
+  if (cardFrac && hitFrac) {
+    return cardFrac.num === hitFrac.num && cardFrac.den === hitFrac.den ? "match" : "mismatch";
+  }
+  const cardHead = cardNumber?.trim().match(/^#?\s*(\d+)/)?.[1]?.replace(/^0+(?=\d)/, "");
+  const hitHead = hitNumber?.trim().match(/^#?\s*(\d+)/)?.[1]?.replace(/^0+(?=\d)/, "");
+  if (cardHead && hitHead) {
+    return cardHead === hitHead ? "match" : "mismatch";
+  }
+  return "unknown";
+}
+
 export function scoreNameSetNumber(
   card: ExtractedCard,
   hit: { name: string; setName?: string | null; cardNumber?: string | null; year?: string | null },
@@ -71,8 +89,6 @@ export function scoreNameSetNumber(
   const hitName = normalizeCatalogToken(hit.name);
   const set = normalizeCatalogToken(card.set);
   const hitSet = normalizeCatalogToken(hit.setName);
-  const num = normalizeCatalogToken(card.number)?.replace(/\s+/g, "");
-  const hitNum = normalizeCatalogToken(hit.cardNumber)?.replace(/\s+/g, "");
 
   if (options?.franchiseHint) {
     score += 8;
@@ -97,10 +113,11 @@ export function scoreNameSetNumber(
       conflicts.push("set");
     }
   }
-  if (num && hitNum && (num === hitNum || hitNum.includes(num) || num.includes(hitNum))) {
+  const numberAgreement = collectorNumbersAgree(card.number, hit.cardNumber ?? undefined);
+  if (numberAgreement === "match") {
     score += 18;
     reasons.push("number");
-  } else if (num && hitNum) {
+  } else if (numberAgreement === "mismatch") {
     conflicts.push("number");
   }
   if (card.year && hit.year && card.year === hit.year) {

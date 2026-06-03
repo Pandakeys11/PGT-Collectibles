@@ -1,5 +1,6 @@
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { ExtractedCard } from "@/lib/scan/schemas";
+import { catalogVariantLabelFromCatalogId } from "@/lib/scan/print-identity-ui";
 import { resolvePrintEdition } from "@/lib/scan/print-edition";
 
 /** Sports / TCG parallel and finish cues (non-Pokémon canonical ids). */
@@ -98,12 +99,16 @@ export function displayPrintPromo(
 }
 
 export function displayPrintVersionForSpecimen(specimen: ScanSpecimen): string {
-  const version = displayPrintVersion(specimen.card, specimen.context.variantLabel);
+  const catalogVariant = catalogVariantLabelFromCatalogId(specimen.context.catalogId);
+  const variantHint = catalogVariant ?? specimen.context.variantLabel;
+  const version = displayPrintVersion(specimen.card, variantHint);
   return version || "—";
 }
 
 export function displayPrintPromoForSpecimen(specimen: ScanSpecimen): string {
-  const promo = displayPrintPromo(specimen.card, specimen.context.variantLabel);
+  const catalogVariant = catalogVariantLabelFromCatalogId(specimen.context.catalogId);
+  const variantHint = catalogVariant ?? specimen.context.variantLabel;
+  const promo = displayPrintPromo(specimen.card, variantHint);
   return promo || "—";
 }
 

@@ -4,17 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { BarChart2, BookOpen, ChevronRight, Layers, LayoutGrid, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
-
-const PROMPT_CHIPS = [
-  "Scan binder page",
-  "Live market pulse",
-  "Vendor calculator",
-  "Open master catalog",
-  "Open companion",
-  "Identify graded cards",
-  "Estimate market value",
-  "Export to CSV",
-] as const;
+import { LiquidScanQuickActions } from "./liquid-scan-quick-actions";
 
 type StepId = "upload" | "extract" | "catalog" | "comps";
 
@@ -111,22 +101,8 @@ export function EmptyScannerState({
         matches catalogs, and compiles live comps.
       </p>
 
-      {/* Suggested Prompt Chips */}
-      <div className="mt-6 flex flex-wrap justify-center gap-2">
-        {PROMPT_CHIPS.map((chip, i) => (
-          <motion.button
-            key={chip}
-            type="button"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.04 * i, duration: 0.35 }}
-            onClick={() => onChipClick(chip)}
-            className="rounded-full border border-white/8 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-cyan-100"
-          >
-            {chip}
-          </motion.button>
-        ))}
-      </div>
+      {/* Suggested Prompt Chips — frosted banner-style pills */}
+      <LiquidScanQuickActions onChipClick={onChipClick} className="mt-6" />
 
       {/* Interactive Walkthrough Infographic */}
       <div className="mt-12 w-full text-left border-t border-white/6 pt-8">

@@ -1,9 +1,20 @@
+import { resolveSoldLookbackDays } from "@/lib/market/evidence-dates";
 import { isPriceChartingSoldScrapeEnabled } from "@/lib/market/pricecharting/config";
 import { findPriceChartingProduct } from "@/lib/market/pricecharting/scrape-product";
 import { toPriceChartingHistoryUrl } from "@/lib/market/pricecharting/queries";
 import { priceChartingUsdFromEvidence } from "@/lib/market/catalog-raw-fmv";
 import type { ExtractedCard, MarketEvidence } from "@/lib/scan/schemas";
 import { effectiveCatalogSearchName } from "@/lib/scan/card-display";
+
+function saleWithinLookback(saleDate: string | null, lookbackDays: number): boolean {
+  if (lookbackDays <= 0) return true;
+  const iso = saleDateToIso(saleDate);
+  if (!iso) return true;
+  const ts = Date.parse(iso);
+  if (Number.isNaN(ts)) return true;
+  const cutoff = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
+  return ts >= cutoff;
+}
 
 function saleDateToIso(saleDate: string | null): string | null {
   if (!saleDate?.trim()) return null;
@@ -82,8 +93,14 @@ export async function harvestPriceChartingSoldEvidence(
       });
     }
 
+    const lookbackDays = resolveSoldLookbackDays();
     const soldRows: MarketEvidence[] = product.comparables
-      .filter((c) => c.price > 0 && c.url)
+      .filter(
+        (c) =>
+          c.price > 0 &&
+          c.url &&
+          saleWithinLookback(c.saleDate, lookbackDays),
+      )
       .slice(0, 30)
       .map((comp) => {
         const platform = comp.platform ?? "PriceCharting";

@@ -7,6 +7,7 @@ import type { ScanSpecimen } from "@/hooks/use-scan-session";
 import type { AssistantChatMessage, ScanSummary } from "@/lib/scanner-chat/types";
 import type { CompanionController } from "@/hooks/use-companion";
 import type { CatalogScanPrefill } from "@/lib/scan/catalog-bridge";
+import type { SlabzPack, SlabzRipRecord } from "@/lib/slabz/types";
 import {
   buildScanSummaryFromSpecimens,
   specimenToCardMatch,
@@ -33,6 +34,7 @@ export function AIStreamingScanMessage({
   cardHandlers,
   companion,
   onCatalogScanPrefill,
+  onOpenSlabzRipInScan,
   onDismissOutput,
   digitalScanOn,
   digitalScanAssets,
@@ -44,6 +46,7 @@ export function AIStreamingScanMessage({
   onDownloadSingleDigitalScan,
   vaultSaving,
   onDismissHowTo,
+  hidePipelineNarrative = false,
 }: {
   message: AssistantChatMessage;
   specimens?: ScanSpecimen[];
@@ -51,6 +54,7 @@ export function AIStreamingScanMessage({
   cardHandlers?: CardInteractionHandlers;
   companion?: CompanionController;
   onCatalogScanPrefill?: (prefill: CatalogScanPrefill) => void;
+  onOpenSlabzRipInScan?: (rip: SlabzRipRecord, pack: SlabzPack | null) => void;
   onDismissOutput?: () => void;
   digitalScanOn?: boolean;
   digitalScanAssets?: DigitalScanAsset[];
@@ -62,6 +66,8 @@ export function AIStreamingScanMessage({
   onDownloadSingleDigitalScan?: (asset: DigitalScanAsset) => void;
   vaultSaving?: boolean;
   onDismissHowTo?: () => void;
+  /** When the evolution pipeline panel shows the status line, skip duplicate ask UI. */
+  hidePipelineNarrative?: boolean;
 }) {
   const [resultsView, setResultsView] = useState<ScanResultsView>("cards");
 
@@ -87,7 +93,17 @@ export function AIStreamingScanMessage({
   }, [liveSpecimens, message.summary]);
 
   const showResults = liveCards.length > 0;
-  const showAskSpinner = !message.scanReport && !showResults && !message.output;
+  const showAskSpinner =
+    !hidePipelineNarrative &&
+    !message.scanReport &&
+    !showResults &&
+    !message.output;
+  const pipelineOnlyPending =
+    hidePipelineNarrative &&
+    !showResults &&
+    !message.scanReport &&
+    !message.output &&
+    !message.digitalScanHowTo;
   const showDoneNarrative =
     !message.scanReport && !showAskSpinner && message.text.trim().length > 0 && !isLiveScan;
   const wideEmbed =
@@ -96,7 +112,9 @@ export function AIStreamingScanMessage({
     message.output?.kind === "calculator" ||
     message.output?.kind === "live-market" ||
     message.output?.kind === "ebay-ending" ||
-    message.output?.kind === "pgt-youtube";
+    message.output?.kind === "pgt-youtube" ||
+    message.output?.kind === "pgt-arcade" ||
+    message.output?.kind === "slabz-rip";
 
   const calculatorFmv =
     sessionSummary?.estimatedTotal ??
@@ -114,6 +132,8 @@ export function AIStreamingScanMessage({
     !message.digitalScanHowTo &&
     (message.id === "pending-result" || Boolean(message.cards?.length)) &&
     Boolean(digitalScanAssets?.length || digitalScanRendering);
+
+  if (pipelineOnlyPending) return null;
 
   return (
     <motion.article
@@ -265,6 +285,14 @@ export function AIStreamingScanMessage({
             <LiquidChatOutputPanel kind="ebay-ending" onDismiss={onDismissOutput} />
           ) : message.output.kind === "pgt-youtube" ? (
             <LiquidChatOutputPanel kind="pgt-youtube" onDismiss={onDismissOutput} />
+          ) : message.output.kind === "pgt-arcade" ? (
+            <LiquidChatOutputPanel kind="pgt-arcade" onDismiss={onDismissOutput} />
+          ) : message.output.kind === "slabz-rip" ? (
+            <LiquidChatOutputPanel
+              kind="slabz-rip"
+              onDismiss={onDismissOutput}
+              onOpenSlabzRipInScan={onOpenSlabzRipInScan}
+            />
           ) : null
         ) : null}
       </div>

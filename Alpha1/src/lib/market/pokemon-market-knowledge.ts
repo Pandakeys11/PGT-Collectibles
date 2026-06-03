@@ -75,6 +75,9 @@ function catalogVariantEditionHints(
   if (catalogId.includes("__unlimited")) {
     return { printStamps: "Unlimited", details: "Unlimited" };
   }
+  if (catalogId.includes("__reverse_holo")) {
+    return { printStamps: "Reverse Holo", details: "Reverse Holo" };
+  }
   return {};
 }
 

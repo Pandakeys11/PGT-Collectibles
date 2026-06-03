@@ -80,6 +80,8 @@ export function priceSnapshotToPricesJson(
     priceChartingPsa10Usd: snapshot.priceChartingPsa10Usd ?? null,
     priceChartingPsa10Url: snapshot.priceChartingPsa10Url ?? null,
     priceChartingPsa10UpdatedAt: snapshot.priceChartingPsa10UpdatedAt ?? null,
+    priceChartingPsa9Usd: snapshot.priceChartingPsa9Usd ?? null,
+    priceChartingPsa8Usd: snapshot.priceChartingPsa8Usd ?? null,
     pokeTrace: snapshot.pokeTrace ?? null,
   };
 }

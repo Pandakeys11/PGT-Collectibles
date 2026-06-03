@@ -149,6 +149,16 @@ export function MarketSourceLogo({
     );
   }
 
+  if (norm.includes("130") && norm.includes("POINT")) {
+    return (
+      <div className={cn("flex flex-wrap items-center gap-1.5 font-black text-[11px] tracking-tight", className)}>
+        <span className="text-[#E85D04]">130</span>
+        <span className="text-primary">Point</span>
+        {showLane && norm.includes("SOLD") ? laneChip("Sold") : null}
+      </div>
+    );
+  }
+
   if (norm.includes("POKETRACE")) {
     return (
       <div className={cn("flex items-center gap-1.5 font-bold text-[11px] tracking-tight text-primary", className)}>
@@ -254,6 +264,15 @@ export function MarketSourceLogoCompact({
 
   if (norm.includes("FANATICS")) {
     return <span className={cn("font-black text-[9px] text-[#0066CC]", className)}>FC</span>;
+  }
+
+  if (norm.includes("130") && norm.includes("POINT")) {
+    return (
+      <span className={cn("font-black text-[10px] tracking-tight", className)}>
+        <span className="text-[#E85D04]">130</span>
+        <span className="text-primary/90">Pt</span>
+      </span>
+    );
   }
 
   if (norm.includes("POKETRACE")) {

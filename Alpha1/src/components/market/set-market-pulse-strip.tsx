@@ -228,6 +228,7 @@ export function SetMarketPulseStrip({
   }, [setId, setName, cards, seedPayload, moverColumnSize]);
 
   const display = payload ?? preview;
+  const emptyHint = display?.hint ?? payload?.hint ?? preview?.hint;
   const signalSubtitle = moversSignalSubtitle(display?.signalKind);
   const showLoading = loading && !display?.ready;
 
@@ -257,8 +258,8 @@ export function SetMarketPulseStrip({
           className,
         )}
       >
-        No cards moved ±3% vs their 30-day median in this set yet. With PokeTrace configured you get US
-        TCGPlayer/eBay trends; otherwise EU Cardmarket averages are used when available.
+        {emptyHint ??
+          "No cards moved ±3% vs their 30-day median in this set yet. With PokeTrace you get US TCGPlayer/eBay trends; EU Cardmarket 7d/30d is used when available."}
       </div>
     );
   }

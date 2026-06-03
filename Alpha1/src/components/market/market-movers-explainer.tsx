@@ -35,7 +35,7 @@ export function MarketMoversFootnote({
   className?: string;
 }) {
   const parts: string[] = [];
-  if (usCount != null && usCount > 0) parts.push(`${usCount} US (TCGPlayer/eBay)`);
+  if (usCount != null && usCount > 0) parts.push(`${usCount} US (PGT / TCGPlayer)`);
   if (euCount != null && euCount > 0) parts.push(`${euCount} EU (Cardmarket)`);
 
   return (

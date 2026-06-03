@@ -4,6 +4,7 @@ import {
   combineSlabLabelSources,
   extractSlabSubgrades,
   parseStructuredSlabLabel,
+  splitSlabLabelLines,
   synthesizeSlabLabelTitle,
 } from "@/lib/scan/slab-label-parse";
 import type { ExtractedCard } from "@/lib/scan/schemas";
@@ -94,6 +95,24 @@ function appendUniqueDetails(
   if (!existing?.trim()) return e;
   if (existing.toLowerCase().includes(e.toLowerCase())) return existing.trim();
   return `${existing.trim()} · ${e}`;
+}
+
+/** Collapse repeated vision segments in holder label text. */
+function canonicalizeSlabLabelTitle(
+  labelTitle: string | undefined,
+  labelBlob: string,
+): string | undefined {
+  const lines = splitSlabLabelLines(labelTitle || labelBlob);
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const line of lines) {
+    const key = line.toLowerCase().replace(/\s+/g, " ").trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(line);
+  }
+  if (unique.length === 0) return labelTitle?.trim() || undefined;
+  return unique.join(" · ").slice(0, 400);
 }
 
 function slabTextBlobs(card: ExtractedCard): string[] {
@@ -260,8 +279,8 @@ export function normalizeGradedSlabFields(
       printStamps,
     });
     if (synthesized) labelTitle = synthesized;
-  } else if (labelBlob.length > labelTitle.length + 8) {
-    labelTitle = labelBlob.slice(0, 400);
+  } else {
+    labelTitle = canonicalizeSlabLabelTitle(labelTitle, labelBlob) ?? labelTitle;
   }
 
   for (const blob of blobs) {

@@ -64,6 +64,10 @@ function isPokemonRawCard(card: ExtractedCard): boolean {
 function rawPokemonTrustsCatalog(card: ExtractedCard, catalog: CatalogMatch): boolean {
   if (!isPokemonRawCard(card)) return false;
   if (catalog.candidates[0]?.conflicts?.includes("name conflict")) return false;
+  if (catalog.candidates[0]?.conflicts?.includes("print_variant")) return false;
+  if (catalog.candidates[0]?.conflicts?.includes("denominator")) return false;
+  if (catalog.candidates[0]?.conflicts?.includes("denominator conflict")) return false;
+  if (catalog.catalogIdentityStatus === "ambiguous") return false;
   if (catalog.catalogIdentityStatus === "confirmed") return true;
   if (catalog.catalogIdentityStatus !== "likely") return false;
   const gap = catalog.score - (catalog.candidates[1]?.score ?? 0);
