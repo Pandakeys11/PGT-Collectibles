@@ -42,8 +42,13 @@ export interface CardMatch {
   fmvUsd: number | null;
   fmvDisplay: string;
   fmvSubline: string | null;
+  fmvBasis?: import("@/lib/market/fair-value").FairValueBasis | null;
   fmvHeld?: boolean;
   fmvHoldMessage?: string | null;
+  /** Quick comp chips (raw sold / PSA 10 / listed) when session market data is ready. */
+  compRawSold?: string;
+  compPsa10Sold?: string;
+  compListed?: string;
   /** Sticker or handwritten ask on the card/slab photo. */
   stickerUsd: number | null;
   stickerDisplay: string;

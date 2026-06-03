@@ -166,8 +166,11 @@ export function EbayEndingSoonPanel({
             Loading live eBay auctions…
           </div>
         ) : feed.error && listings.length === 0 ? (
-          <div className="flex min-h-[10rem] flex-col items-center justify-center gap-2 text-center">
+          <div className="flex min-h-[10rem] flex-col items-center justify-center gap-2 px-2 text-center">
             <p className="text-xs text-danger">{feed.error}</p>
+            {feed.configHint ? (
+              <p className="max-w-md text-[10px] leading-snug text-muted">{feed.configHint}</p>
+            ) : null}
             <Button type="button" size="sm" variant="secondary" onClick={() => void feed.reload()}>
               Retry
             </Button>

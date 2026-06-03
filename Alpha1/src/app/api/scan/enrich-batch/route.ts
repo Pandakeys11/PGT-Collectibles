@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
       catalogConfidence?: number;
       catalogCandidates?: unknown;
       identityEvidence?: unknown;
+      artMatchImageBase64?: string;
+      artMatchMimeType?: string;
     }>;
     phase?: string;
     skipRegistry?: boolean;
@@ -107,6 +109,14 @@ export async function POST(req: NextRequest) {
 
     const skipRegistry = item.skipRegistry === true || globalSkipRegistry;
     const skipCache = item.skipCache === true;
+    const artMatchImageBase64 =
+      typeof item.artMatchImageBase64 === "string" && item.artMatchImageBase64.trim()
+        ? item.artMatchImageBase64.trim().slice(0, 8 * 1024 * 1024)
+        : undefined;
+    const artMatchMimeType =
+      typeof item.artMatchMimeType === "string" && item.artMatchMimeType.trim()
+        ? item.artMatchMimeType.trim()
+        : undefined;
     const catalogCandidatesParsed = catalogCandidateSchema.array().safeParse(
       item.catalogCandidates,
     );
@@ -169,6 +179,8 @@ export async function POST(req: NextRequest) {
         skipRegistry,
         skipCache,
         userId,
+        artMatchImageBase64,
+        artMatchMimeType,
         ...catalogSnapshot,
       });
       return {

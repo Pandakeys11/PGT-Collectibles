@@ -1,4 +1,5 @@
 import { searchDbCatalog, searchDbCatalogBroad } from "@/lib/catalog/db-catalog";
+import { matchCatalogByArt } from "@/lib/catalog/art-match";
 import { mergeCatalogMatches } from "@/lib/market/catalog-candidate-merge";
 import { matchCatalogForEnrich } from "@/lib/market/catalog-router";
 import type { CatalogMatch } from "@/lib/market/pokemon-catalog";
@@ -52,7 +53,10 @@ async function withTimeout<T>(
  */
 export async function ensureCatalogMatchOptions(
   card: ExtractedCard,
-  options?: { hintCatalogId?: string | null },
+  options?: {
+    hintCatalogId?: string | null;
+    artMatchImage?: { base64: string; mimeType: string } | null;
+  },
 ): Promise<CatalogMatch | null> {
   if (isNonTcgPokemonCollectible(card)) return null;
 
@@ -87,9 +91,42 @@ export async function ensureCatalogMatchOptions(
   }
 
   if (dbMatchIsUsable(match)) {
+    if (options?.artMatchImage) {
+      const artMatch = await withTimeout(
+        matchCatalogByArt({
+          card: catalogCard,
+          franchise,
+          image: options.artMatchImage,
+          textMatch: match,
+        }),
+        22_000,
+        null,
+      );
+      if (artMatch) {
+        match = mergeCatalogMatches(match, artMatch);
+      }
+    }
     return match;
   }
 
   const fallback = await withTimeout(matchCatalogForEnrich(catalogCard), 8_000, null);
-  return mergeCatalogMatches(match, fallback);
+  match = mergeCatalogMatches(match, fallback);
+
+  if (options?.artMatchImage && match) {
+    const artMatch = await withTimeout(
+      matchCatalogByArt({
+        card: catalogCard,
+        franchise,
+        image: options.artMatchImage,
+        textMatch: match,
+      }),
+      22_000,
+      null,
+    );
+    if (artMatch) {
+      match = mergeCatalogMatches(match, artMatch);
+    }
+  }
+
+  return match;
 }

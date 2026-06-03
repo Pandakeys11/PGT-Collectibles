@@ -1,4 +1,5 @@
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
+import { formatFmvBasis } from "@/lib/market/fmv-display";
 import { resolveCardListFmv } from "@/lib/scan/card-list-fmv";
 import { formatAskingPriceCompact as formatAskingPriceUnified } from "@/lib/scan/specimen-present";
 import type { FairValueBasis } from "@/lib/market/fair-value";
@@ -93,10 +94,11 @@ export function formatFairMarketValueHero(specimen: ScanSpecimen): {
   basis: string | null;
 } {
   const fmv = resolveCardListFmv(specimen);
+  if (fmv.fmvHeld) return { amount: "—", basis: fmv.fmvHoldMessage };
   if (fmv.fmvUsd == null) return { amount: "—", basis: null };
   return {
     amount: fmv.fmvDisplay,
-    basis: formatFmvBasisLabel(fmv.fmvBasis),
+    basis: formatFmvBasis(fmv.fmvBasis),
   };
 }
 

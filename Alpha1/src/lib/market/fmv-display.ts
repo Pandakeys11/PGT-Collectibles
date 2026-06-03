@@ -160,18 +160,24 @@ export function buildFmvHeadlineFromCardMatch(card: {
   fmvUsd: number | null;
   fmvDisplay: string;
   fmvSubline: string | null;
+  fmvBasis?: FairValueBasis | null;
   fmvHeld?: boolean;
   fmvHoldMessage?: string | null;
+  fmvLanes?: FmvLaneChip[];
 }): FmvHeadline {
   const held = card.fmvHeld === true;
   return {
     amount: card.fmvDisplay,
     amountUsd: held ? null : card.fmvUsd,
-    basisLabel: held ? null : card.fmvSubline,
+    basisLabel: held
+      ? null
+      : card.fmvBasis
+        ? formatFmvBasis(card.fmvBasis)
+        : card.fmvSubline,
     sourceLabel: null,
     held,
     holdMessage: card.fmvHoldMessage ?? null,
-    lanes: [],
+    lanes: card.fmvLanes ?? [],
     preview: held,
   };
 }

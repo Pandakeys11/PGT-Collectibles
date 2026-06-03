@@ -7,7 +7,10 @@ import {
   type EbayEndingSoonListing,
   type EbayEndingSoonPayload,
 } from "@/lib/market/ebay-ending-soon-types";
-import { getEbayApiEnv, getEbayClientId, getEbayClientSecret } from "@/lib/market/env-market";
+import {
+  getEbayApiEnv,
+  getEbayBrowseConfigStatus,
+} from "@/lib/market/env-market";
 
 const POKEMON_TCG_CATEGORY = "2536";
 const SEARCH_QUERY = "Pokemon";
@@ -73,10 +76,13 @@ export async function buildEbayEndingSoonFeed(): Promise<EbayEndingSoonPayload> 
     listings: [],
   };
 
-  if (!getEbayClientId() || !getEbayClientSecret()) {
+  const config = getEbayBrowseConfigStatus();
+  if (!config.configured) {
     return {
       ...empty,
-      error: "eBay Browse OAuth is not configured (EBAY_CLIENT_ID / EBAY_CLIENT_SECRET).",
+      configured: false,
+      error: config.message,
+      configHint: config.hint,
     };
   }
 
@@ -140,6 +146,7 @@ export async function buildEbayEndingSoonFeed(): Promise<EbayEndingSoonPayload> 
 
   return {
     ready: true,
+    configured: true,
     fetchedAt: new Date().toISOString(),
     hubUrl,
     listings,

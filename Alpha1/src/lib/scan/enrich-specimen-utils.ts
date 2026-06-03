@@ -11,6 +11,7 @@ export type EnrichableSpecimen = {
   id: string;
   card: ExtractedCard;
   context: ScanCardContext;
+  previewUrl?: string | null;
 };
 
 /** One HTTP call: catalog + market when vision identity is already strong. */

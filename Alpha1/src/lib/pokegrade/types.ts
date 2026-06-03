@@ -9,6 +9,12 @@ export type PokeGradeHudSnapshot = {
   psa10SoldUsd: number | null;
   psa10SoldLabel: string | null;
   provider: "pgt" | "pokegrade";
+  /** Catalog art when matched; falls back to capture preview in HUD. */
+  catalogImageUrl?: string | null;
+  capturePreviewUrl?: string | null;
+  compsCount?: number;
+  catalogVerified?: boolean;
+  rarity?: string | null;
 };
 
 export type LiveScanResult = {

@@ -124,6 +124,6 @@ Files: `src/lib/scan/spatial-grid.ts`, `src/lib/scan/specimen-crop.ts`, `src/lib
 ## Recommended next investments
 
 1. **Cert → catalogId cache** — Persist PSA/GemRate identity → `tcg_catalog_cards.catalog_id` in `pgt_slab_registry` for instant art on repeat certs.
-2. **Visual embedding match** — Crop embedding vs catalog image vectors for art-first disambiguation (ex: multiple Charizards).
+2. **Visual embedding match** — Gemini `gemini-embedding-001` vectors cached in `tcg_catalog_art_embeddings`; scan crop compared at enrich time (`src/lib/catalog/art-match.ts`). Backfill: `node scripts/backfill-catalog-art-embeddings.mjs --franchise=pokemon --limit=500`.
 3. **Single enrich endpoint** — Combine catalog + market (+ registry) server-side with one round-trip per card to cut UI latency in half.
 4. **Catalog sync health dashboard** — Surface last sync time / row count in Liquid Scan so ops knows when DB is stale.

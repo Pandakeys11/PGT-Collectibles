@@ -36,6 +36,8 @@ export type EnrichBatchItemInput = {
   phase?: EnrichPhase;
   skipRegistry?: boolean;
   skipCache?: boolean;
+  artMatchImageBase64?: string;
+  artMatchMimeType?: string;
 } & Partial<CatalogContextSnapshot>;
 
 export type EnrichBatchItemResult = {
@@ -65,6 +67,10 @@ export async function enrichExtractedCard(args: {
   skipCache?: boolean;
   /** Bulk scan: skip slow cert registry chain; load via /api/scan/registry when row is selected. */
   skipRegistry?: boolean;
+  /** Override default client timeout (live camera uses shorter budgets). */
+  timeoutMs?: number;
+  artMatchImageBase64?: string;
+  artMatchMimeType?: string;
 }): Promise<{
   card: ExtractedCard;
   context: ScanCardContext;
@@ -72,7 +78,9 @@ export async function enrichExtractedCard(args: {
   catalogId?: string | null;
 }> {
   const phase = args.phase ?? "full";
-  const timeoutMs = phase === "catalog" ? 45_000 : phase === "market" ? 90_000 : 75_000;
+  const timeoutMs =
+    args.timeoutMs ??
+    (phase === "catalog" ? 45_000 : phase === "market" ? 90_000 : 75_000);
   const maxAttempts = 3;
 
   let lastError = "Enrichment failed";
@@ -220,6 +228,8 @@ export async function enrichExtractedCardWithBatchFallback(
       phase: item.phase ?? "catalog",
       skipCache: item.skipCache,
       skipRegistry: item.skipRegistry,
+      artMatchImageBase64: item.artMatchImageBase64,
+      artMatchMimeType: item.artMatchMimeType,
       ...pickCatalogContextFields(item),
     });
     return {

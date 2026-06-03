@@ -44,6 +44,8 @@ export type RunEnrichInput = {
   skipCache?: boolean;
   skipRegistry?: boolean;
   userId?: string | null;
+  artMatchImageBase64?: string;
+  artMatchMimeType?: string;
 } & Partial<CatalogContextSnapshot>;
 
 export type EnrichRunResult = {
@@ -182,7 +184,14 @@ export async function runEnrichForSpecimen(
   }
 
   const hintCatalogId = await readCachedCertCatalogId(catalogInput);
-  const catalog = await ensureCatalogMatchOptions(catalogInput, { hintCatalogId });
+  const artMatchImage =
+    input.artMatchImageBase64 && input.artMatchMimeType
+      ? { base64: input.artMatchImageBase64, mimeType: input.artMatchMimeType }
+      : null;
+  const catalog = await ensureCatalogMatchOptions(catalogInput, {
+    hintCatalogId,
+    artMatchImage,
+  });
   logCatalogEnrichTelemetry(
     buildCatalogEnrichTelemetry(specimenId, catalogInput, catalog),
   );

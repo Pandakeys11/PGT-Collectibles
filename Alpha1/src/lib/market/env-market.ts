@@ -46,6 +46,52 @@ export function isEbayBrowseConfigured(): boolean {
   return Boolean(getEbayClientId() && getEbayClientSecret());
 }
 
+export type EbayBrowseConfigStatus = {
+  configured: boolean;
+  apiEnv: EbayApiEnv;
+  hasClientId: boolean;
+  hasClientSecret: boolean;
+  message: string;
+  hint: string;
+};
+
+/** Server-side eBay Browse credential check (for APIs + dev startup hints). */
+export function getEbayBrowseConfigStatus(): EbayBrowseConfigStatus {
+  const apiEnv = getEbayApiEnv();
+  const hasClientId = Boolean(getEbayClientId());
+  const hasClientSecret = Boolean(getEbayClientSecret());
+  const configured = hasClientId && hasClientSecret;
+  const onVercel = Boolean(process.env.VERCEL?.trim());
+  const localProdStart =
+    process.env.NODE_ENV === "production" && !onVercel;
+
+  const idVars =
+    apiEnv === "sandbox"
+      ? "EBAY_SANDBOX_CLIENT_ID / EBAY_SANDBOX_CLIENT_SECRET (or EBAY_CLIENT_ID with EBAY_API_ENV=production)"
+      : "EBAY_CLIENT_ID / EBAY_CLIENT_SECRET";
+
+  const message = configured
+    ? ""
+    : `eBay Browse OAuth is not configured (${idVars}).`;
+
+  const hint = configured
+    ? ""
+    : onVercel
+      ? "Add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET in Vercel → Project → Settings → Environment Variables (Production), then redeploy."
+      : localProdStart
+        ? "Add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET to Alpha1/.env.production, then restart `npm run start`."
+        : "Add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET to Alpha1/.env.local, then restart dev (`npm run dev:clean` or `npm run dev:tunnel`).";
+
+  return {
+    configured,
+    apiEnv,
+    hasClientId,
+    hasClientSecret,
+    message,
+    hint,
+  };
+}
+
 const POKETRACE_DEFAULT_BASE = "https://api.poketrace.com/v1";
 
 export function getPokeTraceApiKey(): string | null {

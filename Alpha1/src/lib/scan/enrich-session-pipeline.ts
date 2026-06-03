@@ -5,6 +5,7 @@ import {
   type EnrichBatchItemInput,
   type EnrichBatchItemResult,
 } from "@/lib/scan/enrich-client";
+import { parseArtMatchImageFromDataUrl } from "@/lib/catalog/art-embedding";
 import { hasMinimumIdentityForCatalog } from "@/lib/scan/catalog-merge";
 import { buildScanCardContext, pickCatalogContext } from "@/lib/scan/context-builder";
 import {
@@ -153,6 +154,17 @@ async function mergeBatchResults<T extends SessionEnrichSpecimen>(
   return out;
 }
 
+function artMatchFieldsFromPreview(
+  previewUrl: string | null | undefined,
+): Pick<EnrichBatchItemInput, "artMatchImageBase64" | "artMatchMimeType"> {
+  const parsed = parseArtMatchImageFromDataUrl(previewUrl);
+  if (!parsed) return {};
+  return {
+    artMatchImageBase64: parsed.base64,
+    artMatchMimeType: parsed.mimeType,
+  };
+}
+
 async function runCatalogBatch<T extends SessionEnrichSpecimen>(
   chunk: T[],
   options: {
@@ -177,6 +189,7 @@ async function runCatalogBatch<T extends SessionEnrichSpecimen>(
       card: specimen.card,
       phase,
       skipRegistry: skipRegistryFor(specimen, options.skipRegistryOnBulk),
+      ...artMatchFieldsFromPreview(specimen.previewUrl),
     }));
     let results: EnrichBatchItemResult[] = [];
     try {

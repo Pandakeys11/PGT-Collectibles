@@ -44,6 +44,24 @@ export function getGeminiTextModel(): string {
   return process.env.GEMINI_TEXT_MODEL?.trim() || "gemini-2.5-flash";
 }
 
+export function getGeminiEmbeddingModel(): string {
+  return process.env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-001";
+}
+
+export function getGeminiEmbeddingDimensions(): number {
+  const raw = process.env.GEMINI_EMBEDDING_DIMENSIONS?.trim();
+  const n = raw ? Number(raw) : 768;
+  if (!Number.isFinite(n) || n < 128 || n > 3072) return 768;
+  return Math.floor(n);
+}
+
+/** Visual art match against cached catalog embeddings (requires Gemini). */
+export function isArtMatchEnabled(): boolean {
+  const raw = process.env.ART_MATCH_ENABLED?.trim();
+  if (raw === "0" || raw?.toLowerCase() === "false") return false;
+  return isGeminiServiceEnabled();
+}
+
 export function getGroqApiKey(): string | null {
   return firstConfiguredEnv("GROQ_API_KEY");
 }

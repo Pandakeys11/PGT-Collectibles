@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnvLocal } from "./load-env-local.mjs";
+import { logEbayBrowseEnvHint } from "./log-ebay-browse-env.mjs";
 import { ensureCleanNextForDev } from "./next-dev-hygiene.mjs";
 import {
   fetchNgrokPublicUrl,
@@ -47,6 +48,7 @@ function prefixStream(stream, label, out) {
 
 await ensureCleanNextForDev(root);
 
+logEbayBrowseEnvHint();
 console.log(`Starting Next.js on http://localhost:${port} + ngrok tunnel…`);
 console.log(
   "If you see errors like Cannot find module './5745.js', stop the server and run: npm run dev:clean\n",

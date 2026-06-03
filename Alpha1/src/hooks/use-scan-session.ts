@@ -17,6 +17,8 @@ import {
   flushRuntimeCaches,
   recordScanObservation,
 } from "@/lib/scan/enrich-client";
+import { enrichLiveSpecimenMarket } from "@/lib/pokegrade/live-scan";
+import { rowHasMarketData } from "@/lib/scan/enrich-specimen-utils";
 import {
   runCatalogEnrichSession,
   runMarketEnrichSession,
@@ -1629,6 +1631,23 @@ export function useScanSession(options?: {
     setSpecimens((current) => [...current, result.specimen]);
     setSelectedId(result.specimen.id);
     setError(null);
+
+    if (!rowHasMarketData(result.specimen.context)) {
+      const specimenId = result.specimen.id;
+      setMarketEnriching(true);
+      void enrichLiveSpecimenMarket(result.specimen)
+        .then((enriched) => {
+          setSpecimens((current) =>
+            current.map((s) => (s.id === specimenId ? enriched : s)),
+          );
+        })
+        .catch(() => {
+          // Keep catalog-only row if market backfill fails.
+        })
+        .finally(() => {
+          setMarketEnriching(false);
+        });
+    }
   }, []);
 
   return {

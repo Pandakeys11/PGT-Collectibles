@@ -11,7 +11,8 @@ import {
 } from "@/lib/market/sources";
 import type { FairValueBasis } from "@/lib/market/fair-value";
 import type { MarketEvidence } from "@/lib/scan/schemas";
-import { formatFmvBasisLabel, type SourceSummary } from "@/lib/scan/sheet-present";
+import { formatFmvBasis } from "@/lib/market/fmv-display";
+import type { SourceSummary } from "@/lib/scan/sheet-present";
 
 function formatUsd(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -40,7 +41,9 @@ export function formatCatalogFmvHero(snapshot: CatalogMarketSnapshot): {
   if (value == null) return { amount: "—", basis: null };
   return {
     amount: formatUsd(value),
-    basis: formatFmvBasisLabel(snapshot.fairValueBasis as FairValueBasis | null),
+    basis: snapshot.fairValueBasis
+      ? formatFmvBasis(snapshot.fairValueBasis as FairValueBasis)
+      : null,
   };
 }
 

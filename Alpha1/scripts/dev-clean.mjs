@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnvLocal } from "./load-env-local.mjs";
+import { logEbayBrowseEnvHint } from "./log-ebay-browse-env.mjs";
 import { resolveDevPort } from "./ngrok-clerk-hint.mjs";
 import {
   ensureCleanNextForDev,
@@ -74,6 +75,7 @@ console.log("Removed .next");
 await sleep(400);
 await ensureCleanNextForDev(root, { log: false });
 
+logEbayBrowseEnvHint();
 console.log(`Starting Next.js on http://localhost:${port} …`);
 console.log("Wait for “Ready”, then open the app (first compile can take ~10s).\n");
 

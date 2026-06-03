@@ -256,6 +256,39 @@ export function CardMatchResult({
                 ) : null}
               </div>
 
+              {!card.fmvHeld &&
+              (card.compRawSold || card.compPsa10Sold || card.compListed) &&
+              [card.compRawSold, card.compPsa10Sold, card.compListed].some(
+                (v) => v && v !== "—",
+              ) ? (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {card.compRawSold && card.compRawSold !== "—" ? (
+                    <div className="rounded-md border border-white/8 bg-white/[0.02] px-2 py-1.5 text-center">
+                      <p className="text-[8px] font-semibold uppercase tracking-wide text-slate-500">Raw sold</p>
+                      <p className="font-mono text-[11px] font-medium tabular-nums text-slate-200">
+                        {card.compRawSold}
+                      </p>
+                    </div>
+                  ) : null}
+                  {card.compPsa10Sold && card.compPsa10Sold !== "—" ? (
+                    <div className="rounded-md border border-white/8 bg-white/[0.02] px-2 py-1.5 text-center">
+                      <p className="text-[8px] font-semibold uppercase tracking-wide text-slate-500">PSA 10</p>
+                      <p className="font-mono text-[11px] font-medium tabular-nums text-slate-200">
+                        {card.compPsa10Sold}
+                      </p>
+                    </div>
+                  ) : null}
+                  {card.compListed && card.compListed !== "—" ? (
+                    <div className="rounded-md border border-white/8 bg-white/[0.02] px-2 py-1.5 text-center">
+                      <p className="text-[8px] font-semibold uppercase tracking-wide text-slate-500">Listed</p>
+                      <p className="font-mono text-[11px] font-medium tabular-nums text-slate-200">
+                        {card.compListed}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               {card.latestSoldUsd != null ? (
                 <div className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.02] px-2 py-1.5">
                   <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500">
@@ -267,7 +300,7 @@ export function CardMatchResult({
                 </div>
               ) : null}
 
-              {card.fmvSubline ? (
+              {card.fmvSubline && !card.fmvHeld ? (
                 <p className="text-[10px] leading-snug text-slate-500">{card.fmvSubline}</p>
               ) : null}
               {card.sources.length > 0 ? (

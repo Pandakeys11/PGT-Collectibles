@@ -1963,3 +1963,15 @@
 .pg-hud-reticle {
   box-shadow: inset 0 0 40px rgb(0 0 0 / 0.25);
 }
+
+.pg-hud-result__art {
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.45);
+}
+
+.sc-live-scan-result-sheet {
+  pointer-events: none;
+}
+
+.sc-live-scan-result-sheet > * {
+  pointer-events: auto;
+}

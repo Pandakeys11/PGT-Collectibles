@@ -26,6 +26,9 @@ export function buildHudFromSpecimen(
     .filter(Boolean)
     .join(" · ");
 
+  const evidence = specimen.context.marketEvidence ?? [];
+  const compsCount = evidence.filter((row) => row.priceUsd != null && row.priceUsd > 0).length;
+
   return {
     cardName: getCardDisplayTitle(specimen.card),
     subtitle: setLine || "Set resolving…",
@@ -39,5 +42,10 @@ export function buildHudFromSpecimen(
         ? `PSA 10 FMV ${formatMarketUsd(psa10.fmvUsd)}`
         : null,
     provider,
+    catalogImageUrl: specimen.context.catalogImageUrl ?? null,
+    capturePreviewUrl: specimen.previewUrl ?? null,
+    compsCount,
+    catalogVerified: Boolean(specimen.context.catalogId),
+    rarity: specimen.card.rarity ?? null,
   };
 }

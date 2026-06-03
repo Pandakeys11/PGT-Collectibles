@@ -1,28 +1,15 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { FmvHeadlineBlock } from "@/components/market/fmv-headline-block";
+import { MarketLaneCompGrid } from "@/components/market/market-lane-comp-grid";
 import { SourceChips } from "@/components/scan-panels/source-chips";
+import { useCatalogIntelLite } from "@/hooks/use-catalog-intel-lite";
 import { catalogMarketEligible, useCatalogMarket } from "@/hooks/use-catalog-market";
 import type { ScanSpecimen } from "@/hooks/use-scan-session";
-import {
-  catalogMarketReady,
-  formatCatalogCompListed,
-  formatCatalogCompPsa10Sold,
-  formatCatalogCompRawSold,
-  formatCatalogFmvHero,
-  summarizeCatalogSources,
-} from "@/lib/scan/catalog-market-present";
-import {
-  formatCompChipListed,
-  formatCompChipPsa10Sold,
-  formatCompChipRawSold,
-  formatFairMarketValueHero,
-  formatStickerPrice,
-  marketDataReady,
-  summarizeSources,
-} from "@/lib/scan/sheet-present";
+import { buildScanMarketPresentation } from "@/lib/scan/scan-market-present";
 import { printIdentityMarketScopeLabel } from "@/lib/scan/print-identity-ui";
-import { assessFmvReadiness } from "@/lib/scan/fmv-readiness";
+import { formatStickerPrice } from "@/lib/scan/sheet-present";
 import { cn } from "@/lib/cn";
 
 function catalogStatusLabel(status: ScanSpecimen["context"]["catalogIdentityStatus"]): string {
@@ -37,6 +24,34 @@ function CompTile({ label, value }: { label: string; value: string }) {
     <div className="min-w-[4.5rem] flex-1 rounded-lg bg-panel-raised/40 px-2 py-1.5">
       <p className="text-desk-label text-[0.6875rem]">{label}</p>
       <p className="mt-0.5 font-mono text-[12px] text-primary tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function PriceChartingTierRow({
+  tiers,
+}: {
+  tiers: { label: string; usd: number | null }[];
+}) {
+  if (!tiers.length) return null;
+  return (
+    <div className="mt-2">
+      <p className="mb-1 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-200/85">
+        PriceCharting graded (PSA 8–10)
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {tiers.map((tier) => (
+          <div
+            key={tier.label}
+            className="min-w-[4rem] flex-1 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-2 py-1.5"
+          >
+            <p className="text-[7px] font-semibold uppercase tracking-wider text-muted">{tier.label}</p>
+            <p className="font-mono text-[11px] font-medium tabular-nums text-violet-200/95">
+              {tier.usd != null ? `$${Math.round(tier.usd).toLocaleString()}` : "—"}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -61,60 +76,27 @@ export function SpecimenMarketSummary({
     enabled: useCatalog,
     printingHint,
   });
+  const { referencePrices: catalogReferencePrices } = useCatalogIntelLite(catalogId, {
+    enabled: useCatalog && variant !== "compact",
+  });
 
   const snapshot = catalogPayload?.snapshot;
-  const scanReady = marketDataReady(specimen);
-  const indexReady = catalogMarketReady(snapshot);
-  const ready = scanReady || indexReady;
+  const market = buildScanMarketPresentation(specimen, {
+    snapshot,
+    marketSourceLinks: catalogPayload?.marketSourceLinks,
+    pricesInput: catalogReferencePrices,
+  });
 
-  const readiness = assessFmvReadiness(specimen);
-  const scanHero = formatFairMarketValueHero(specimen);
-  const indexHero = snapshot ? formatCatalogFmvHero(snapshot) : { amount: "—", basis: null };
-  const hero = !readiness.ready
-    ? { amount: "—", basis: readiness.message }
-    : scanReady
-      ? scanHero
-      : indexReady
-        ? indexHero
-        : scanHero;
-
-  const rawComp = scanReady
-    ? formatCompChipRawSold(specimen)
-    : indexReady && snapshot
-      ? formatCatalogCompRawSold(snapshot)
-      : "—";
-  const psa10Comp = scanReady
-    ? formatCompChipPsa10Sold(specimen)
-    : indexReady && snapshot
-      ? formatCatalogCompPsa10Sold(snapshot)
-      : "—";
-  const listedComp = scanReady
-    ? formatCompChipListed(specimen)
-    : indexReady && snapshot
-      ? formatCatalogCompListed(snapshot)
-      : "—";
-
-  const sources = scanReady
-    ? summarizeSources(specimen)
-    : indexReady && snapshot
-      ? summarizeCatalogSources(snapshot, catalogPayload?.marketSourceLinks ?? [])
-      : [];
+  const { headline, lanes, compChips, sources, dataSource, ready, scanReady, indexReady, priceChartingTiers } =
+    market;
 
   const showCatalogId =
     catalogId &&
     (specimen.context.catalogIdentityStatus === "confirmed" ||
       specimen.context.catalogIdentityStatus === "likely");
 
-  const dataSource =
-    scanReady && indexReady
-      ? "Session + index"
-      : scanReady
-        ? "Scan session"
-        : indexReady
-          ? "Catalog index"
-          : null;
-
   const showCatalogSpinner = useCatalog && catalogLoading && !scanReady && !indexReady;
+  const headlineSize = variant === "hero" ? "hero" : variant === "compact" ? "compact" : "default";
 
   if (variant === "desk") {
     return (
@@ -125,8 +107,14 @@ export function SpecimenMarketSummary({
           </div>
         ) : null}
         <p className="text-desk-label">Verified value</p>
-        <p className="text-desk-value mt-0.5 text-accent tabular-nums">{hero.amount}</p>
-        {hero.basis ? <p className="mt-0.5 text-[0.6875rem] text-muted">Basis · {hero.basis}</p> : null}
+        <p className="text-desk-value mt-0.5 text-accent tabular-nums">{headline.amount}</p>
+        {(headline.basisLabel || headline.holdMessage) && !headline.held ? (
+          <p className="mt-0.5 text-[0.6875rem] text-muted">
+            Basis · {headline.basisLabel ?? headline.holdMessage}
+          </p>
+        ) : headline.held && headline.holdMessage ? (
+          <p className="mt-0.5 text-[0.6875rem] text-amber-300/85">{headline.holdMessage}</p>
+        ) : null}
       </div>
     );
   }
@@ -150,19 +138,10 @@ export function SpecimenMarketSummary({
         )}
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-desk-label">Fair market value</p>
-            <p
-              className={cn(
-                "mt-0.5 font-semibold tabular-nums text-accent",
-                variant === "hero" ? "text-2xl" : variant === "compact" ? "text-sm" : "text-lg",
-              )}
-            >
-              {hero.amount}
-            </p>
-            {hero.basis ? <p className="mt-0.5 text-[0.6875rem] text-muted">Basis · {hero.basis}</p> : null}
+          <div className="min-w-0 flex-1">
+            <FmvHeadlineBlock headline={headline} size={headlineSize} className="border-0 bg-transparent p-0" />
             {compScope ? (
-              <p className="mt-0.5 text-[0.6875rem] text-violet-300/85" title="Market comps filtered to this print run">
+              <p className="mt-1 text-[0.6875rem] text-violet-300/85" title="Market comps filtered to this print run">
                 Comps scoped to · {compScope}
               </p>
             ) : null}
@@ -183,9 +162,9 @@ export function SpecimenMarketSummary({
         {variant !== "compact" ? (
           <>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              <CompTile label="Raw sold" value={ready ? rawComp : "—"} />
-              <CompTile label="PSA 10" value={ready ? psa10Comp : "—"} />
-              <CompTile label="Listed" value={ready ? listedComp : "—"} />
+              <CompTile label="Raw sold" value={ready ? compChips.rawSold : "—"} />
+              <CompTile label="PSA 10" value={ready ? compChips.psa10Sold : "—"} />
+              <CompTile label="Listed" value={ready ? compChips.listed : "—"} />
               <div className="min-w-[4.5rem] flex-1 rounded-lg bg-panel-raised/40 px-2 py-1.5">
                 <p className="text-desk-label text-[0.6875rem]">Sticker / ask</p>
                 <p
@@ -200,6 +179,14 @@ export function SpecimenMarketSummary({
                 </p>
               </div>
             </div>
+
+            {lanes.length > 0 ? (
+              <div className="mt-2">
+                <MarketLaneCompGrid lanes={lanes} />
+              </div>
+            ) : null}
+
+            <PriceChartingTierRow tiers={priceChartingTiers} />
 
             <div className="desk-divider mt-2 border-t pt-2">
               <p className="text-desk-label text-[0.6875rem]">Sources</p>

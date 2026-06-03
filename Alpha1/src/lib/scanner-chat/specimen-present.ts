@@ -11,7 +11,8 @@ import {
   displayPrintPromo,
   displayPrintVersion,
 } from "@/lib/scan/display-print-edition";
-import { summarizeSources } from "@/lib/scan/sheet-present";
+import { buildScanCompChips } from "@/lib/scan/scan-market-present";
+import { marketDataReady, summarizeSources } from "@/lib/scan/sheet-present";
 import type { CardMatch, MatchStatus, ScanSummary } from "./types";
 
 function matchStatus(specimen: ScanSpecimen): MatchStatus {
@@ -51,6 +52,8 @@ export function specimenToCardMatch(specimen: ScanSpecimen, index: number): Card
   const gradedTag =
     context.lane === "graded" ? formatGradedSlabTag(slabCard, "graded") : null;
   const fmv = resolveCardListFmv(specimen);
+  const scanMarketReady = marketDataReady(specimen);
+  const compChips = scanMarketReady ? buildScanCompChips(specimen) : null;
   const printVersion = displayPrintVersion(card, context.variantLabel);
   const printPromo = displayPrintPromo(card, context.variantLabel);
   const sources = summarizeSources(specimen).map((s) => s.label);
@@ -84,8 +87,12 @@ export function specimenToCardMatch(specimen: ScanSpecimen, index: number): Card
     fmvUsd: fmv.fmvUsd,
     fmvDisplay: fmv.fmvDisplay,
     fmvSubline: fmv.fmvSubline,
+    fmvBasis: fmv.fmvBasis,
     fmvHeld: fmv.fmvHeld,
     fmvHoldMessage: fmv.fmvHoldMessage,
+    compRawSold: compChips?.rawSold,
+    compPsa10Sold: compChips?.psa10Sold,
+    compListed: compChips?.listed,
     stickerUsd: fmv.stickerUsd,
     stickerDisplay: fmv.stickerDisplay,
     hasSticker: fmv.hasSticker,

@@ -9,7 +9,7 @@ import {
   type GradedGradeFilter,
 } from "@/lib/scan/market-intelligence";
 import { getAskingUsd } from "@/lib/scan/specimen-present";
-import { formatFmvBasisLabel } from "@/lib/scan/sheet-present";
+import { formatFmvBasis } from "@/lib/market/fmv-display";
 
 export type CardListFmv = {
   /** Market-derived FMV (comps / guide) — never the physical sticker alone. */
@@ -149,8 +149,8 @@ function buildSubline(
     parts.push(`${count} sold comp${count === 1 ? "" : "s"}`);
   }
 
-  const basisLabel = formatFmvBasisLabel(fmvBasis);
-  if (basisLabel) {
+  const basisLabel = fmvBasis ? formatFmvBasis(fmvBasis) : null;
+  if (basisLabel && basisLabel !== "insufficient comps") {
     parts.push(basisLabel);
   }
 

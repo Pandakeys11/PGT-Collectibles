@@ -95,6 +95,14 @@ export async function POST(req: NextRequest) {
   const userId = appUser?.id ?? null;
 
   const catalogSnapshot = phase === "market" || phase === "full" ? parseCatalogSnapshot(body) : {};
+  const artMatchImageBase64 =
+    typeof body.artMatchImageBase64 === "string" && body.artMatchImageBase64.trim()
+      ? body.artMatchImageBase64.trim().slice(0, 8 * 1024 * 1024)
+      : undefined;
+  const artMatchMimeType =
+    typeof body.artMatchMimeType === "string" && body.artMatchMimeType.trim()
+      ? body.artMatchMimeType.trim()
+      : undefined;
 
   try {
     const result = await runEnrichForSpecimen({
@@ -104,6 +112,8 @@ export async function POST(req: NextRequest) {
       skipRegistry,
       skipCache,
       userId,
+      artMatchImageBase64,
+      artMatchMimeType,
       ...catalogSnapshot,
     });
 

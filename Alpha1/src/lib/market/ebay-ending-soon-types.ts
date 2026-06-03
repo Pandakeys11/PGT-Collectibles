@@ -16,6 +16,9 @@ export type EbayEndingSoonListing = {
 export type EbayEndingSoonPayload = {
   ready: boolean;
   error?: string;
+  /** Actionable fix when `ready` is false (local .env vs Vercel, etc.). */
+  configHint?: string;
+  configured?: boolean;
   fetchedAt: string | null;
   hubUrl: string;
   listings: EbayEndingSoonListing[];
