@@ -175,7 +175,7 @@ function IntelLiveTickerStrip({ onOpen }: { onOpen: () => void }) {
   return (
     <LiveMarketTickerPill
       slide={active.slide}
-      laneLabel={active.laneLabel}
+      laneLabel={active.lane.label}
       slideIndex={idx}
       slideTotal={bannerPills.length}
       onClick={onOpen}
